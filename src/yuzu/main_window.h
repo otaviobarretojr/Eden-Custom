@@ -13,6 +13,7 @@
 #include <QMainWindow>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QStringList>
 #include <QTimer>
 #include <QTranslator>
 #include <qaction.h>
