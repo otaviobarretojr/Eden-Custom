@@ -162,9 +162,11 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
            tr("Stretches the renderer to fit the specified aspect ratio.\nMost games only support "
               "16:9, so modifications are required to get other ratios.\nAlso controls the "
               "aspect ratio of captured screenshots."));
-    INSERT(Settings, use_disk_shader_cache, tr("Use persistent pipeline cache"),
-           tr("Allows saving shaders to storage for faster loading on following game "
-              "boots.\nDisabling it is only intended for debugging."));
+    INSERT(Settings, use_disk_shader_cache,
+           tr("Prepare known shaders before launch (persistent cache)"),
+           tr("Saves discovered shader pipelines and prepares them before gameplay on later "
+              "launches.\nNew shader combinations can still appear while exploring new game "
+              "content. Disabling this is only intended for debugging."));
     INSERT(Settings, use_asynchronous_gpu_emulation, tr("Use asynchronous GPU emulation"),
            tr("Uses an extra CPU thread for rendering.\nThis option should always remain enabled."));
     INSERT(Settings, nvdec_emulation, tr("NVDEC emulation:"),
