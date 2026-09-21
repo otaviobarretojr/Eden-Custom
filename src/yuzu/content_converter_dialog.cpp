@@ -588,6 +588,9 @@ void ContentConverterDialog::StartNextFile() {
     progress_bar->setValue(0);
 
     QStringList arguments = prefix_arguments;
+    // Conversion must be deterministic: if a prior converted NSP exists, replace it rather
+    // than silently inspecting/installing stale output. The source NSZ is never removed.
+    arguments << QStringLiteral("--overwrite");
     arguments << QStringLiteral("--minimal-output");
     if (verify_checkbox->isChecked()) {
         arguments << QStringLiteral("--verify");
