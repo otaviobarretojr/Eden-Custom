@@ -8262,6 +8262,34 @@ Would you like to bypass this and exit anyway?</source>
         <source>Not recorded</source>
         <translation>Não registrado</translation>
     </message>
+    <message>
+        <source>Performance Profiles</source>
+        <translation>Perfis de desempenho</translation>
+    </message>
+    <message>
+        <source>Performance Profile Applied</source>
+        <translation>Perfil de desempenho aplicado</translation>
+    </message>
+    <message>
+        <source>Stop the current game before changing a performance profile. Profiles are applied globally for the next game launch.</source>
+        <translation>Pare o jogo atual antes de alterar um perfil de desempenho. Os perfis são aplicados globalmente na próxima execução do jogo.</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>Automático</translation>
+    </message>
+    <message>
+        <source>Stable</source>
+        <translation>Estável</translation>
+    </message>
+    <message>
+        <source>Performance</source>
+        <translation>Desempenho</translation>
+    </message>
+    <message>
+        <source>Quality</source>
+        <translation>Qualidade</translation>
+    </message>
 </context>
 <context>
     <name>MigrationWorker</name>
@@ -10783,6 +10811,69 @@ Error code: %3</source>
     <message>
         <source>Developer build</source>
         <translation>Build de desenvolvimento</translation>
+    </message>
+</context>
+<context>
+    <name>PerformanceProfileDialog</name>
+    <message>
+        <source>Eden Custom Performance Profiles</source>
+        <translation>Perfis de desempenho do Eden Custom</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>Automático</translation>
+    </message>
+    <message>
+        <source>Recommended</source>
+        <translation>Recomendado</translation>
+    </message>
+    <message>
+        <source>Stable</source>
+        <translation>Estável</translation>
+    </message>
+    <message>
+        <source>Compatibility first</source>
+        <translation>Prioridade para compatibilidade</translation>
+    </message>
+    <message>
+        <source>Performance</source>
+        <translation>Desempenho</translation>
+    </message>
+    <message>
+        <source>Favor frametime and throughput</source>
+        <translation>Prioriza frametime e desempenho</translation>
+    </message>
+    <message>
+        <source>Quality</source>
+        <translation>Qualidade</translation>
+    </message>
+    <message>
+        <source>Sharper image</source>
+        <translation>Imagem mais nítida</translation>
+    </message>
+    <message>
+        <source>Custom</source>
+        <translation>Personalizado</translation>
+    </message>
+    <message>
+        <source>Full manual control</source>
+        <translation>Controle manual completo</translation>
+    </message>
+    <message>
+        <source>Open custom settings</source>
+        <translation>Abrir configurações personalizadas</translation>
+    </message>
+    <message>
+        <source>Detected Vulkan GPU: unavailable</source>
+        <translation>GPU Vulkan detectada: indisponível</translation>
+    </message>
+    <message>
+        <source>Detected Vulkan GPU: %1</source>
+        <translation>GPU Vulkan detectada: %1</translation>
+    </message>
+    <message>
+        <source>Profile changes are saved globally and take effect on the next game launch. Per-game configuration can still override global settings.</source>
+        <translation>As alterações do perfil são salvas globalmente e entram em vigor na próxima execução do jogo. As configurações por jogo ainda podem substituir as configurações globais.</translation>
     </message>
 </context>
 </TS>
