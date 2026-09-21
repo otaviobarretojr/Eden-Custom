@@ -84,63 +84,29 @@ jobs:
 
           for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
             Write-Host "CMake configure attempt $attempt/$maxAttempts"
-
             $configureLog = Join-Path $env:RUNNER_TEMP "eden-cmake-configure-$attempt.log"
-            $configureOut = Join-Path $env:RUNNER_TEMP "eden-cmake-configure-$attempt.out.log"
-            $configureErr = Join-Path $env:RUNNER_TEMP "eden-cmake-configure-$attempt.err.log"
 
-            $cmakeArgumentLine = (
-              $cmakeArgs | ForEach-Object {
-                if ($_ -match '\s') {
-                  '"' + ($_ -replace '"', '\\"') + '"'
-                } else {
-                  $_
-                }
-              }
-            ) -join ' '
+            $previousErrorActionPreference = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            & cmake @cmakeArgs 2>&1 | Tee-Object -FilePath $configureLog
+            $configureExitCode = $LASTEXITCODE
+            $ErrorActionPreference = $previousErrorActionPreference
 
-            $process = Start-Process -FilePath "cmake" -ArgumentList $cmakeArgumentLine -PassThru -NoNewWindow `
-              -RedirectStandardOutput $configureOut -RedirectStandardError $configureErr
+            Write-Host "CMake exit code: $configureExitCode"
 
-            $configureTimedOut = -not $process.WaitForExit(480000)
-            if ($configureTimedOut) {
-              Write-Warning "CMake configure attempt timed out after 8 minutes. Terminating the process tree."
-              & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
-              $process.WaitForExit()
-              $configureExitCode = 124
-            } else {
-              # PowerShell 5/.NET Framework can expose a stale ExitCode after the timed
-              # WaitForExit overload. Complete the wait and refresh the process object first.
-              $process.WaitForExit()
-              $process.Refresh()
-              $configureExitCode = $process.ExitCode
+            if ($configureExitCode -eq 0) {
+              $configured = $true
+              break
             }
-
-            $configureOutput = @()
-            if (Test-Path $configureOut) {
-              $configureOutput += Get-Content -Path $configureOut
-            }
-            if (Test-Path $configureErr) {
-              $configureOutput += Get-Content -Path $configureErr
-            }
-            $configureOutput | Tee-Object -FilePath $configureLog
-            $configureText = $configureOutput -join [Environment]::NewLine
-
-            $rootBuildWritten =
-              $configureText -match '(?m)^-- Build files have been written to: .*[\\/]build\s*
 
             if ($attempt -lt $maxAttempts) {
               Write-Warning "CMake configure failed. Cleaning partial build state and invalid CPM entries before retrying."
 
+              $configureText = Get-Content -Raw -Path $configureLog
               $failedDependencies = [System.Collections.Generic.HashSet[string]]::new(
                 [System.StringComparer]::OrdinalIgnoreCase
               )
-              if (-not $configureText) {
-                $configureText = Get-Content -Raw -Path $configureLog
-              }
 
-              # Only inspect actual error/failure lines for _deps paths. Successful
-              # sub-build paths (for example Qt extraction) must never poison the cache.
               $errorContext = (
                 $configureText -split "\r?\n" |
                   Where-Object { $_ -match '(?i)(error|failed|download)' }
@@ -158,108 +124,6 @@ jobs:
                 '(?ms)Target\s+"[^"]+"\s+links to:\s+([A-Za-z0-9_.+-]+)::[A-Za-z0-9_.+-]+\s+but the target was not found'
               )) {
                 [void]$failedDependencies.Add($match.Groups[1].Value)
-              }
-
-              if (Test-Path build) {
-                Remove-Item -Recurse -Force build
-              }
-
-              if (Test-Path .cache/cpm) {
-                foreach ($dependency in $failedDependencies) {
-                  Get-ChildItem -Path .cache/cpm -Directory -ErrorAction SilentlyContinue |
-                    Where-Object { $_.Name -ieq $dependency } |
-                    ForEach-Object {
-                      Write-Warning "Removing incomplete CPM cache entry: $($_.FullName)"
-                      Remove-Item -Recurse -Force $_.FullName
-                    }
-                }
-              }
-
-              Start-Sleep -Seconds (10 * $attempt)
-            }
-          }
-
-          if (-not $configured) {
-            throw "CMake configure failed after $maxAttempts attempts"
-          }
-
-      - name: Build Eden Custom
-        shell: powershell
-        run: |
-          cmake --build build --config Release --target yuzu --parallel 2
-
-      - name: Stage performance package
-        shell: powershell
-        run: |
-          New-Item -ItemType Directory -Force -Path package | Out-Null
-
-          $eden = Get-ChildItem -Path build/bin -Recurse -Filter eden.exe -File | Select-Object -First 1
-          if (-not $eden) { throw "eden.exe was not produced" }
-          Copy-Item $eden.FullName package/eden.exe
-
-          Get-ChildItem -Path $eden.Directory.FullName -Filter *.dll -File -ErrorAction SilentlyContinue |
-            ForEach-Object { Copy-Item $_.FullName package/ }
-
-          Copy-Item LICENSE.txt package/LICENSE.txt
-          Copy-Item LICENSES package/LICENSES -Recurse
-          Copy-Item README.md package/README.md
-          Copy-Item CUSTOM_PROJECT.md package/CUSTOM_PROJECT.md
-
-          @(
-            "Eden Custom performance build"
-            "Profile: ${{ matrix.profile }}"
-            "Commit: $env:GITHUB_SHA"
-            "Base: Eden v0.2.1"
-            "Toolchain: MSVC / Visual Studio 2022 x64"
-            "CXX flags: ${{ matrix.cxx_flags }}"
-          ) | Set-Content -Encoding UTF8 package/PERFORMANCE_PROFILE.txt
-
-      - name: Validate package
-        shell: powershell
-        run: |
-          if (-not (Test-Path package/eden.exe)) { throw "eden.exe missing" }
-          Get-ChildItem -Path package -Recurse -File | Select-Object FullName, Length
-
-      - name: Upload performance build
-        uses: actions/upload-artifact@v4
-        with:
-          name: Eden-Custom-${{ matrix.profile }}-Windows-MSVC
-          path: package/**
-          if-no-files-found: error
-          retention-days: 14
-
-            $hasCmakeError =
-              $configureText -match '(?im)^(CMake Error|CUSTOMBUILD\s*:\s*error|.*error MSB)'
-
-            Write-Host "CMake exit code: $configureExitCode; root build generated: $rootBuildWritten; fatal CMake error: $hasCmakeError"
-
-            if (($configureExitCode -eq 0 -or $rootBuildWritten) -and -not $hasCmakeError) {
-              $configured = $true
-              break
-            }
-
-            if ($attempt -lt $maxAttempts) {
-              Write-Warning "CMake configure failed. Cleaning partial build state and invalid CPM entries before retrying."
-
-              $failedDependencies = [System.Collections.Generic.HashSet[string]]::new(
-                [System.StringComparer]::OrdinalIgnoreCase
-              )
-              $configureText = Get-Content -Raw -Path $configureLog
-
-              foreach ($match in [regex]::Matches(
-                $configureText,
-                '[\\/]build[\\/]_deps[\\/]([A-Za-z0-9_.+-]+)-subbuild'
-              )) {
-                [void]$failedDependencies.Add($match.Groups[1].Value)
-              }
-
-              if ($configureText -match 'but the target was not found') {
-                foreach ($match in [regex]::Matches(
-                  $configureText,
-                  '(?m)^\s*([A-Za-z0-9_.+-]+)::[A-Za-z0-9_.+-]+\s*$'
-                )) {
-                  [void]$failedDependencies.Add($match.Groups[1].Value)
-                }
               }
 
               if (Test-Path build) {
