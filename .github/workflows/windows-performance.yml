@@ -79,7 +79,24 @@ jobs:
             $cmakeArgs += "-DCMAKE_CXX_FLAGS=$extraFlags"
           }
 
-          cmake @cmakeArgs
+          $configured = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Write-Host "CMake configure attempt $attempt/3"
+            cmake @cmakeArgs
+            if ($LASTEXITCODE -eq 0) {
+              $configured = $true
+              break
+            }
+
+            if ($attempt -lt 3) {
+              Write-Warning "CMake configure failed. Retrying after a transient dependency/download error..."
+              Start-Sleep -Seconds (10 * $attempt)
+            }
+          }
+
+          if (-not $configured) {
+            throw "CMake configure failed after 3 attempts"
+          }
 
       - name: Build Eden Custom
         shell: powershell
