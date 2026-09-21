@@ -37,6 +37,7 @@
 #include <QVBoxLayout>
 
 #include "common/fs/path_util.h"
+#include "core/file_sys/common_funcs.h"
 #include "core/file_sys/content_archive.h"
 #include "core/file_sys/nca_metadata.h"
 #include "core/file_sys/submission_package.h"
@@ -88,14 +89,15 @@ std::optional<ContentFileHint> InferContentFileHint(const QString& filename) {
     } else if (suffix == 0x800ULL) {
         hint.type = QStringLiteral("UPDATE");
         hint.base_title_id =
-            QStringLiteral("%1").arg(numeric_id - 0x800ULL, 16, 16, QLatin1Char('0')).toUpper();
+            QStringLiteral("%1")
+                .arg(FileSys::GetBaseTitleID(numeric_id), 16, 16, QLatin1Char('0'))
+                .toUpper();
     } else {
         hint.type = QStringLiteral("DLC?");
-        const qulonglong aligned_id = numeric_id & ~0xFFFULL;
-        if (aligned_id >= 0x1000ULL) {
-            hint.base_title_id =
-                QStringLiteral("%1").arg(aligned_id - 0x1000ULL, 16, 16, QLatin1Char('0')).toUpper();
-        }
+        hint.base_title_id =
+            QStringLiteral("%1")
+                .arg(FileSys::GetBaseTitleID(numeric_id), 16, 16, QLatin1Char('0'))
+                .toUpper();
     }
 
     return hint;
@@ -715,19 +717,12 @@ void ContentConverterDialog::InspectConvertedFile(const QString& input_path) {
                 QStringLiteral("%1").arg(title_id, 16, 16, QLatin1Char('0')).toUpper();
 
             QString related_base;
-            if (title_type == FileSys::TitleType::Update) {
+            if (title_type == FileSys::TitleType::Update ||
+                title_type == FileSys::TitleType::AOC) {
                 related_base =
                     QStringLiteral("%1")
-                        .arg(title_id - 0x800ULL, 16, 16, QLatin1Char('0'))
+                        .arg(FileSys::GetBaseTitleID(title_id), 16, 16, QLatin1Char('0'))
                         .toUpper();
-            } else if (title_type == FileSys::TitleType::AOC) {
-                const u64 aligned_id = title_id & ~0xFFFULL;
-                if (aligned_id >= 0x1000ULL) {
-                    related_base =
-                        QStringLiteral("%1")
-                            .arg(aligned_id - 0x1000ULL, 16, 16, QLatin1Char('0'))
-                            .toUpper();
-                }
             }
 
             QString detail = tr("%1 confirmed — Title ID %2 — version %3")
