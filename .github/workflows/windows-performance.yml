@@ -99,9 +99,18 @@ jobs:
               }
             ) -join ' '
 
-            $process = Start-Process -FilePath "cmake" -ArgumentList $cmakeArgumentLine -Wait -PassThru -NoNewWindow `
+            $process = Start-Process -FilePath "cmake" -ArgumentList $cmakeArgumentLine -PassThru -NoNewWindow `
               -RedirectStandardOutput $configureOut -RedirectStandardError $configureErr
-            $configureExitCode = $process.ExitCode
+
+            $configureTimedOut = -not $process.WaitForExit(480000)
+            if ($configureTimedOut) {
+              Write-Warning "CMake configure attempt timed out after 8 minutes. Terminating the process tree."
+              & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
+              $process.WaitForExit()
+              $configureExitCode = 124
+            } else {
+              $configureExitCode = $process.ExitCode
+            }
 
             $configureOutput = @()
             if (Test-Path $configureOut) {
