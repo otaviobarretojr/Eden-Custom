@@ -2164,7 +2164,9 @@ void MainWindow::BootGame(const QString& filename, Service::AM::FrontendAppletPa
     // behavior of asking.
     user_flag_cmd_line = false;
 
+    current_game_title_id = title_id;
     if (!LoadROM(filename, params)) {
+        current_game_title_id = 0;
         return;
     }
 
@@ -2416,8 +2418,12 @@ void MainWindow::OnEmulationStopped() {
     // When closing the game, destroy the GLWindow to clear the context after the game is closed
     render_window->ReleaseRenderTarget();
 
-    // Enable game list
+    // Enable game list and refresh only the shader badge for the title that just stopped.
     game_list->setEnabled(true);
+    if (current_game_title_id != 0) {
+        game_list->RefreshShaderPreparationStatus(current_game_title_id);
+        current_game_title_id = 0;
+    }
 
     Settings::RestoreGlobalState(QtCommon::system->IsPoweredOn());
     QtCommon::system->HIDCore().ReloadInputDevices();
