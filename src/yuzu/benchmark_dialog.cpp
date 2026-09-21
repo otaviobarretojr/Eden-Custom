@@ -7,7 +7,9 @@
 #include <cmath>
 #include <cstddef>
 #include <numeric>
+#include <utility>
 
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QFile>
 #include <QFileDialog>
@@ -26,6 +28,29 @@
 #include "qt_common/qt_common.h"
 
 namespace {
+
+std::pair<QString, QString> ReadBuildIdentity() {
+    QString profile = QObject::tr("Developer build");
+    QString commit = QStringLiteral("unknown");
+
+    QFile file{QCoreApplication::applicationDirPath() +
+               QStringLiteral("/PERFORMANCE_PROFILE.txt")};
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return {profile, commit};
+    }
+
+    QTextStream stream{&file};
+    while (!stream.atEnd()) {
+        const QString line = stream.readLine().trimmed();
+        if (line.startsWith(QStringLiteral("Profile:"))) {
+            profile = line.section(QLatin1Char(':'), 1).trimmed();
+        } else if (line.startsWith(QStringLiteral("Commit:"))) {
+            commit = line.section(QLatin1Char(':'), 1).trimmed();
+        }
+    }
+
+    return {profile, commit};
+}
 
 double Mean(const std::vector<double>& values) {
     if (values.empty()) {
@@ -77,6 +102,10 @@ BenchmarkDialog::BenchmarkDialog(QWidget* parent) : QDialog(parent) {
     setAttribute(Qt::WA_DeleteOnClose, true);
     resize(620, 520);
 
+    const auto build_identity = ReadBuildIdentity();
+    build_profile = build_identity.first;
+    build_commit = build_identity.second;
+
     auto* root = new QVBoxLayout(this);
 
     auto* intro = new QLabel(
@@ -89,22 +118,27 @@ BenchmarkDialog::BenchmarkDialog(QWidget* parent) : QDialog(parent) {
     auto* live_group = new QGroupBox(tr("Live session"), this);
     auto* live_layout = new QGridLayout(live_group);
 
+    const QString short_commit =
+        build_commit == QStringLiteral("unknown") ? build_commit : build_commit.left(12);
+    build_label = new QLabel(tr("%1 • %2").arg(build_profile, short_commit), live_group);
     status_label = new QLabel(tr("Ready"), live_group);
     elapsed_label = new QLabel(QStringLiteral("0.0 s"), live_group);
     fps_label = new QLabel(QStringLiteral("--"), live_group);
     frametime_label = new QLabel(QStringLiteral("--"), live_group);
     shader_label = new QLabel(QStringLiteral("0"), live_group);
 
-    live_layout->addWidget(new QLabel(tr("Status:"), live_group), 0, 0);
-    live_layout->addWidget(status_label, 0, 1);
-    live_layout->addWidget(new QLabel(tr("Elapsed:"), live_group), 1, 0);
-    live_layout->addWidget(elapsed_label, 1, 1);
-    live_layout->addWidget(new QLabel(tr("Game FPS:"), live_group), 2, 0);
-    live_layout->addWidget(fps_label, 2, 1);
-    live_layout->addWidget(new QLabel(tr("Emulation frame:"), live_group), 3, 0);
-    live_layout->addWidget(frametime_label, 3, 1);
-    live_layout->addWidget(new QLabel(tr("Shaders building:"), live_group), 4, 0);
-    live_layout->addWidget(shader_label, 4, 1);
+    live_layout->addWidget(new QLabel(tr("Build:"), live_group), 0, 0);
+    live_layout->addWidget(build_label, 0, 1);
+    live_layout->addWidget(new QLabel(tr("Status:"), live_group), 1, 0);
+    live_layout->addWidget(status_label, 1, 1);
+    live_layout->addWidget(new QLabel(tr("Elapsed:"), live_group), 2, 0);
+    live_layout->addWidget(elapsed_label, 2, 1);
+    live_layout->addWidget(new QLabel(tr("Game FPS:"), live_group), 3, 0);
+    live_layout->addWidget(fps_label, 3, 1);
+    live_layout->addWidget(new QLabel(tr("Emulation frame:"), live_group), 4, 0);
+    live_layout->addWidget(frametime_label, 4, 1);
+    live_layout->addWidget(new QLabel(tr("Shaders building:"), live_group), 5, 0);
+    live_layout->addWidget(shader_label, 5, 1);
     root->addWidget(live_group);
 
     results_view = new QPlainTextEdit(this);
@@ -217,7 +251,11 @@ QString BenchmarkDialog::BuildResultsText(const std::vector<double>& frame_times
     const double low_1 = LowFpsFromWorstFrames(sorted, 0.01);
     const double low_01 = LowFpsFromWorstFrames(sorted, 0.001);
 
-    return tr(
+    const QString build_header =
+        tr("Build profile: %1\nCommit: %2\n\n").arg(build_profile, build_commit);
+
+    return build_header +
+           tr(
                "Duration: %1 s\n"
                "Frame-time samples: %2\n"
                "Average game FPS: %3\n"
@@ -274,9 +312,14 @@ void BenchmarkDialog::SaveCsv() {
         return;
     }
 
+    QString profile_slug = build_profile;
+    profile_slug.replace(QLatin1Char(' '), QLatin1Char('-'));
+    profile_slug.replace(QLatin1Char('/'), QLatin1Char('-'));
+
     const QString suggested =
-        QStringLiteral("eden-benchmark-%1.csv")
-            .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
+        QStringLiteral("eden-benchmark-%1-%2.csv")
+            .arg(profile_slug,
+                 QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
     const QString path = QFileDialog::getSaveFileName(
         this, tr("Save benchmark frame times"), suggested, tr("CSV files (*.csv)"));
     if (path.isEmpty()) {
@@ -291,6 +334,10 @@ void BenchmarkDialog::SaveCsv() {
     }
 
     QTextStream stream{&file};
+    stream << "metadata,value\n";
+    stream << "profile," << build_profile << '\n';
+    stream << "commit," << build_commit << '\n';
+    stream << '\n';
     stream << "frame,frametime_ms\n";
     for (std::size_t i = 0; i < last_frame_times.size(); ++i) {
         stream << i << ',' << QString::number(last_frame_times[i], 'f', 6) << '\n';
