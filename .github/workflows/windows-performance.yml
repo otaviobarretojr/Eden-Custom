@@ -86,8 +86,21 @@ jobs:
             Write-Host "CMake configure attempt $attempt/$maxAttempts"
 
             $configureLog = Join-Path $env:RUNNER_TEMP "eden-cmake-configure-$attempt.log"
-            cmake @cmakeArgs 2>&1 | Tee-Object -FilePath $configureLog
-            $configureExitCode = $LASTEXITCODE
+            $configureOut = Join-Path $env:RUNNER_TEMP "eden-cmake-configure-$attempt.out.log"
+            $configureErr = Join-Path $env:RUNNER_TEMP "eden-cmake-configure-$attempt.err.log"
+
+            $process = Start-Process -FilePath "cmake" -ArgumentList $cmakeArgs -Wait -PassThru -NoNewWindow `
+              -RedirectStandardOutput $configureOut -RedirectStandardError $configureErr
+            $configureExitCode = $process.ExitCode
+
+            $configureOutput = @()
+            if (Test-Path $configureOut) {
+              $configureOutput += Get-Content -Path $configureOut
+            }
+            if (Test-Path $configureErr) {
+              $configureOutput += Get-Content -Path $configureErr
+            }
+            $configureOutput | Tee-Object -FilePath $configureLog
 
             if ($configureExitCode -eq 0) {
               $configured = $true
