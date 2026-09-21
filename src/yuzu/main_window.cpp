@@ -3072,6 +3072,11 @@ void MainWindow::OnPerformanceProfiles() {
             [this, detected_gpu](EdenPerformanceProfile profile) {
                 QTimer::singleShot(0, this, [this, detected_gpu, profile] {
                 const bool was_global = Settings::IsConfiguringGlobal();
+
+                // Force every switchable setting back to its global backing value before applying
+                // a profile. SetConfiguringGlobal() only controls configuration UI semantics; it
+                // does not itself change SwitchableSetting::use_global.
+                Settings::RestoreGlobalState(false);
                 Settings::SetConfiguringGlobal(true);
 
                 auto& values = Settings::values;
