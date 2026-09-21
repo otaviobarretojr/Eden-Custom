@@ -111,7 +111,8 @@ std::vector<double> PerfStats::GetFrameTimeHistory() const {
         return {};
     }
 
-    return {perf_history.begin() + IgnoreFrames, perf_history.begin() + current_index};
+    return std::vector<double>(perf_history.begin() + IgnoreFrames,
+                               perf_history.begin() + current_index);
 }
 
 PerfStatsResults PerfStats::GetAndResetStats(microseconds current_system_time_us) {
