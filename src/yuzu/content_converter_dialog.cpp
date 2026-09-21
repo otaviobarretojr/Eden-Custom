@@ -37,6 +37,11 @@
 #include <QVBoxLayout>
 
 #include "common/fs/path_util.h"
+#include "core/file_sys/content_archive.h"
+#include "core/file_sys/nca_metadata.h"
+#include "core/file_sys/submission_package.h"
+#include "core/loader/loader.h"
+#include "qt_common/qt_common.h"
 
 namespace {
 constexpr auto kManagedConverterUrl =
@@ -604,6 +609,144 @@ void ContentConverterDialog::UpdateProgressFromText(const QString& text) {
     }
 }
 
+void ContentConverterDialog::InspectConvertedFile(const QString& input_path) {
+    const QFileInfo input_info{input_path};
+    const QString output_path =
+        QDir(output_directory->text().trimmed())
+            .filePath(input_info.completeBaseName() + QStringLiteral(".nsp"));
+
+    if (!QFileInfo::exists(output_path)) {
+        AppendLog(tr("Converted NSP was not found for metadata inspection: %1").arg(output_path));
+        return;
+    }
+
+    const auto virtual_file =
+        QtCommon::vfs->OpenFile(output_path.toStdString(), FileSys::OpenMode::Read);
+    if (virtual_file == nullptr) {
+        AppendLog(tr("Converted NSP could not be opened by Eden for metadata inspection."));
+        return;
+    }
+
+    FileSys::NSP nsp{virtual_file};
+    if (nsp.GetStatus() != Loader::ResultStatus::Success) {
+        AppendLog(tr("NSP conversion completed, but Eden could not fully parse its metadata."));
+        return;
+    }
+
+    const auto& ncas = nsp.GetNCAs();
+    bool metadata_found = false;
+
+    for (const auto& [title_id, entries] : ncas) {
+        for (const auto& [type_pair, nca] : entries) {
+            const auto [title_type, content_type] = type_pair;
+            if (content_type != FileSys::ContentRecordType::Meta || nca == nullptr) {
+                continue;
+            }
+
+            QString type_label = QStringLiteral("CONTENT");
+            switch (title_type) {
+            case FileSys::TitleType::Application:
+                type_label = QStringLiteral("BASE");
+                break;
+            case FileSys::TitleType::Update:
+                type_label = QStringLiteral("UPDATE");
+                break;
+            case FileSys::TitleType::AOC:
+                type_label = QStringLiteral("DLC");
+                break;
+            default:
+                break;
+            }
+
+            u32 version = 0;
+            const auto subdirectories = nca->GetSubdirectories();
+            if (!subdirectories.empty() && subdirectories[0] != nullptr) {
+                for (const auto& inner_file : subdirectories[0]->GetFiles()) {
+                    if (inner_file != nullptr && inner_file->GetExtension() == "cnmt") {
+                        const FileSys::CNMT cnmt{inner_file};
+                        version = cnmt.GetTitleVersion();
+                        type_label = [&] {
+                            switch (cnmt.GetType()) {
+                            case FileSys::TitleType::Application:
+                                return QStringLiteral("BASE");
+                            case FileSys::TitleType::Update:
+                                return QStringLiteral("UPDATE");
+                            case FileSys::TitleType::AOC:
+                                return QStringLiteral("DLC");
+                            default:
+                                return QStringLiteral("CONTENT");
+                            }
+                        }();
+                        break;
+                    }
+                }
+            }
+
+            const QString title_id_text =
+                QStringLiteral("%1").arg(title_id, 16, 16, QLatin1Char('0')).toUpper();
+
+            QString related_base;
+            if (title_type == FileSys::TitleType::Update) {
+                related_base =
+                    QStringLiteral("%1")
+                        .arg(title_id - 0x800ULL, 16, 16, QLatin1Char('0'))
+                        .toUpper();
+            } else if (title_type == FileSys::TitleType::AOC) {
+                const u64 aligned_id = title_id & ~0xFFFULL;
+                if (aligned_id >= 0x1000ULL) {
+                    related_base =
+                        QStringLiteral("%1")
+                            .arg(aligned_id - 0x1000ULL, 16, 16, QLatin1Char('0'))
+                            .toUpper();
+                }
+            }
+
+            QString detail = tr("%1 confirmed — Title ID %2 — version %3")
+                                 .arg(type_label, title_id_text)
+                                 .arg(version);
+            if (!related_base.isEmpty()) {
+                detail += tr(" — base %1").arg(related_base);
+            }
+            AppendLog(detail);
+            status_label->setText(detail);
+
+            for (int i = 0; i < file_list->count(); ++i) {
+                auto* item = file_list->item(i);
+                if (item->data(Qt::UserRole).toString() != input_path) {
+                    continue;
+                }
+
+                item->setText(
+                    QStringLiteral("[%1]  %2").arg(type_label, input_info.fileName()));
+                QString tooltip =
+                    tr("Converted: %1\nTitle ID: %2\nVersion: %3\nConfirmed type: %4")
+                        .arg(output_path, title_id_text)
+                        .arg(version)
+                        .arg(type_label);
+                if (!related_base.isEmpty()) {
+                    tooltip += tr("\nRelated base Title ID: %1").arg(related_base);
+                }
+                item->setToolTip(tooltip);
+                item->setData(Qt::UserRole + 1, output_path);
+                item->setData(Qt::UserRole + 2, type_label);
+                item->setData(Qt::UserRole + 3, title_id_text);
+                item->setData(Qt::UserRole + 4, related_base);
+                break;
+            }
+
+            metadata_found = true;
+            break;
+        }
+        if (metadata_found) {
+            break;
+        }
+    }
+
+    if (!metadata_found) {
+        AppendLog(tr("Conversion succeeded, but no CNMT metadata entry was found."));
+    }
+}
+
 void ContentConverterDialog::ProcessFinished(int exit_code, QProcess::ExitStatus exit_status) {
     ReadProcessOutput();
 
@@ -627,7 +770,9 @@ void ContentConverterDialog::ProcessFinished(int exit_code, QProcess::ExitStatus
     }
 
     progress_bar->setValue(100);
-    AppendLog(tr("Completed: %1").arg(QFileInfo(queue.at(queue_index)).fileName()));
+    const QString completed_input = queue.at(queue_index);
+    AppendLog(tr("Completed: %1").arg(QFileInfo(completed_input).fileName()));
+    InspectConvertedFile(completed_input);
     ++queue_index;
     StartNextFile();
 }
