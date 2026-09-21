@@ -24,6 +24,7 @@
 #include "debugger/controller.h"
 
 #include "about_dialog.h"
+#include "benchmark_dialog.h"
 #include "data_dialog.h"
 #include "deps_dialog.h"
 #include "content_converter_dialog.h"
@@ -1619,6 +1620,7 @@ void MainWindow::ConnectMenuEvents() {
     connect_menu(ui->action_Load_Folder, &MainWindow::OnMenuLoadFolder);
     connect_menu(ui->action_Install_File_NAND, &MainWindow::OnMenuInstallToNAND);
     connect_menu(ui->action_Content_Converter, &MainWindow::OnContentConverter);
+    connect_menu(ui->action_Benchmark_Tool, &MainWindow::OnBenchmarkTool);
     connect_menu(ui->action_Exit, &QMainWindow::close);
     connect_menu(ui->action_Load_Amiibo, &MainWindow::OnLoadAmiibo);
 
@@ -2951,6 +2953,18 @@ void MainWindow::OnMenuLoadFolder() {
 
 void MainWindow::IncrementInstallProgress() {
     install_progress->setValue(install_progress->value() + 1);
+}
+
+void MainWindow::OnBenchmarkTool() {
+    if (benchmark_dialog == nullptr) {
+        benchmark_dialog = new BenchmarkDialog(this);
+        connect(benchmark_dialog, &QObject::destroyed, this,
+                [this] { benchmark_dialog = nullptr; });
+    }
+
+    benchmark_dialog->show();
+    benchmark_dialog->raise();
+    benchmark_dialog->activateWindow();
 }
 
 void MainWindow::OnContentConverter() {
@@ -4373,6 +4387,10 @@ void MainWindow::UpdateStatusBar() {
     auto results = QtCommon::system->GetAndResetPerfStats();
     auto& shader_notify = QtCommon::system->GPU().ShaderNotify();
     const int shaders_building = shader_notify.ShadersBuilding();
+
+    if (benchmark_dialog != nullptr) {
+        benchmark_dialog->UpdateStats(results, shaders_building);
+    }
 
     emit statsUpdated(results, shader_notify);
 
