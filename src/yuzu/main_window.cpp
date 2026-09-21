@@ -2963,7 +2963,8 @@ void MainWindow::OpenContentConverter(const QStringList& files) {
     connect(&dialog, &ContentConverterDialog::InstallConvertedContentRequested, this,
             [this](const QStringList& converted_files) {
                 InstallFilesToNAND(converted_files);
-            });
+            },
+            Qt::QueuedConnection);
 
     connect(&dialog, &ContentConverterDialog::AddConvertedDirectoriesRequested, this,
             [this](const QStringList& directories) {
@@ -2980,7 +2981,8 @@ void MainWindow::OpenContentConverter(const QStringList& files) {
                     OnSaveConfig();
                     game_list->PopulateAsync(UISettings::values.game_dirs);
                 }
-            });
+            },
+            Qt::QueuedConnection);
 
     dialog.exec();
 }
