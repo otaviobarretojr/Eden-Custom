@@ -10977,6 +10977,16 @@ Execução B: %3 • %4
         <source>Close</source>
         <translation>Fechar</translation>
     </message>
+    <message>
+        <source>Title ID</source>
+        <translation>Title ID</translation>
+    </message>
+    <message>
+        <source>Warning: Title IDs differ. These benchmarks are from different games or applications and should not be compared directly.
+</source>
+        <translation>Aviso: os Title IDs são diferentes. Esses benchmarks são de jogos ou aplicativos diferentes e não devem ser comparados diretamente.
+</translation>
+    </message>
 </context>
 <context>
     <name>PerformanceProfileDialog</name>

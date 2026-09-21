@@ -101,6 +101,7 @@ double LowFpsFromWorstFrames(const std::vector<double>& sorted_frame_times,
 struct BenchmarkCsvData {
     QString profile;
     QString commit;
+    QString title_id;
     bool has_duration{};
     double duration_seconds{};
     bool has_average_game_fps{};
@@ -197,6 +198,7 @@ bool LoadBenchmarkCsv(const QString& path, BenchmarkCsvData& data, QString& erro
 
     data.profile = metadata.value(QStringLiteral("profile"), QFileInfo{path}.baseName());
     data.commit = metadata.value(QStringLiteral("commit"), QStringLiteral("unknown"));
+    data.title_id = metadata.value(QStringLiteral("title_id")).trimmed().toUpper();
     data.has_duration =
         ReadMetadataDouble(metadata, QStringLiteral("duration_seconds"), data.duration_seconds);
     data.has_average_game_fps = ReadMetadataDouble(
@@ -490,10 +492,20 @@ void BenchmarkDialog::SaveCsv() {
     const double low_1 = LowFpsFromWorstFrames(sorted, 0.01);
     const double low_01 = LowFpsFromWorstFrames(sorted, 0.001);
 
+    const u64 title_id =
+        QtCommon::system ? QtCommon::system->GetApplicationProcessProgramID() : 0;
+    const QString title_id_text =
+        title_id == 0
+            ? QString{}
+            : QStringLiteral("%1").arg(title_id, 16, 16, QLatin1Char('0')).toUpper();
+
     QTextStream stream{&file};
     stream << "metadata,value\n";
     stream << "profile," << build_profile << '\n';
     stream << "commit," << build_commit << '\n';
+    if (!title_id_text.isEmpty()) {
+        stream << "title_id," << title_id_text << '\n';
+    }
     stream << "duration_seconds," << QString::number(last_duration_seconds, 'f', 3) << '\n';
     stream << "frame_time_samples," << last_frame_times.size() << '\n';
     stream << "average_game_fps," << QString::number(average_game_fps, 'f', 6) << '\n';
@@ -562,6 +574,9 @@ void BenchmarkDialog::CompareCsvs() {
         tr("Run A: %1 • %2\nRun B: %3 • %4\n\n").arg(a.profile, a.commit, b.profile, b.commit);
     text += tr("Metric | A | B | Delta B vs A\n");
     text += QStringLiteral("-----------------------------------------------\n");
+    text += MetricLine(tr("Title ID"),
+                       a.title_id.isEmpty() ? not_available : a.title_id,
+                       b.title_id.isEmpty() ? not_available : b.title_id, not_available);
     text += MetricLine(tr("Duration (s)"),
                        optional_metric(a.has_duration, a.duration_seconds, 2),
                        optional_metric(b.has_duration, b.duration_seconds, 2),
@@ -597,6 +612,10 @@ void BenchmarkDialog::CompareCsvs() {
                        integer_metric(b.max_shaders_building), not_available);
 
     QString warnings;
+    if (!a.title_id.isEmpty() && !b.title_id.isEmpty() && a.title_id != b.title_id) {
+        warnings += tr("Warning: Title IDs differ. These benchmarks are from different games or "
+                       "applications and should not be compared directly.\n");
+    }
     if (a.has_duration && b.has_duration) {
         const double largest_duration = std::max(a.duration_seconds, b.duration_seconds);
         if (largest_duration > 0.0 &&
