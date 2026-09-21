@@ -308,7 +308,7 @@ void ContentConverterDialog::FinishConverterDownload() {
         return;
     }
 
-    const auto cleanup = qScopeGuard([reply] { reply->deleteLater(); });
+    reply->deleteLater();
 
     if (reply->error() != QNetworkReply::NoError) {
         status_label->setText(tr("Converter download failed."));
@@ -327,7 +327,7 @@ void ContentConverterDialog::FinishConverterDownload() {
         status_label->setText(tr("Downloaded converter failed SHA-256 validation."));
         AppendLog(tr("Security validation failed. Expected %1, received %2.")
                       .arg(QString::fromLatin1(kManagedConverterSha256),
-                           QString::fromLatin1(digest)));
+                           QString::fromLatin1(digest.constData())));
         QMessageBox::critical(
             this, tr("NSZ converter"),
             tr("The downloaded converter did not match the pinned SHA-256 checksum and was not "
