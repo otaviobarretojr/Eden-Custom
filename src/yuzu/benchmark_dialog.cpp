@@ -1253,7 +1253,7 @@ void BenchmarkDialog::CompareCsvSet() {
     buttons->addStretch();
     buttons->addWidget(close_button);
     root->addLayout(buttons);
-    connect(export_button, &QPushButton::clicked, dialog, [this, dialog, report_csv] {
+    connect(export_button, &QPushButton::clicked, dialog, [dialog, report_csv] {
         const QString suggested =
             QStringLiteral("eden-benchmark-report-%1.csv")
                 .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
