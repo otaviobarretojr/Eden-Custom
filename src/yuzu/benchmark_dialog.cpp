@@ -64,6 +64,28 @@ double Mean(const std::vector<double>& values) {
            static_cast<double>(values.size());
 }
 
+double StandardDeviation(const std::vector<double>& values) {
+    if (values.empty()) {
+        return 0.0;
+    }
+
+    const double mean = Mean(values);
+    const double squared_sum =
+        std::accumulate(values.begin(), values.end(), 0.0, [mean](double sum, double value) {
+            const double delta = value - mean;
+            return sum + delta * delta;
+        });
+    return std::sqrt(squared_sum / static_cast<double>(values.size()));
+}
+
+double CoefficientOfVariation(const std::vector<double>& values) {
+    const double mean = Mean(values);
+    if (values.empty() || std::abs(mean) < 0.0000001) {
+        return 0.0;
+    }
+    return (StandardDeviation(values) / std::abs(mean)) * 100.0;
+}
+
 double Percentile(const std::vector<double>& sorted_values, double percentile) {
     if (sorted_values.empty()) {
         return 0.0;
@@ -334,12 +356,14 @@ BenchmarkDialog::BenchmarkDialog(QWidget* parent) : QDialog(parent) {
     stop_button = new QPushButton(tr("Stop && results"), this);
     save_button = new QPushButton(tr("Save frame-time CSV"), this);
     compare_button = new QPushButton(tr("Compare CSVs"), this);
+    compare_set_button = new QPushButton(tr("Compare A/B set"), this);
     auto* close_button = new QPushButton(tr("Close"), this);
 
     buttons->addWidget(start_button);
     buttons->addWidget(stop_button);
     buttons->addWidget(save_button);
     buttons->addWidget(compare_button);
+    buttons->addWidget(compare_set_button);
     buttons->addStretch();
     buttons->addWidget(close_button);
     root->addLayout(buttons);
@@ -348,6 +372,7 @@ BenchmarkDialog::BenchmarkDialog(QWidget* parent) : QDialog(parent) {
     connect(stop_button, &QPushButton::clicked, this, [this] { StopBenchmark(); });
     connect(save_button, &QPushButton::clicked, this, [this] { SaveCsv(); });
     connect(compare_button, &QPushButton::clicked, this, [this] { CompareCsvs(); });
+    connect(compare_set_button, &QPushButton::clicked, this, [this] { CompareCsvSet(); });
     connect(close_button, &QPushButton::clicked, this, &QDialog::close);
 
     ResetUi();
@@ -712,6 +737,352 @@ void BenchmarkDialog::CompareCsvs() {
     auto* intro = new QLabel(
         tr("Compare two Eden Custom benchmark CSVs. New-format CSVs include FPS and shader "
            "metadata; older CSVs remain compatible for frame-time metrics."),
+        dialog);
+    intro->setWordWrap(true);
+    root->addWidget(intro);
+
+    auto* view = new QPlainTextEdit(dialog);
+    view->setReadOnly(true);
+    view->setPlainText(text);
+    root->addWidget(view, 1);
+
+    auto* close_button = new QPushButton(tr("Close"), dialog);
+    auto* buttons = new QHBoxLayout();
+    buttons->addStretch();
+    buttons->addWidget(close_button);
+    root->addLayout(buttons);
+    connect(close_button, &QPushButton::clicked, dialog, &QDialog::close);
+
+    dialog->show();
+}
+
+
+void BenchmarkDialog::CompareCsvSet() {
+    const QStringList paths = QFileDialog::getOpenFileNames(
+        this, tr("Select A/B benchmark CSVs"), {}, tr("CSV files (*.csv)"));
+    if (paths.isEmpty()) {
+        return;
+    }
+    if (paths.size() < 4) {
+        QMessageBox::information(
+            this, tr("Benchmark set comparison"),
+            tr("Select at least four CSVs, ideally two runs from each build."));
+        return;
+    }
+
+    struct LoadedRun {
+        QString path;
+        BenchmarkCsvData data;
+    };
+
+    std::vector<LoadedRun> runs;
+    runs.reserve(static_cast<std::size_t>(paths.size()));
+
+    for (const QString& path : paths) {
+        BenchmarkCsvData data;
+        QString error;
+        if (!LoadBenchmarkCsv(path, data, error)) {
+            QMessageBox::critical(
+                this, tr("Benchmark set comparison"),
+                tr("Could not read benchmark CSV:\n%1\n\nFile: %2").arg(error, path));
+            return;
+        }
+        runs.push_back({path, std::move(data)});
+    }
+
+    QStringList profiles;
+    for (const auto& run : runs) {
+        if (!profiles.contains(run.data.profile)) {
+            profiles.push_back(run.data.profile);
+        }
+    }
+
+    if (profiles.size() != 2) {
+        QMessageBox::critical(
+            this, tr("Benchmark set comparison"),
+            tr("The selected CSVs must contain exactly two build profiles. Found: %1")
+                .arg(profiles.join(QStringLiteral(", "))));
+        return;
+    }
+
+    if (profiles.contains(QStringLiteral("Stable")) &&
+        profiles.contains(QStringLiteral("Zen3-AVX2"))) {
+        profiles = {QStringLiteral("Stable"), QStringLiteral("Zen3-AVX2")};
+    }
+
+    std::vector<const BenchmarkCsvData*> group_a;
+    std::vector<const BenchmarkCsvData*> group_b;
+    for (const auto& run : runs) {
+        if (run.data.profile == profiles[0]) {
+            group_a.push_back(&run.data);
+        } else if (run.data.profile == profiles[1]) {
+            group_b.push_back(&run.data);
+        }
+    }
+
+    if (group_a.size() < 2 || group_b.size() < 2) {
+        QMessageBox::information(
+            this, tr("Benchmark set comparison"),
+            tr("Each build profile needs at least two runs for a repeatability comparison."));
+        return;
+    }
+
+    const QString not_available = tr("n/a");
+
+    auto collect_metric = [](const std::vector<const BenchmarkCsvData*>& group,
+                             const auto& getter) {
+        std::vector<double> values;
+        values.reserve(group.size());
+        for (const auto* run : group) {
+            values.push_back(getter(*run));
+        }
+        return values;
+    };
+
+    auto collect_optional = [](const std::vector<const BenchmarkCsvData*>& group,
+                               const auto& available, const auto& getter) {
+        std::vector<double> values;
+        values.reserve(group.size());
+        for (const auto* run : group) {
+            if (available(*run)) {
+                values.push_back(getter(*run));
+            }
+        }
+        return values;
+    };
+
+    auto format_mean_sd = [&](const std::vector<double>& values, int decimals) {
+        if (values.empty()) {
+            return not_available;
+        }
+        return tr("%1 ± %2")
+            .arg(Mean(values), 0, 'f', decimals)
+            .arg(StandardDeviation(values), 0, 'f', decimals);
+    };
+
+    auto mean_delta = [&](const std::vector<double>& a, const std::vector<double>& b) {
+        return a.empty() || b.empty() ? not_available : PercentageDelta(Mean(a), Mean(b));
+    };
+
+    const auto duration_a = collect_optional(
+        group_a, [](const BenchmarkCsvData& run) { return run.has_duration; },
+        [](const BenchmarkCsvData& run) { return run.duration_seconds; });
+    const auto duration_b = collect_optional(
+        group_b, [](const BenchmarkCsvData& run) { return run.has_duration; },
+        [](const BenchmarkCsvData& run) { return run.duration_seconds; });
+    const auto fps_a = collect_optional(
+        group_a, [](const BenchmarkCsvData& run) { return run.has_average_game_fps; },
+        [](const BenchmarkCsvData& run) { return run.average_game_fps; });
+    const auto fps_b = collect_optional(
+        group_b, [](const BenchmarkCsvData& run) { return run.has_average_game_fps; },
+        [](const BenchmarkCsvData& run) { return run.average_game_fps; });
+
+    const auto mean_a = collect_metric(
+        group_a, [](const BenchmarkCsvData& run) { return run.mean_frame; });
+    const auto mean_b = collect_metric(
+        group_b, [](const BenchmarkCsvData& run) { return run.mean_frame; });
+    const auto median_a = collect_metric(
+        group_a, [](const BenchmarkCsvData& run) { return run.median_frame; });
+    const auto median_b = collect_metric(
+        group_b, [](const BenchmarkCsvData& run) { return run.median_frame; });
+    const auto p95_a = collect_metric(
+        group_a, [](const BenchmarkCsvData& run) { return run.p95_frame; });
+    const auto p95_b = collect_metric(
+        group_b, [](const BenchmarkCsvData& run) { return run.p95_frame; });
+    const auto p99_a = collect_metric(
+        group_a, [](const BenchmarkCsvData& run) { return run.p99_frame; });
+    const auto p99_b = collect_metric(
+        group_b, [](const BenchmarkCsvData& run) { return run.p99_frame; });
+    const auto low1_a = collect_metric(
+        group_a, [](const BenchmarkCsvData& run) { return run.low_1; });
+    const auto low1_b = collect_metric(
+        group_b, [](const BenchmarkCsvData& run) { return run.low_1; });
+    const auto low01_a = collect_metric(
+        group_a, [](const BenchmarkCsvData& run) { return run.low_01; });
+    const auto low01_b = collect_metric(
+        group_b, [](const BenchmarkCsvData& run) { return run.low_01; });
+    const auto samples_a = collect_metric(
+        group_a, [](const BenchmarkCsvData& run) {
+            return static_cast<double>(run.frame_times.size());
+        });
+    const auto samples_b = collect_metric(
+        group_b, [](const BenchmarkCsvData& run) {
+            return static_cast<double>(run.frame_times.size());
+        });
+    const auto shaders_a = collect_optional(
+        group_a, [](const BenchmarkCsvData& run) { return run.shader_active_intervals >= 0; },
+        [](const BenchmarkCsvData& run) {
+            return static_cast<double>(run.shader_active_intervals);
+        });
+    const auto shaders_b = collect_optional(
+        group_b, [](const BenchmarkCsvData& run) { return run.shader_active_intervals >= 0; },
+        [](const BenchmarkCsvData& run) {
+            return static_cast<double>(run.shader_active_intervals);
+        });
+    const auto max_shaders_a = collect_optional(
+        group_a, [](const BenchmarkCsvData& run) { return run.max_shaders_building >= 0; },
+        [](const BenchmarkCsvData& run) {
+            return static_cast<double>(run.max_shaders_building);
+        });
+    const auto max_shaders_b = collect_optional(
+        group_b, [](const BenchmarkCsvData& run) { return run.max_shaders_building >= 0; },
+        [](const BenchmarkCsvData& run) {
+            return static_cast<double>(run.max_shaders_building);
+        });
+
+    QString text =
+        tr("Profile A: %1 (%2 runs)\nProfile B: %3 (%4 runs)\n\n")
+            .arg(profiles[0])
+            .arg(group_a.size())
+            .arg(profiles[1])
+            .arg(group_b.size());
+    text += tr("Metric | A mean ± SD | B mean ± SD | Delta B vs A\n");
+    text += QStringLiteral("--------------------------------------------------------------\n");
+    text += MetricLine(tr("Duration (s)"), format_mean_sd(duration_a, 2),
+                       format_mean_sd(duration_b, 2), mean_delta(duration_a, duration_b));
+    text += MetricLine(tr("Average game FPS"), format_mean_sd(fps_a, 2),
+                       format_mean_sd(fps_b, 2), mean_delta(fps_a, fps_b));
+    text += MetricLine(tr("Mean emulation frame (ms)"), format_mean_sd(mean_a, 3),
+                       format_mean_sd(mean_b, 3), mean_delta(mean_a, mean_b));
+    text += MetricLine(tr("Median emulation frame (ms)"), format_mean_sd(median_a, 3),
+                       format_mean_sd(median_b, 3), mean_delta(median_a, median_b));
+    text += MetricLine(tr("P95 emulation frame (ms)"), format_mean_sd(p95_a, 3),
+                       format_mean_sd(p95_b, 3), mean_delta(p95_a, p95_b));
+    text += MetricLine(tr("P99 emulation frame (ms)"), format_mean_sd(p99_a, 3),
+                       format_mean_sd(p99_b, 3), mean_delta(p99_a, p99_b));
+    text += MetricLine(tr("Derived 1% low (FPS)"), format_mean_sd(low1_a, 2),
+                       format_mean_sd(low1_b, 2), mean_delta(low1_a, low1_b));
+    text += MetricLine(tr("Derived 0.1% low (FPS)"), format_mean_sd(low01_a, 2),
+                       format_mean_sd(low01_b, 2), mean_delta(low01_a, low01_b));
+    text += MetricLine(tr("Frame-time samples"), format_mean_sd(samples_a, 0),
+                       format_mean_sd(samples_b, 0), mean_delta(samples_a, samples_b));
+    text += MetricLine(tr("Intervals with shader compilation"), format_mean_sd(shaders_a, 1),
+                       format_mean_sd(shaders_b, 1), mean_delta(shaders_a, shaders_b));
+    text += MetricLine(tr("Maximum simultaneous shaders building"),
+                       format_mean_sd(max_shaders_a, 1), format_mean_sd(max_shaders_b, 1),
+                       mean_delta(max_shaders_a, max_shaders_b));
+
+    text += QStringLiteral("\n");
+    text += tr("Run-to-run CV — Average FPS: A %1% | B %2%\n")
+                .arg(fps_a.empty() ? not_available
+                                   : QString::number(CoefficientOfVariation(fps_a), 'f', 2))
+                .arg(fps_b.empty() ? not_available
+                                   : QString::number(CoefficientOfVariation(fps_b), 'f', 2));
+    text += tr("Run-to-run CV — P99 frame: A %1% | B %2%\n")
+                .arg(QString::number(CoefficientOfVariation(p99_a), 'f', 2))
+                .arg(QString::number(CoefficientOfVariation(p99_b), 'f', 2));
+
+    QStringList title_ids;
+    QStringList settings_signatures;
+    QStringList commits;
+    std::vector<double> all_durations;
+    std::vector<double> all_samples;
+    bool missing_title_id = false;
+    bool missing_settings_signature = false;
+    bool missing_average_fps = false;
+    bool shaders_active = false;
+
+    for (const auto& run : runs) {
+        if (run.data.title_id.isEmpty()) {
+            missing_title_id = true;
+        } else if (!title_ids.contains(run.data.title_id)) {
+            title_ids.push_back(run.data.title_id);
+        }
+
+        if (run.data.settings_signature.isEmpty()) {
+            missing_settings_signature = true;
+        } else if (!settings_signatures.contains(run.data.settings_signature)) {
+            settings_signatures.push_back(run.data.settings_signature);
+        }
+
+        if (!run.data.commit.isEmpty() && run.data.commit != QStringLiteral("unknown") &&
+            !commits.contains(run.data.commit)) {
+            commits.push_back(run.data.commit);
+        }
+
+        if (run.data.has_duration) {
+            all_durations.push_back(run.data.duration_seconds);
+        }
+        all_samples.push_back(static_cast<double>(run.data.frame_times.size()));
+
+        if (!run.data.has_average_game_fps) {
+            missing_average_fps = true;
+        }
+        if (run.data.shader_active_intervals > 0) {
+            shaders_active = true;
+        }
+    }
+
+    const bool title_ids_match = !missing_title_id && title_ids.size() == 1;
+    const bool settings_match =
+        !missing_settings_signature && settings_signatures.size() == 1;
+
+    text += tr("Title ID match across set: %1\n")
+                .arg(title_ids_match ? tr("Yes") : (title_ids.isEmpty() ? not_available : tr("No")));
+    text += tr("Settings match across set: %1\n")
+                .arg(settings_match ? tr("Yes")
+                                    : (settings_signatures.isEmpty() ? not_available : tr("No")));
+
+    auto relative_spread = [](const std::vector<double>& values) {
+        if (values.size() < 2) {
+            return 0.0;
+        }
+        const auto [minimum, maximum] = std::minmax_element(values.begin(), values.end());
+        if (*maximum <= 0.0) {
+            return 0.0;
+        }
+        return (*maximum - *minimum) / *maximum;
+    };
+
+    QString warnings;
+    if (!title_ids_match) {
+        warnings += tr("Warning: Title IDs are missing or differ across the selected runs.\n");
+    }
+    if (!settings_match) {
+        warnings +=
+            tr("Warning: benchmark settings are missing or differ across the selected runs.\n");
+    }
+    if (commits.size() > 1) {
+        warnings += tr("Warning: commit hashes differ across the selected runs. Results may include "
+                       "code changes beyond the build profile.\n");
+    }
+    if (all_durations.size() == runs.size() && relative_spread(all_durations) > 0.05) {
+        warnings += tr("Warning: benchmark durations differ by more than 5% across the set.\n");
+    }
+    if (relative_spread(all_samples) > 0.10) {
+        warnings += tr("Warning: frame-time sample counts differ by more than 10% across the set.\n");
+    }
+    if (group_a.size() != group_b.size()) {
+        warnings += tr("Warning: the build profiles have different numbers of runs.\n");
+    }
+    if (missing_average_fps) {
+        warnings += tr("Warning: at least one CSV is missing average FPS metadata. FPS aggregation "
+                       "uses only runs where it is available.\n");
+    }
+    if (shaders_active) {
+        warnings += tr("Warning: shader compilation was active during at least one run. Consider "
+                       "warming the same route before measuring build performance.\n");
+    }
+
+    if (!warnings.isEmpty()) {
+        text += QStringLiteral("\n") + warnings;
+    }
+
+    text += QStringLiteral("\n") +
+            tr("Mean ± SD summarizes repeated runs. CV is the run-to-run coefficient of variation; "
+               "lower CV means better repeatability. Delta is profile B relative to profile A. "
+               "Positive frametime means B took longer; positive FPS means B was higher. No overall "
+               "winner is declared automatically.");
+
+    auto* dialog = new QDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose, true);
+    dialog->setWindowTitle(tr("Benchmark set comparison"));
+    dialog->resize(900, 680);
+
+    auto* root = new QVBoxLayout(dialog);
+    auto* intro = new QLabel(
+        tr("Aggregate repeated benchmark CSVs from two build profiles. For the recommended A/B/A/B "
+           "test, select all four CSVs together."),
         dialog);
     intro->setWordWrap(true);
     root->addWidget(intro);
