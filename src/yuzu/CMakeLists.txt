@@ -166,6 +166,8 @@ add_executable(yuzu
 
     hotkeys.cpp
     hotkeys.h
+    content_converter_dialog.cpp
+    content_converter_dialog.h
     install_dialog.cpp
     install_dialog.h
     loading_screen.cpp
