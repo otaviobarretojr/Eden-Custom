@@ -24,7 +24,8 @@ class ContentConverterDialog final : public QDialog {
     Q_OBJECT
 
 public:
-    explicit ContentConverterDialog(QWidget* parent = nullptr);
+    explicit ContentConverterDialog(QWidget* parent = nullptr,
+                                    const QStringList& initial_files = {});
     ~ContentConverterDialog() override;
 
 protected:
