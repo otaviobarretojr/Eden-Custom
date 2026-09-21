@@ -105,6 +105,11 @@ QString CurrentBenchmarkSettingsSignature() {
     const auto& values = Settings::values;
     const QStringList parts{
         QStringLiteral("backend=%1").arg(static_cast<int>(values.renderer_backend.GetValue())),
+        QStringLiteral("multicore=%1").arg(values.use_multi_core.GetValue() ? 1 : 0),
+        QStringLiteral("vsync=%1").arg(static_cast<int>(values.vsync_mode.GetValue())),
+        QStringLiteral("speed_limit_enabled=%1")
+            .arg(values.use_speed_limit.GetValue() ? 1 : 0),
+        QStringLiteral("speed_limit=%1").arg(Settings::SpeedLimit()),
         QStringLiteral("cpu=%1").arg(static_cast<int>(values.cpu_accuracy.GetValue())),
         QStringLiteral("gpu=%1").arg(static_cast<int>(values.gpu_accuracy.GetValue())),
         QStringLiteral("resolution=%1").arg(static_cast<int>(values.resolution_setup.GetValue())),
