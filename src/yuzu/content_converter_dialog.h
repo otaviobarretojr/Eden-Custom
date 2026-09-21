@@ -33,6 +33,7 @@ protected:
 
 signals:
     void InstallConvertedContentRequested(const QStringList& files);
+    void AddConvertedDirectoriesRequested(const QStringList& directories);
 
 private slots:
     void AddFiles();
@@ -68,6 +69,7 @@ private:
     QPlainTextEdit* log_view{};
     QCheckBox* verify_checkbox{};
     QCheckBox* auto_install_checkbox{};
+    QCheckBox* auto_library_checkbox{};
     QPushButton* add_button{};
     QPushButton* remove_button{};
     QPushButton* clear_button{};
@@ -82,6 +84,7 @@ private:
     QNetworkReply* download_reply{};
     QStringList queue{};
     QStringList pending_install_files{};
+    QStringList pending_library_dirs{};
     int queue_index{};
     bool cancel_requested{};
 };
