@@ -49,6 +49,8 @@ private:
     QElapsedTimer elapsed_timer{};
     QString build_profile;
     QString build_commit;
+    QString benchmark_title_id;
+    QString benchmark_settings_signature;
     bool benchmark_running{};
     double last_duration_seconds{};
     int shader_active_samples{};

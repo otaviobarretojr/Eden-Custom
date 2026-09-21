@@ -353,6 +353,8 @@ BenchmarkDialog::~BenchmarkDialog() = default;
 void BenchmarkDialog::ResetUi() {
     benchmark_running = false;
     last_duration_seconds = 0.0;
+    benchmark_title_id.clear();
+    benchmark_settings_signature.clear();
     fps_samples.clear();
     interval_frametime_samples.clear();
     last_frame_times.clear();
@@ -380,6 +382,13 @@ void BenchmarkDialog::StartBenchmark() {
                                  tr("Start a game before beginning a benchmark session."));
         return;
     }
+
+    const u64 title_id = QtCommon::system->GetApplicationProcessProgramID();
+    benchmark_title_id =
+        title_id == 0
+            ? QString{}
+            : QStringLiteral("%1").arg(title_id, 16, 16, QLatin1Char('0')).toUpper();
+    benchmark_settings_signature = CurrentBenchmarkSettingsSignature();
 
     QtCommon::system->GetPerfStats().ResetFrameTimeHistory();
 
@@ -528,21 +537,14 @@ void BenchmarkDialog::SaveCsv() {
     const double low_1 = LowFpsFromWorstFrames(sorted, 0.01);
     const double low_01 = LowFpsFromWorstFrames(sorted, 0.001);
 
-    const u64 title_id =
-        QtCommon::system ? QtCommon::system->GetApplicationProcessProgramID() : 0;
-    const QString title_id_text =
-        title_id == 0
-            ? QString{}
-            : QStringLiteral("%1").arg(title_id, 16, 16, QLatin1Char('0')).toUpper();
-
     QTextStream stream{&file};
     stream << "metadata,value\n";
     stream << "profile," << build_profile << '\n';
     stream << "commit," << build_commit << '\n';
-    if (!title_id_text.isEmpty()) {
-        stream << "title_id," << title_id_text << '\n';
+    if (!benchmark_title_id.isEmpty()) {
+        stream << "title_id," << benchmark_title_id << '\n';
     }
-    stream << "settings_signature," << CurrentBenchmarkSettingsSignature() << '\n';
+    stream << "settings_signature," << benchmark_settings_signature << '\n';
     stream << "duration_seconds," << QString::number(last_duration_seconds, 'f', 3) << '\n';
     stream << "frame_time_samples," << last_frame_times.size() << '\n';
     stream << "average_game_fps," << QString::number(average_game_fps, 'f', 6) << '\n';
