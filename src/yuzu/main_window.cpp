@@ -26,6 +26,7 @@
 #include "about_dialog.h"
 #include "data_dialog.h"
 #include "deps_dialog.h"
+#include "content_converter_dialog.h"
 #include "install_dialog.h"
 
 #include "bootmanager.h"
@@ -1617,6 +1618,7 @@ void MainWindow::ConnectMenuEvents() {
     connect_menu(ui->action_Load_File, &MainWindow::OnMenuLoadFile);
     connect_menu(ui->action_Load_Folder, &MainWindow::OnMenuLoadFolder);
     connect_menu(ui->action_Install_File_NAND, &MainWindow::OnMenuInstallToNAND);
+    connect_menu(ui->action_Content_Converter, &MainWindow::OnContentConverter);
     connect_menu(ui->action_Exit, &QMainWindow::close);
     connect_menu(ui->action_Load_Amiibo, &MainWindow::OnLoadAmiibo);
 
@@ -2943,6 +2945,11 @@ void MainWindow::OnMenuLoadFolder() {
 
 void MainWindow::IncrementInstallProgress() {
     install_progress->setValue(install_progress->value() + 1);
+}
+
+void MainWindow::OnContentConverter() {
+    ContentConverterDialog dialog(this);
+    dialog.exec();
 }
 
 void MainWindow::OnMenuInstallToNAND() {
