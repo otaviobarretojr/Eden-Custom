@@ -168,6 +168,8 @@ add_executable(yuzu
     hotkeys.h
     benchmark_dialog.cpp
     benchmark_dialog.h
+    performance_profile_dialog.cpp
+    performance_profile_dialog.h
     shader_preparation_status.cpp
     shader_preparation_status.h
     content_converter_dialog.cpp
