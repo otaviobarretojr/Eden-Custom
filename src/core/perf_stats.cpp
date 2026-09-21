@@ -99,6 +99,21 @@ double PerfStats::GetMeanFrametime() const {
     return sum / static_cast<double>(current_index - IgnoreFrames);
 }
 
+void PerfStats::ResetFrameTimeHistory() {
+    std::scoped_lock lock{object_mutex};
+    current_index = 0;
+}
+
+std::vector<double> PerfStats::GetFrameTimeHistory() const {
+    std::scoped_lock lock{object_mutex};
+
+    if (current_index <= IgnoreFrames) {
+        return {};
+    }
+
+    return {perf_history.begin() + IgnoreFrames, perf_history.begin() + current_index};
+}
+
 PerfStatsResults PerfStats::GetAndResetStats(microseconds current_system_time_us) {
     std::scoped_lock lock{object_mutex};
 
