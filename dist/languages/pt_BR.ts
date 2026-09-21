@@ -11223,6 +11223,102 @@ Perfil B: %3 (%4 execuções)
         <source>Aggregate repeated benchmark CSVs from two build profiles. For the recommended A/B/A/B test, select all four CSVs together.</source>
         <translation>Agregue CSVs de benchmarks repetidos de dois perfis de build. Para o teste A/B/A/B recomendado, selecione os quatro CSVs juntos.</translation>
     </message>
+    <message>
+        <source>Example: A1 or B1</source>
+        <translation>Exemplo: A1 ou B1</translation>
+    </message>
+    <message>
+        <source>Example: city route 01</source>
+        <translation>Exemplo: rota cidade 01</translation>
+    </message>
+    <message>
+        <source>Run label:</source>
+        <translation>Nome da execução:</translation>
+    </message>
+    <message>
+        <source>Scene / route:</source>
+        <translation>Cena / rota:</translation>
+    </message>
+    <message>
+        <source>Build profile: %1
+Commit: %2
+</source>
+        <translation>Perfil da build: %1
+Commit: %2
+</translation>
+    </message>
+    <message>
+        <source>Run label: %1
+</source>
+        <translation>Nome da execução: %1
+</translation>
+    </message>
+    <message>
+        <source>Scene / route: %1
+</source>
+        <translation>Cena / rota: %1
+</translation>
+    </message>
+    <message>
+        <source>Run label</source>
+        <translation>Nome da execução</translation>
+    </message>
+    <message>
+        <source>Scene / route</source>
+        <translation>Cena / rota</translation>
+    </message>
+    <message>
+        <source>Scene / route match: %1
+</source>
+        <translation>Cena / rota igual: %1
+</translation>
+    </message>
+    <message>
+        <source>Warning: scene / route tags differ. Use the same test scene and route for a fair comparison.
+</source>
+        <translation>Aviso: as identificações de cena / rota são diferentes. Use a mesma cena e rota de teste para uma comparação justa.
+</translation>
+    </message>
+    <message>
+        <source>Scene / route match across set: %1
+</source>
+        <translation>Cena / rota igual em todo o conjunto: %1
+</translation>
+    </message>
+    <message>
+        <source>Warning: scene / route tags are missing or differ across the selected runs. Use the same scene and route for every run.
+</source>
+        <translation>Aviso: as identificações de cena / rota estão ausentes ou são diferentes entre as execuções selecionadas. Use a mesma cena e rota em todas as execuções.
+</translation>
+    </message>
+    <message>
+        <source>%1 runs vs %2 runs</source>
+        <translation>%1 execuções vs %2 execuções</translation>
+    </message>
+    <message>
+        <source>Title ID match</source>
+        <translation>Title ID igual</translation>
+    </message>
+    <message>
+        <source>Settings match</source>
+        <translation>Configurações iguais</translation>
+    </message>
+    <message>
+        <source>Scene / route match</source>
+        <translation>Cena / rota igual</translation>
+    </message>
+    <message>
+        <source>Export report CSV</source>
+        <translation>Exportar relatório CSV</translation>
+    </message>
+    <message>
+        <source>Export benchmark report</source>
+        <translation>Exportar relatório de benchmark</translation>
+    </message>
+    <message>
+        <source>The benchmark report could not be saved.</source>
+        <translation>Não foi possível salvar o relatório de benchmark.</translation>
+    </message>
 </context>
 <context>
     <name>PerformanceProfileDialog</name>
