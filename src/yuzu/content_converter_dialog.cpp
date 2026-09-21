@@ -175,6 +175,14 @@ void ContentConverterDialog::BuildUi() {
     verify_checkbox = new QCheckBox(tr("Verify integrity during conversion"), paths_group);
     verify_checkbox->setChecked(true);
     paths_layout->addWidget(verify_checkbox, 2, 1, 1, 2);
+
+    auto_install_checkbox =
+        new QCheckBox(tr("Install confirmed updates and DLC automatically after conversion"),
+                      paths_group);
+    auto_install_checkbox->setChecked(true);
+    auto_install_checkbox->setToolTip(
+        tr("Base games are never installed to NAND automatically."));
+    paths_layout->addWidget(auto_install_checkbox, 3, 1, 1, 3);
     root->addWidget(paths_group);
 
     auto* progress_group = new QGroupBox(tr("Progress"), this);
@@ -505,6 +513,7 @@ void ContentConverterDialog::StartConversion() {
     }
 
     queue_index = 0;
+    pending_install_files.clear();
     cancel_requested = false;
     log_view->clear();
     SetBusy(true);
@@ -524,6 +533,12 @@ void ContentConverterDialog::StartNextFile() {
         status_label->setText(tr("All files were converted successfully."));
         AppendLog(tr("All conversions completed."));
         SetBusy(false);
+
+        if (auto_install_checkbox->isChecked() && !pending_install_files.isEmpty()) {
+            AppendLog(tr("Sending %1 converted update/DLC file(s) to NAND installation.")
+                          .arg(pending_install_files.size()));
+            emit InstallConvertedContentRequested(pending_install_files);
+        }
         return;
     }
 
@@ -710,6 +725,12 @@ void ContentConverterDialog::InspectConvertedFile(const QString& input_path) {
             AppendLog(detail);
             status_label->setText(detail);
 
+            if ((title_type == FileSys::TitleType::Update ||
+                 title_type == FileSys::TitleType::AOC) &&
+                !pending_install_files.contains(output_path)) {
+                pending_install_files.append(output_path);
+            }
+
             for (int i = 0; i < file_list->count(); ++i) {
                 auto* item = file_list->item(i);
                 if (item->data(Qt::UserRole).toString() != input_path) {
@@ -787,6 +808,7 @@ void ContentConverterDialog::SetBusy(bool busy) {
     output_directory->setEnabled(!busy);
     converter_path->setEnabled(!busy);
     verify_checkbox->setEnabled(!busy);
+    auto_install_checkbox->setEnabled(!busy);
     start_button->setEnabled(!busy);
     cancel_button->setEnabled(busy);
     file_list->setEnabled(!busy);
