@@ -80,22 +80,26 @@ jobs:
           }
 
           $configured = $false
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            Write-Host "CMake configure attempt $attempt/3"
+          $maxAttempts = 5
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            Write-Host "CMake configure attempt $attempt/$maxAttempts"
             cmake @cmakeArgs
             if ($LASTEXITCODE -eq 0) {
               $configured = $true
               break
             }
 
-            if ($attempt -lt 3) {
-              Write-Warning "CMake configure failed. Retrying after a transient dependency/download error..."
+            if ($attempt -lt $maxAttempts) {
+              Write-Warning "CMake configure failed. Removing the partial build tree and retrying; CPM source cache is preserved."
+              if (Test-Path build) {
+                Remove-Item -Recurse -Force build
+              }
               Start-Sleep -Seconds (10 * $attempt)
             }
           }
 
           if (-not $configured) {
-            throw "CMake configure failed after 3 attempts"
+            throw "CMake configure failed after $maxAttempts attempts"
           }
 
       - name: Build Eden Custom
