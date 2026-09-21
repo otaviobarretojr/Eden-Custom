@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstddef>
 #include <mutex>
+#include <vector>
 #include "common/common_types.h"
 
 namespace Core {
@@ -44,6 +45,12 @@ public:
      * Returns the arithmetic mean of all frametime values stored in the performance history.
      */
     double GetMeanFrametime() const;
+
+    /// Clears the internal frame-time history used by Eden Custom benchmark sessions.
+    void ResetFrameTimeHistory();
+
+    /// Returns a copy of the recorded frame-time history in milliseconds.
+    std::vector<double> GetFrameTimeHistory() const;
 
     /**
      * Gets the ratio between walltime and the emulated time of the previous system frame. This is
