@@ -83,9 +83,9 @@ LoadingScreen::LoadingScreen(QWidget* parent)
     qRegisterMetaType<VideoCore::LoadCallbackStage>();
 
     stage_translations = {
-        {VideoCore::LoadCallbackStage::Prepare, tr("Loading...")},
-        {VideoCore::LoadCallbackStage::Build, tr("Loading Shaders %1 / %2")},
-        {VideoCore::LoadCallbackStage::Complete, tr("Launching...")},
+        {VideoCore::LoadCallbackStage::Prepare, tr("Preparing game...")},
+        {VideoCore::LoadCallbackStage::Build, tr("Preparing known shaders %1 / %2")},
+        {VideoCore::LoadCallbackStage::Complete, tr("Shader preparation complete — launching...")},
     };
     progressbar_style = {
         {VideoCore::LoadCallbackStage::Prepare, PROGRESSBAR_STYLE_PREPARE},
@@ -165,25 +165,55 @@ void LoadingScreen::OnLoadProgress(VideoCore::LoadCallbackStage stage, std::size
         }
         // only calculate an estimate time after a second has passed since stage change
         const auto diff = duration_cast<milliseconds>(now - slow_shader_start);
-        if (diff > seconds{1}) {
-            const auto eta_mseconds =
-                static_cast<long>(static_cast<double>(total - slow_shader_first_value) /
-                                  (value - slow_shader_first_value) * diff.count());
+        const auto compiled_since_sample = value - slow_shader_first_value;
+        if (diff > seconds{1} && compiled_since_sample > 0 && total >= value) {
+            const auto remaining = total - value;
+            const auto eta_mseconds = static_cast<long>(
+                static_cast<double>(remaining) / static_cast<double>(compiled_since_sample) *
+                diff.count());
             estimate =
-                tr("Estimated Time %1")
+                tr("Estimated time: %1")
                     .arg(QTime(0, 0, 0, 0)
-                             .addMSecs(std::max<long>(eta_mseconds - diff.count() + 1000, 1000))
+                             .addMSecs(std::max<long>(eta_mseconds, 1000))
                              .toString(QStringLiteral("mm:ss")));
         }
     }
 
-    // update labels and progress bar
+    // Update labels and progress bar. Eden can only prepare pipelines already discovered during
+    // earlier gameplay; a zero-sized cache therefore means a genuine first-run/unknown-cache case.
     if (stage == VideoCore::LoadCallbackStage::Build) {
-        ui->stage->setText(stage_translations[stage].arg(value).arg(total));
+        if (total == 0) {
+            ui->stage->setText(tr("No known shader pipelines yet"));
+            ui->value->setText(
+                tr("First run: new pipelines will be learned and cached during gameplay."));
+            ui->progress_bar->hide();
+        } else {
+            ui->progress_bar->show();
+            ui->stage->setText(stage_translations[stage].arg(value).arg(total));
+
+            const int percent =
+                static_cast<int>((std::min(value, total) * 100ULL) / std::max<std::size_t>(total, 1));
+            QString detail =
+                tr("Known cache: %1 pipelines • %2%").arg(total).arg(percent);
+            if (!estimate.isEmpty()) {
+                detail += QStringLiteral(" • ") + estimate;
+            }
+            ui->value->setText(detail);
+        }
+    } else if (stage == VideoCore::LoadCallbackStage::Complete) {
+        ui->stage->setText(stage_translations[stage]);
+        if (previous_total > 0) {
+            ui->value->setText(
+                tr("%1 known shader pipelines prepared before gameplay.").arg(previous_total));
+        } else {
+            ui->value->setText(
+                tr("No known cache was available; shaders will be learned as the game runs."));
+        }
     } else {
         ui->stage->setText(stage_translations[stage]);
+        ui->value->clear();
     }
-    ui->value->setText(estimate);
+
     ui->progress_bar->setValue(static_cast<int>(value));
     previous_time = now;
 }
