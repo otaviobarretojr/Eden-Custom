@@ -2909,7 +2909,7 @@ void MainWindow::OnMenuLoadFile() {
     const QString extensions =
         QStringLiteral("*.")
             .append(GameList::supported_file_extensions.join(QStringLiteral(" *.")))
-            .append(QStringLiteral(" main"));
+            .append(QStringLiteral(" *.nsz main"));
     const QString file_filter = tr("Switch Executable (%1);;All Files (*.*)",
                                    "%1 is an identifier for the Switch executable file extensions.")
                                     .arg(extensions);
@@ -2922,6 +2922,12 @@ void MainWindow::OnMenuLoadFile() {
     }
 
     UISettings::values.roms_path = QFileInfo(filename).path().toStdString();
+
+    if (QFileInfo(filename).suffix().compare(QStringLiteral("nsz"), Qt::CaseInsensitive) == 0) {
+        OpenContentConverter({filename});
+        return;
+    }
+
     BootGame(filename, ApplicationAppletParameters());
 }
 
@@ -2948,10 +2954,16 @@ void MainWindow::IncrementInstallProgress() {
 }
 
 void MainWindow::OnContentConverter() {
-    ContentConverterDialog dialog(this);
+    OpenContentConverter();
+}
+
+void MainWindow::OpenContentConverter(const QStringList& files) {
+    ContentConverterDialog dialog(this, files);
 
     connect(&dialog, &ContentConverterDialog::InstallConvertedContentRequested, this,
-            [this](const QStringList& files) { InstallFilesToNAND(files); });
+            [this](const QStringList& converted_files) {
+                InstallFilesToNAND(converted_files);
+            });
 
     connect(&dialog, &ContentConverterDialog::AddConvertedDirectoriesRequested, this,
             [this](const QStringList& directories) {
@@ -4743,7 +4755,12 @@ bool MainWindow::DropAction(QDropEvent* event) {
     const QMimeData* mime_data = event->mimeData();
     const QString& filename = mime_data->urls().at(0).toLocalFile();
 
-    if (emulation_running && QFileInfo(filename).suffix() == QStringLiteral("bin")) {
+    const QString suffix = QFileInfo(filename).suffix();
+
+    if (suffix.compare(QStringLiteral("nsz"), Qt::CaseInsensitive) == 0) {
+        OpenContentConverter({filename});
+    } else if (emulation_running &&
+               suffix.compare(QStringLiteral("bin"), Qt::CaseInsensitive) == 0) {
         // Amiibo
         LoadAmiibo(filename);
     } else {
