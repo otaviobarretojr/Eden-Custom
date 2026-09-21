@@ -376,6 +376,7 @@ private slots:
     void OnMenuInstallToNAND();
     void OnContentConverter();
     void OnBenchmarkTool();
+    void OnPerformanceProfiles();
     void OnMenuRecentFile();
     void OnConfigure();
     void OnConfigureTas();
