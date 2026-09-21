@@ -392,6 +392,7 @@ void BenchmarkDialog::StartBenchmark() {
 
     QtCommon::system->GetPerfStats().ResetFrameTimeHistory();
 
+    last_duration_seconds = 0.0;
     fps_samples.clear();
     interval_frametime_samples.clear();
     last_frame_times.clear();
