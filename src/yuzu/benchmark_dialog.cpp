@@ -305,6 +305,25 @@ QString MetricLine(const QString& label, const QString& a, const QString& b,
     return QStringLiteral("%1 | %2 | %3 | %4\n").arg(label, a, b, delta);
 }
 
+QString CsvEscape(const QString& value) {
+    QString escaped = value;
+    escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+    if (escaped.contains(QLatin1Char(',')) || escaped.contains(QLatin1Char('"')) ||
+        escaped.contains(QLatin1Char('\n')) || escaped.contains(QLatin1Char('\r'))) {
+        return QLatin1Char('"') + escaped + QLatin1Char('"');
+    }
+    return escaped;
+}
+
+QString CsvRow(const QStringList& values) {
+    QStringList escaped;
+    escaped.reserve(values.size());
+    for (const QString& value : values) {
+        escaped.push_back(CsvEscape(value));
+    }
+    return escaped.join(QLatin1Char(',')) + QLatin1Char('\n');
+}
+
 } // namespace
 
 BenchmarkDialog::BenchmarkDialog(QWidget* parent) : QDialog(parent) {
@@ -679,6 +698,12 @@ void BenchmarkDialog::CompareCsvs() {
     text += MetricLine(tr("Title ID"),
                        a.title_id.isEmpty() ? not_available : a.title_id,
                        b.title_id.isEmpty() ? not_available : b.title_id, not_available);
+    text += MetricLine(tr("Run label"),
+                       a.run_label.isEmpty() ? not_available : a.run_label,
+                       b.run_label.isEmpty() ? not_available : b.run_label, not_available);
+    text += MetricLine(tr("Scene / route"),
+                       a.scene_tag.isEmpty() ? not_available : a.scene_tag,
+                       b.scene_tag.isEmpty() ? not_available : b.scene_tag, not_available);
     text += MetricLine(tr("Duration (s)"),
                        optional_metric(a.has_duration, a.duration_seconds, 2),
                        optional_metric(b.has_duration, b.duration_seconds, 2),
@@ -721,6 +746,12 @@ void BenchmarkDialog::CompareCsvs() {
                 .arg(has_settings_signatures
                          ? (settings_match ? tr("Yes") : tr("No"))
                          : not_available);
+    const bool has_scene_tags = !a.scene_tag.isEmpty() && !b.scene_tag.isEmpty();
+    const bool scene_tags_match = has_scene_tags && a.scene_tag == b.scene_tag;
+    text += tr("Scene / route match: %1\n")
+                .arg(has_scene_tags
+                         ? (scene_tags_match ? tr("Yes") : tr("No"))
+                         : not_available);
 
     QString warnings;
     if (has_settings_signatures && !settings_match) {
@@ -731,6 +762,10 @@ void BenchmarkDialog::CompareCsvs() {
     if (!a.title_id.isEmpty() && !b.title_id.isEmpty() && a.title_id != b.title_id) {
         warnings += tr("Warning: Title IDs differ. These benchmarks are from different games or "
                        "applications and should not be compared directly.\n");
+    }
+    if (has_scene_tags && !scene_tags_match) {
+        warnings += tr("Warning: scene / route tags differ. Use the same test scene and route for "
+                       "a fair comparison.\n");
     }
     if (a.has_duration && b.has_duration) {
         const double largest_duration = std::max(a.duration_seconds, b.duration_seconds);
@@ -778,11 +813,33 @@ void BenchmarkDialog::CompareCsvs() {
     view->setPlainText(text);
     root->addWidget(view, 1);
 
+    auto* export_button = new QPushButton(tr("Export report CSV"), dialog);
     auto* close_button = new QPushButton(tr("Close"), dialog);
     auto* buttons = new QHBoxLayout();
+    buttons->addWidget(export_button);
     buttons->addStretch();
     buttons->addWidget(close_button);
     root->addLayout(buttons);
+    connect(export_button, &QPushButton::clicked, dialog, [this, dialog, report_csv] {
+        const QString suggested =
+            QStringLiteral("eden-benchmark-report-%1.csv")
+                .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
+        const QString report_path = QFileDialog::getSaveFileName(
+            dialog, tr("Export benchmark report"), suggested, tr("CSV files (*.csv)"));
+        if (report_path.isEmpty()) {
+            return;
+        }
+
+        QFile report_file{report_path};
+        if (!report_file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QMessageBox::critical(dialog, tr("Benchmark set comparison"),
+                                  tr("The benchmark report could not be saved."));
+            return;
+        }
+
+        QTextStream report_stream{&report_file};
+        report_stream << report_csv;
+    });
     connect(close_button, &QPushButton::clicked, dialog, &QDialog::close);
 
     dialog->show();
@@ -1006,11 +1063,13 @@ void BenchmarkDialog::CompareCsvSet() {
 
     QStringList title_ids;
     QStringList settings_signatures;
+    QStringList scene_tags;
     QStringList commits;
     std::vector<double> all_durations;
     std::vector<double> all_samples;
     bool missing_title_id = false;
     bool missing_settings_signature = false;
+    bool missing_scene_tag = false;
     bool missing_average_fps = false;
     bool shaders_active = false;
 
@@ -1025,6 +1084,12 @@ void BenchmarkDialog::CompareCsvSet() {
             missing_settings_signature = true;
         } else if (!settings_signatures.contains(run.data.settings_signature)) {
             settings_signatures.push_back(run.data.settings_signature);
+        }
+
+        if (run.data.scene_tag.isEmpty()) {
+            missing_scene_tag = true;
+        } else if (!scene_tags.contains(run.data.scene_tag)) {
+            scene_tags.push_back(run.data.scene_tag);
         }
 
         if (!run.data.commit.isEmpty() && run.data.commit != QStringLiteral("unknown") &&
@@ -1048,12 +1113,16 @@ void BenchmarkDialog::CompareCsvSet() {
     const bool title_ids_match = !missing_title_id && title_ids.size() == 1;
     const bool settings_match =
         !missing_settings_signature && settings_signatures.size() == 1;
+    const bool scene_tags_match = !missing_scene_tag && scene_tags.size() == 1;
 
     text += tr("Title ID match across set: %1\n")
                 .arg(title_ids_match ? tr("Yes") : (title_ids.isEmpty() ? not_available : tr("No")));
     text += tr("Settings match across set: %1\n")
                 .arg(settings_match ? tr("Yes")
                                     : (settings_signatures.isEmpty() ? not_available : tr("No")));
+    text += tr("Scene / route match across set: %1\n")
+                .arg(scene_tags_match ? tr("Yes")
+                                      : (scene_tags.isEmpty() ? not_available : tr("No")));
 
     auto relative_spread = [](const std::vector<double>& values) {
         if (values.size() < 2) {
@@ -1073,6 +1142,10 @@ void BenchmarkDialog::CompareCsvSet() {
     if (!settings_match) {
         warnings +=
             tr("Warning: benchmark settings are missing or differ across the selected runs.\n");
+    }
+    if (!scene_tags_match) {
+        warnings += tr("Warning: scene / route tags are missing or differ across the selected "
+                       "runs. Use the same scene and route for every run.\n");
     }
     if (commits.size() > 1) {
         warnings += tr("Warning: commit hashes differ across the selected runs. Results may include "
@@ -1105,6 +1178,58 @@ void BenchmarkDialog::CompareCsvSet() {
                "lower CV means better repeatability. Delta is profile B relative to profile A. "
                "Positive frametime means B took longer; positive FPS means B was higher. No overall "
                "winner is declared automatically.");
+
+    QString report_csv =
+        QStringLiteral("record_type,name,profile_a,profile_b,delta_b_vs_a,details\n");
+    report_csv += CsvRow({QStringLiteral("metadata"), QStringLiteral("profiles"), profiles[0],
+                          profiles[1], QString{}, tr("%1 runs vs %2 runs")
+                                                        .arg(group_a.size())
+                                                        .arg(group_b.size())});
+    report_csv += CsvRow({QStringLiteral("metric"), tr("Duration (s)"),
+                          format_mean_sd(duration_a, 2), format_mean_sd(duration_b, 2),
+                          mean_delta(duration_a, duration_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("metric"), tr("Average game FPS"),
+                          format_mean_sd(fps_a, 2), format_mean_sd(fps_b, 2),
+                          mean_delta(fps_a, fps_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("metric"), tr("Mean emulation frame (ms)"),
+                          format_mean_sd(mean_a, 3), format_mean_sd(mean_b, 3),
+                          mean_delta(mean_a, mean_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("metric"), tr("Median emulation frame (ms)"),
+                          format_mean_sd(median_a, 3), format_mean_sd(median_b, 3),
+                          mean_delta(median_a, median_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("metric"), tr("P95 emulation frame (ms)"),
+                          format_mean_sd(p95_a, 3), format_mean_sd(p95_b, 3),
+                          mean_delta(p95_a, p95_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("metric"), tr("P99 emulation frame (ms)"),
+                          format_mean_sd(p99_a, 3), format_mean_sd(p99_b, 3),
+                          mean_delta(p99_a, p99_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("metric"), tr("Derived 1% low (FPS)"),
+                          format_mean_sd(low1_a, 2), format_mean_sd(low1_b, 2),
+                          mean_delta(low1_a, low1_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("metric"), tr("Derived 0.1% low (FPS)"),
+                          format_mean_sd(low01_a, 2), format_mean_sd(low01_b, 2),
+                          mean_delta(low01_a, low01_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("metric"), tr("Frame-time samples"),
+                          format_mean_sd(samples_a, 0), format_mean_sd(samples_b, 0),
+                          mean_delta(samples_a, samples_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("validation"), tr("Title ID match"),
+                          title_ids_match ? tr("Yes") : tr("No"), QString{}, QString{},
+                          title_ids.join(QStringLiteral(" | "))});
+    report_csv += CsvRow({QStringLiteral("validation"), tr("Settings match"),
+                          settings_match ? tr("Yes") : tr("No"), QString{}, QString{},
+                          QString{}});
+    report_csv += CsvRow({QStringLiteral("validation"), tr("Scene / route match"),
+                          scene_tags_match ? tr("Yes") : tr("No"), QString{}, QString{},
+                          scene_tags.join(QStringLiteral(" | "))});
+    for (const auto& run : runs) {
+        report_csv += CsvRow({QStringLiteral("run"), QFileInfo{run.path}.fileName(),
+                              run.data.profile, run.data.run_label, QString{},
+                              run.data.scene_tag});
+    }
+    if (!warnings.isEmpty()) {
+        report_csv += CsvRow({QStringLiteral("warnings"), QStringLiteral("summary"), QString{},
+                              QString{}, QString{}, warnings.trimmed()});
+    }
 
     auto* dialog = new QDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose, true);
