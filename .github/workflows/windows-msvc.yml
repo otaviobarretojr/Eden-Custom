@@ -76,5 +76,10 @@ jobs:
             build/bin/**/*.exe
             build/bin/**/*.dll
             build/bin/**/translations/**
+            LICENSE.txt
+            LICENSES/**
+            README.md
+            CUSTOM_PROJECT.md
+            docs/custom/NSZ_CONVERTER.md
           if-no-files-found: error
           retention-days: 14
