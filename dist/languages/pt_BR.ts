@@ -8290,6 +8290,42 @@ Would you like to bypass this and exit anyway?</source>
         <source>Quality</source>
         <translation>Qualidade</translation>
     </message>
+    <message>
+        <source>RTX 5060 Ti detected: native 1x, aggressive VRAM, GPU Medium, CPU Auto and persistent shader caches.</source>
+        <translation>RTX 5060 Ti detectada: 1x nativo, VRAM agressiva, GPU Média, CPU Automática e caches persistentes de shaders.</translation>
+    </message>
+    <message>
+        <source>Safe automatic baseline: native 1x, conservative VRAM, GPU Medium, CPU Auto and persistent shader caches.</source>
+        <translation>Base automática segura: 1x nativo, VRAM conservadora, GPU Média, CPU Automática e caches persistentes de shaders.</translation>
+    </message>
+    <message>
+        <source>Native 1x, conservative VRAM, GPU Medium, CPU Auto and compatibility-oriented shader settings.</source>
+        <translation>1x nativo, VRAM conservadora, GPU Média, CPU Automática e configurações de shaders voltadas à compatibilidade.</translation>
+    </message>
+    <message>
+        <source>Native 1x, aggressive VRAM and maximum renderer clock request, without unsafe CPU/GPU accuracy or asynchronous shader hacks.</source>
+        <translation>1x nativo, VRAM agressiva e solicitação de clock máximo do renderizador, sem precisão insegura de CPU/GPU nem hacks de shaders assíncronos.</translation>
+    </message>
+    <message>
+        <source>2x resolution, 16x anisotropic filtering and SMAA, while keeping GPU Medium, CPU Auto and persistent shader caches.</source>
+        <translation>Resolução 2x, filtragem anisotrópica 16x e SMAA, mantendo GPU Média, CPU Automática e caches persistentes de shaders.</translation>
+    </message>
+    <message>
+        <source>%1 profile applied.
+
+%2
+
+The settings will be used on the next game launch. Per-game settings can still override this global profile.</source>
+        <translation>Perfil %1 aplicado.
+
+%2
+
+As configurações serão usadas na próxima execução do jogo. As configurações por jogo ainda podem substituir este perfil global.</translation>
+    </message>
+    <message>
+        <source>Performance &amp;Profiles...</source>
+        <translation>&amp;Perfis de desempenho...</translation>
+    </message>
 </context>
 <context>
     <name>MigrationWorker</name>
@@ -10874,6 +10910,38 @@ Error code: %3</source>
     <message>
         <source>Profile changes are saved globally and take effect on the next game launch. Per-game configuration can still override global settings.</source>
         <translation>As alterações do perfil são salvas globalmente e entram em vigor na próxima execução do jogo. As configurações por jogo ainda podem substituir as configurações globais.</translation>
+    </message>
+    <message>
+        <source>Choose a baseline for the next game launch. Profiles avoid unsafe CPU/GPU accuracy hacks and can always be changed later.</source>
+        <translation>Escolha uma configuração base para a próxima execução do jogo. Os perfis evitam ajustes inseguros de precisão de CPU/GPU e podem ser alterados a qualquer momento.</translation>
+    </message>
+    <message>
+        <source>Uses safe Vulkan defaults and adapts VRAM policy for recognized modern desktop GPUs. Keeps native 1x resolution and medium GPU accuracy.</source>
+        <translation>Usa padrões seguros do Vulkan e adapta a política de VRAM para GPUs desktop modernas reconhecidas. Mantém a resolução nativa em 1x e a precisão da GPU em Média.</translation>
+    </message>
+    <message>
+        <source>Closest to Eden's conservative defaults: native resolution, conservative VRAM, medium GPU accuracy and persistent shader caches.</source>
+        <translation>Mais próximo dos padrões conservadores do Eden: resolução nativa, VRAM conservadora, precisão da GPU Média e caches persistentes de shaders.</translation>
+    </message>
+    <message>
+        <source>Native resolution with aggressive VRAM use and maximum renderer clock request. Shader caches stay enabled; unsafe CPU accuracy and asynchronous shader hacks remain off.</source>
+        <translation>Resolução nativa com uso agressivo de VRAM e solicitação de clock máximo do renderizador. Os caches de shaders permanecem ativados; precisão insegura da CPU e hacks de shaders assíncronos permanecem desativados.</translation>
+    </message>
+    <message>
+        <source>2x resolution, 16x anisotropic filtering and SMAA while retaining medium GPU accuracy and the same compatibility-oriented shader settings.</source>
+        <translation>Resolução 2x, filtragem anisotrópica 16x e SMAA, mantendo precisão da GPU Média e as mesmas configurações de shaders voltadas à compatibilidade.</translation>
+    </message>
+    <message>
+        <source>Opens Eden's normal configuration window without changing settings automatically.</source>
+        <translation>Abre a janela normal de configurações do Eden sem alterar configurações automaticamente.</translation>
+    </message>
+    <message>
+        <source>%1  •  %2</source>
+        <translation>%1  •  %2</translation>
+    </message>
+    <message>
+        <source>Apply %1</source>
+        <translation>Aplicar %1</translation>
     </message>
 </context>
 </TS>
