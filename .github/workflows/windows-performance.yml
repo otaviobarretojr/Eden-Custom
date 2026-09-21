@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - performance-v0.2
+      - profiles-v0.3
     paths:
       - "CMakeLists.txt"
       - "cpmfile.json"
