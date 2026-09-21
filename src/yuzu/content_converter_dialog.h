@@ -51,6 +51,7 @@ private:
     void StartNextFile();
     void AppendLog(const QString& text);
     void UpdateProgressFromText(const QString& text);
+    void InspectConvertedFile(const QString& input_path);
     bool ResolveConverter(QString& program, QStringList& prefix_arguments) const;
     QString EdenKeysDirectory() const;
     QString ManagedConverterPath() const;
