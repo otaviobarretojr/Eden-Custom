@@ -33,6 +33,7 @@
 #include "bootmanager.h"
 #include "loading_screen.h"
 #include "ryujinx_dialog.h"
+#include "shader_preparation_status.h"
 #include "set_play_time_dialog.h"
 #include "util/util.h"
 #include "vk_device_info.h"
@@ -67,12 +68,14 @@
 #include <QCheckBox>
 #include <QClipboard>
 #include <QDesktopServices>
+#include <QDateTime>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QInputDialog>
 #include <QMimeData>
+#include <QMessageBox>
 #include <QPalette>
 #include <QProgressDialog>
 #include <QScreen>
@@ -152,6 +155,7 @@ static FileSys::VirtualFile VfsDirectoryCreateFileWrapper(const FileSys::Virtual
 
 // Video Core //
 #include "video_core/gpu.h"
+#include "video_core/rasterizer_interface.h"
 #include "video_core/renderer_base.h"
 #include "video_core/shader_notify.h"
 
@@ -1564,6 +1568,60 @@ void MainWindow::ConnectWidgetEvents() {
     connect(game_list, &GameList::OpenFolderRequested, this, &MainWindow::OnGameListOpenFolder);
     connect(game_list, &GameList::OpenTransferableShaderCacheRequested, this,
             [this](u64 program_id) { QtCommon::Path::OpenShaderCache(program_id, this); });
+    connect(game_list, &GameList::ShaderPreparationStatusRequested, this,
+            [this](u64 program_id) {
+                const auto status = EdenCustom::ReadShaderPreparationStatus(program_id);
+
+                const QString title_id =
+                    QStringLiteral("%1").arg(program_id, 16, 16, QLatin1Char('0')).toUpper();
+
+                QString state;
+                if (!status.has_record && status.transferable_cache_bytes == 0 &&
+                    status.driver_cache_bytes == 0 && status.opengl_cache_bytes == 0) {
+                    state = tr("No known shader cache has been prepared yet.");
+                } else if (!status.has_record) {
+                    state = tr("Cache files exist, but Eden Custom has not measured a preparation yet.");
+                } else if (status.known_pipelines == 0) {
+                    state = tr("The last preparation found no known shader pipelines.");
+                } else if (status.last_completed) {
+                    state = tr("The last shader preparation completed successfully.");
+                } else {
+                    state = tr("The last shader preparation did not reach completion.");
+                }
+
+                auto local_time = [](const QString& utc) {
+                    if (utc.isEmpty()) {
+                        return QObject::tr("Not recorded");
+                    }
+                    const auto parsed = QDateTime::fromString(utc, Qt::ISODateWithMs);
+                    return parsed.isValid()
+                               ? parsed.toLocalTime().toString(QStringLiteral("dd/MM/yyyy HH:mm:ss"))
+                               : utc;
+                };
+
+                const QString details =
+                    tr("Title ID: %1\n\n"
+                       "Status: %2\n"
+                       "Known pipelines at last preparation: %3\n"
+                       "Last preparation started: %4\n"
+                       "Last preparation completed: %5\n\n"
+                       "Vulkan transferable cache: %6\n"
+                       "Vulkan driver cache: %7\n"
+                       "OpenGL cache: %8\n\n"
+                       "Cache folder:\n%9\n\n"
+                       "This number represents pipelines already discovered by Eden. "
+                       "New pipelines can still appear while exploring new game content.")
+                        .arg(title_id, state)
+                        .arg(status.known_pipelines)
+                        .arg(local_time(status.last_started))
+                        .arg(local_time(status.last_completed_at))
+                        .arg(EdenCustom::FormatBytes(status.transferable_cache_bytes))
+                        .arg(EdenCustom::FormatBytes(status.driver_cache_bytes))
+                        .arg(EdenCustom::FormatBytes(status.opengl_cache_bytes))
+                        .arg(QDir::toNativeSeparators(status.cache_directory));
+
+                QMessageBox::information(this, tr("Shader Preparation Status"), details);
+            });
     connect(game_list, &GameList::RemoveInstalledEntryRequested, this,
             &MainWindow::OnGameListRemoveInstalledEntry);
     connect(game_list, &GameList::RemoveFileRequested, this, &MainWindow::OnGameListRemoveFile);
@@ -2132,6 +2190,28 @@ void MainWindow::BootGame(const QString& filename, Service::AM::FrontendAppletPa
 
     connect(emu_thread.get(), &EmuThread::LoadProgress, loading_screen,
             &LoadingScreen::OnLoadProgress, Qt::QueuedConnection);
+
+    struct ShaderPreparationRunState {
+        bool observed_build{};
+        bool recorded_complete{};
+    };
+    const auto shader_preparation_state = std::make_shared<ShaderPreparationRunState>();
+
+    connect(emu_thread.get(), &EmuThread::LoadProgress, this,
+            [title_id, shader_preparation_state](VideoCore::LoadCallbackStage stage,
+                                                 std::size_t value, std::size_t total) {
+                if (stage == VideoCore::LoadCallbackStage::Build &&
+                    !shader_preparation_state->observed_build) {
+                    shader_preparation_state->observed_build = true;
+                    EdenCustom::RecordShaderPreparationStart(title_id, total);
+                } else if (stage == VideoCore::LoadCallbackStage::Complete &&
+                           shader_preparation_state->observed_build &&
+                           !shader_preparation_state->recorded_complete) {
+                    shader_preparation_state->recorded_complete = true;
+                    EdenCustom::RecordShaderPreparationComplete(title_id);
+                }
+            },
+            Qt::QueuedConnection);
 
     // Update the GUI
     UpdateStatusButtons();
