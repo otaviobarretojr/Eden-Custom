@@ -67,3 +67,38 @@ A base MSVC v0.2.1 é a referência estável. Otimizações de compilação/PGO 
 ## Conteúdo e chaves
 
 O projeto não inclui jogos, firmware, chaves ou conteúdo proprietário. Ele opera apenas sobre arquivos e configurações fornecidos legitimamente pelo usuário.
+
+
+## Estado atual da v0.1
+
+Implementado no branch `custom-v0.1`:
+
+- área Tools -> Content Converter
+- seleção múltipla e arrastar/soltar de arquivos NSZ
+- conversão em fila NSZ -> NSP
+- progresso e log
+- verificação durante conversão
+- preservação do NSZ original
+- instalação opcional da ferramenta oficial NSZ 5.0.0 por download
+- validação SHA-256 obrigatória do conversor baixado
+- reutilização da pasta de prod.keys já configurada no Eden
+- identificação preliminar BASE / UPDATE / DLC por Title ID
+- confirmação pós-conversão usando o parser CNMT do próprio Eden
+- relação de UPDATE/DLC com o Title ID base quando aplicável
+- CI Windows MSVC via GitHub Actions
+- cache CPM no CI
+- cancelamento de builds CI obsoletas da mesma branch
+
+### Validação
+
+A referência continua sendo o Eden v0.2.1 MSVC puro.
+Nenhuma otimização agressiva do core será ativada antes de uma build limpa e
+comparação com a referência.
+
+Próxima fase após a primeira build Windows validada:
+
+1. testar o fluxo NSZ -> NSP com arquivo real do usuário;
+2. instalar/associar updates e DLC convertidos;
+3. criar perfil de hardware Ryzen 5 5600X + RTX 5060 Ti 16 GB;
+4. comparar build MSVC padrão vs variante AVX2/Zen 3;
+5. medir frametime, stutter e estabilidade antes de promover qualquer otimização.
