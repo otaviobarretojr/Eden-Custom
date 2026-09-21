@@ -57,6 +57,7 @@ class QSlider;
 class QHBoxLayout;
 class WaitTreeWidget;
 class PerformanceOverlay;
+class BenchmarkDialog;
 enum class GameListOpenTarget;
 enum class DumpRomFSTarget;
 class GameListPlaceholder;
@@ -374,6 +375,7 @@ private slots:
     void IncrementInstallProgress();
     void OnMenuInstallToNAND();
     void OnContentConverter();
+    void OnBenchmarkTool();
     void OnMenuRecentFile();
     void OnConfigure();
     void OnConfigureTas();
@@ -509,6 +511,7 @@ private:
     QTimer shutdown_timer;
     OverlayDialog* shutdown_dialog{};
     PerformanceOverlay* perf_overlay = nullptr;
+    BenchmarkDialog* benchmark_dialog = nullptr;
 
     GameListPlaceholder* game_list_placeholder = nullptr;
 
