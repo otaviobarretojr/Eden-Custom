@@ -102,10 +102,14 @@ std::optional<ContentFileHint> InferContentFileHint(const QString& filename) {
 }
 } // namespace
 
-ContentConverterDialog::ContentConverterDialog(QWidget* parent)
+ContentConverterDialog::ContentConverterDialog(QWidget* parent, const QStringList& initial_files)
     : QDialog(parent), process(new QProcess(this)), network_manager(new QNetworkAccessManager(this)) {
     BuildUi();
     setAcceptDrops(true);
+
+    for (const QString& file : initial_files) {
+        AddFile(file);
+    }
 
     connect(process, &QProcess::readyReadStandardOutput, this, &ContentConverterDialog::ReadProcessOutput);
     connect(process, &QProcess::readyReadStandardError, this, &ContentConverterDialog::ReadProcessOutput);
