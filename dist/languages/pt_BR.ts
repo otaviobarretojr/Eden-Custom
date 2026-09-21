@@ -769,15 +769,15 @@ Também controla a proporção das capturas de tela.</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="165"/>
-        <source>Use persistent pipeline cache</source>
-        <translation>Usar cache persistente de pipeline</translation>
+        <source>Prepare known shaders before launch (persistent cache)</source>
+        <translation>Preparar shaders conhecidos antes de iniciar (cache persistente)</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="166"/>
-        <source>Allows saving shaders to storage for faster loading on following game boots.
-Disabling it is only intended for debugging.</source>
-        <translation>Permite guardar os shaders para carregar os jogos nas execuções seguintes.
-Desabiltar essa opção só serve para propósitos de depuração.</translation>
+        <source>Saves discovered shader pipelines and prepares them before gameplay on later launches.
+New shader combinations can still appear while exploring new game content. Disabling this is only intended for debugging.</source>
+        <translation>Salva os pipelines de shader descobertos e os prepara antes do gameplay nas próximas execuções.
+Novas combinações de shader ainda podem aparecer ao explorar conteúdo novo do jogo. Desabilitar esta opção é indicado apenas para depuração.</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="169"/>
@@ -6740,38 +6740,58 @@ Mensagem de Depuração: </translation>
     <name>LoadingScreen</name>
     <message>
         <location filename="../../src/yuzu/loading_screen.ui" line="84"/>
-        <source>Loading Shaders 387 / 1628</source>
-        <translation>A Carregar Shaders 387 / 1628</translation>
+        <source>Preparing known shaders 0 / 0</source>
+        <translation>Preparando shaders conhecidos 0 / 0</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/loading_screen.ui" line="121"/>
-        <source>Loading Shaders %v out of %m</source>
-        <translation>A Carregar Shaders %v por %m</translation>
+        <source>Preparing known shaders %v / %m</source>
+        <translation>Preparando shaders conhecidos %v / %m</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/loading_screen.ui" line="135"/>
-        <source>Estimated Time 5m 4s</source>
-        <translation>Tempo Estimado 5m 4s</translation>
+        <source></source>
+        <translation></translation>
     </message>
     <message>
         <location filename="../../src/yuzu/loading_screen.cpp" line="86"/>
-        <source>Loading...</source>
-        <translation>A Carregar...</translation>
+        <source>Preparing game...</source>
+        <translation>Preparando jogo...</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/loading_screen.cpp" line="87"/>
-        <source>Loading Shaders %1 / %2</source>
-        <translation>A Carregar Shaders %1 / %2</translation>
+        <source>Preparing known shaders %1 / %2</source>
+        <translation>Preparando shaders conhecidos %1 / %2</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/loading_screen.cpp" line="88"/>
-        <source>Launching...</source>
-        <translation>A iniciar...</translation>
+        <source>Shader preparation complete — launching...</source>
+        <translation>Preparação de shaders concluída — iniciando...</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/loading_screen.cpp" line="173"/>
-        <source>Estimated Time %1</source>
-        <translation>Tempo Estimado %1</translation>
+        <source>Estimated time: %1</source>
+        <translation>Tempo estimado: %1</translation>
+    </message>
+    <message>
+        <source>No known shader pipelines yet</source>
+        <translation>Nenhum pipeline de shader conhecido ainda</translation>
+    </message>
+    <message>
+        <source>First run: new pipelines will be learned and cached during gameplay.</source>
+        <translation>Primeira execução: novos pipelines serão aprendidos e armazenados durante o gameplay.</translation>
+    </message>
+    <message>
+        <source>Known cache: %1 pipelines • %2%</source>
+        <translation>Cache conhecido: %1 pipelines • %2%</translation>
+    </message>
+    <message>
+        <source>%1 known shader pipelines prepared before gameplay.</source>
+        <translation>%1 pipelines de shader conhecidos preparados antes do gameplay.</translation>
+    </message>
+    <message>
+        <source>No known cache was available; shaders will be learned as the game runs.</source>
+        <translation>Nenhum cache conhecido estava disponível; os shaders serão aprendidos enquanto o jogo roda.</translation>
     </message>
 </context>
 <context>
