@@ -19,6 +19,7 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QStringList>
 #include <QMessageBox>
 #include <QPlainTextEdit>
@@ -164,6 +165,8 @@ struct BenchmarkCsvData {
     QString commit;
     QString title_id;
     QString settings_signature;
+    QString run_label;
+    QString scene_tag;
     bool has_duration{};
     double duration_seconds{};
     bool has_average_game_fps{};
@@ -262,6 +265,8 @@ bool LoadBenchmarkCsv(const QString& path, BenchmarkCsvData& data, QString& erro
     data.commit = metadata.value(QStringLiteral("commit"), QStringLiteral("unknown"));
     data.title_id = metadata.value(QStringLiteral("title_id")).trimmed().toUpper();
     data.settings_signature = metadata.value(QStringLiteral("settings_signature")).trimmed();
+    data.run_label = metadata.value(QStringLiteral("run_label")).trimmed();
+    data.scene_tag = metadata.value(QStringLiteral("scene_tag")).trimmed();
     data.has_duration =
         ReadMetadataDouble(metadata, QStringLiteral("duration_seconds"), data.duration_seconds);
     data.has_average_game_fps = ReadMetadataDouble(
@@ -331,6 +336,10 @@ BenchmarkDialog::BenchmarkDialog(QWidget* parent) : QDialog(parent) {
     fps_label = new QLabel(QStringLiteral("--"), live_group);
     frametime_label = new QLabel(QStringLiteral("--"), live_group);
     shader_label = new QLabel(QStringLiteral("0"), live_group);
+    run_label_edit = new QLineEdit(live_group);
+    scene_tag_edit = new QLineEdit(live_group);
+    run_label_edit->setPlaceholderText(tr("Example: A1 or B1"));
+    scene_tag_edit->setPlaceholderText(tr("Example: city route 01"));
 
     live_layout->addWidget(new QLabel(tr("Build:"), live_group), 0, 0);
     live_layout->addWidget(build_label, 0, 1);
@@ -344,6 +353,10 @@ BenchmarkDialog::BenchmarkDialog(QWidget* parent) : QDialog(parent) {
     live_layout->addWidget(frametime_label, 4, 1);
     live_layout->addWidget(new QLabel(tr("Shaders building:"), live_group), 5, 0);
     live_layout->addWidget(shader_label, 5, 1);
+    live_layout->addWidget(new QLabel(tr("Run label:"), live_group), 6, 0);
+    live_layout->addWidget(run_label_edit, 6, 1);
+    live_layout->addWidget(new QLabel(tr("Scene / route:"), live_group), 7, 0);
+    live_layout->addWidget(scene_tag_edit, 7, 1);
     root->addWidget(live_group);
 
     results_view = new QPlainTextEdit(this);
@@ -385,6 +398,8 @@ void BenchmarkDialog::ResetUi() {
     last_duration_seconds = 0.0;
     benchmark_title_id.clear();
     benchmark_settings_signature.clear();
+    benchmark_run_label.clear();
+    benchmark_scene_tag.clear();
     fps_samples.clear();
     interval_frametime_samples.clear();
     last_frame_times.clear();
@@ -404,6 +419,8 @@ void BenchmarkDialog::SetRunning(bool running) {
     benchmark_running = running;
     start_button->setEnabled(!running);
     stop_button->setEnabled(running);
+    run_label_edit->setEnabled(!running);
+    scene_tag_edit->setEnabled(!running);
 }
 
 void BenchmarkDialog::StartBenchmark() {
@@ -419,6 +436,8 @@ void BenchmarkDialog::StartBenchmark() {
             ? QString{}
             : QStringLiteral("%1").arg(title_id, 16, 16, QLatin1Char('0')).toUpper();
     benchmark_settings_signature = CurrentBenchmarkSettingsSignature();
+    benchmark_run_label = run_label_edit->text().trimmed();
+    benchmark_scene_tag = scene_tag_edit->text().trimmed();
 
     QtCommon::system->GetPerfStats().ResetFrameTimeHistory();
 
@@ -475,8 +494,15 @@ QString BenchmarkDialog::BuildResultsText(const std::vector<double>& frame_times
     const double low_1 = LowFpsFromWorstFrames(sorted, 0.01);
     const double low_01 = LowFpsFromWorstFrames(sorted, 0.001);
 
-    const QString build_header =
-        tr("Build profile: %1\nCommit: %2\n\n").arg(build_profile, build_commit);
+    QString build_header =
+        tr("Build profile: %1\nCommit: %2\n").arg(build_profile, build_commit);
+    if (!benchmark_run_label.isEmpty()) {
+        build_header += tr("Run label: %1\n").arg(benchmark_run_label);
+    }
+    if (!benchmark_scene_tag.isEmpty()) {
+        build_header += tr("Scene / route: %1\n").arg(benchmark_scene_tag);
+    }
+    build_header += QLatin1Char('\n');
 
     return build_header +
            tr(
@@ -576,6 +602,12 @@ void BenchmarkDialog::SaveCsv() {
         stream << "title_id," << benchmark_title_id << '\n';
     }
     stream << "settings_signature," << benchmark_settings_signature << '\n';
+    if (!benchmark_run_label.isEmpty()) {
+        stream << "run_label," << benchmark_run_label << '\n';
+    }
+    if (!benchmark_scene_tag.isEmpty()) {
+        stream << "scene_tag," << benchmark_scene_tag << '\n';
+    }
     stream << "duration_seconds," << QString::number(last_duration_seconds, 'f', 3) << '\n';
     stream << "frame_time_samples," << last_frame_times.size() << '\n';
     stream << "average_game_fps," << QString::number(average_game_fps, 'f', 6) << '\n';
