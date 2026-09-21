@@ -1,0 +1,123 @@
+name: Windows Performance Builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - performance-v0.2
+    paths:
+      - "CMakeLists.txt"
+      - "cpmfile.json"
+      - "src/**"
+      - ".github/workflows/windows-performance.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: Stable
+            cxx_flags: ""
+          - profile: Zen3-AVX2
+            cxx_flags: "/arch:AVX2"
+
+    runs-on: windows-2022
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout Eden Custom
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Vulkan SDK
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass
+          ./tools/windows/install-vulkan-sdk.ps1
+
+      - name: Cache CPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: .cache/cpm
+          key: eden-cpm-windows-${{ hashFiles('cpmfile.json', 'CMakeLists.txt', 'CMakeModules/**/*.cmake') }}
+          restore-keys: |
+            eden-cpm-windows-
+
+      - name: Configure MSVC Release
+        shell: powershell
+        run: |
+          $cmakeArgs = @(
+            "-S", ".",
+            "-B", "build",
+            "-G", "Visual Studio 17 2022",
+            "-A", "x64",
+            "-DYUZU_TESTS=OFF",
+            "-DDYNARMIC_TESTS=OFF",
+            "-DENABLE_QT=ON",
+            "-DYUZU_USE_BUNDLED_QT=ON",
+            "-DCMAKE_BUILD_TYPE=Release"
+          )
+
+          $extraFlags = "${{ matrix.cxx_flags }}"
+          if ($extraFlags) {
+            $cmakeArgs += "-DCMAKE_CXX_FLAGS=$extraFlags"
+          }
+
+          cmake @cmakeArgs
+
+      - name: Build Eden Custom
+        shell: powershell
+        run: |
+          cmake --build build --config Release --target yuzu --parallel 2
+
+      - name: Stage performance package
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path package | Out-Null
+
+          $eden = Get-ChildItem -Path build/bin -Recurse -Filter eden.exe -File | Select-Object -First 1
+          if (-not $eden) { throw "eden.exe was not produced" }
+          Copy-Item $eden.FullName package/eden.exe
+
+          Get-ChildItem -Path $eden.Directory.FullName -Filter *.dll -File -ErrorAction SilentlyContinue |
+            ForEach-Object { Copy-Item $_.FullName package/ }
+
+          Copy-Item LICENSE.txt package/LICENSE.txt
+          Copy-Item LICENSES package/LICENSES -Recurse
+          Copy-Item README.md package/README.md
+          Copy-Item CUSTOM_PROJECT.md package/CUSTOM_PROJECT.md
+
+          @(
+            "Eden Custom performance build"
+            "Profile: ${{ matrix.profile }}"
+            "Commit: $env:GITHUB_SHA"
+            "Base: Eden v0.2.1"
+            "Toolchain: MSVC / Visual Studio 2022 x64"
+            "CXX flags: ${{ matrix.cxx_flags }}"
+          ) | Set-Content -Encoding UTF8 package/PERFORMANCE_PROFILE.txt
+
+      - name: Validate package
+        shell: powershell
+        run: |
+          if (-not (Test-Path package/eden.exe)) { throw "eden.exe missing" }
+          Get-ChildItem -Path package -Recurse -File | Select-Object FullName, Length
+
+      - name: Upload performance build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Eden-Custom-${{ matrix.profile }}-Windows-MSVC
+          path: package/**
+          if-no-files-found: error
+          retention-days: 14
