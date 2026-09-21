@@ -779,15 +779,15 @@ void BenchmarkDialog::CompareCsvSet() {
     runs.reserve(static_cast<std::size_t>(paths.size()));
 
     for (const QString& path : paths) {
-        BenchmarkCsvData data;
+        BenchmarkCsvData csv_data;
         QString error;
-        if (!LoadBenchmarkCsv(path, data, error)) {
+        if (!LoadBenchmarkCsv(path, csv_data, error)) {
             QMessageBox::critical(
                 this, tr("Benchmark set comparison"),
                 tr("Could not read benchmark CSV:\n%1\n\nFile: %2").arg(error, path));
             return;
         }
-        runs.push_back({path, std::move(data)});
+        runs.push_back({path, std::move(csv_data)});
     }
 
     QStringList profiles;
