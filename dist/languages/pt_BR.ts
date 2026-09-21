@@ -11089,6 +11089,140 @@ Nota: os valores de low FPS são derivados do histórico interno de tempo de emu
         <source>The benchmark CSV could not be saved.</source>
         <translation>Não foi possível salvar o CSV do benchmark.</translation>
     </message>
+    <message>
+        <source>Compare A/B set</source>
+        <translation>Comparar conjunto A/B</translation>
+    </message>
+    <message>
+        <source>Select A/B benchmark CSVs</source>
+        <translation>Selecionar CSVs de benchmark A/B</translation>
+    </message>
+    <message>
+        <source>Benchmark set comparison</source>
+        <translation>Comparação de conjunto de benchmarks</translation>
+    </message>
+    <message>
+        <source>Select at least four CSVs, ideally two runs from each build.</source>
+        <translation>Selecione pelo menos quatro CSVs, de preferência duas execuções de cada build.</translation>
+    </message>
+    <message>
+        <source>Could not read benchmark CSV:
+%1
+
+File: %2</source>
+        <translation>Não foi possível ler o CSV de benchmark:
+%1
+
+Arquivo: %2</translation>
+    </message>
+    <message>
+        <source>The selected CSVs must contain exactly two build profiles. Found: %1</source>
+        <translation>Os CSVs selecionados devem conter exatamente dois perfis de build. Encontrados: %1</translation>
+    </message>
+    <message>
+        <source>Each build profile needs at least two runs for a repeatability comparison.</source>
+        <translation>Cada perfil de build precisa de pelo menos duas execuções para comparar a repetibilidade.</translation>
+    </message>
+    <message>
+        <source>%1 ± %2</source>
+        <translation>%1 ± %2</translation>
+    </message>
+    <message>
+        <source>Profile A: %1 (%2 runs)
+Profile B: %3 (%4 runs)
+
+</source>
+        <translation>Perfil A: %1 (%2 execuções)
+Perfil B: %3 (%4 execuções)
+
+</translation>
+    </message>
+    <message>
+        <source>Metric | A mean ± SD | B mean ± SD | Delta B vs A
+</source>
+        <translation>Métrica | Média A ± DP | Média B ± DP | Delta B vs A
+</translation>
+    </message>
+    <message>
+        <source>Run-to-run CV — Average FPS: A %1% | B %2%
+</source>
+        <translation>CV entre execuções — FPS médio: A %1% | B %2%
+</translation>
+    </message>
+    <message>
+        <source>Run-to-run CV — P99 frame: A %1% | B %2%
+</source>
+        <translation>CV entre execuções — Quadro P99: A %1% | B %2%
+</translation>
+    </message>
+    <message>
+        <source>Title ID match across set: %1
+</source>
+        <translation>Title ID igual em todo o conjunto: %1
+</translation>
+    </message>
+    <message>
+        <source>Settings match across set: %1
+</source>
+        <translation>Configurações iguais em todo o conjunto: %1
+</translation>
+    </message>
+    <message>
+        <source>Warning: Title IDs are missing or differ across the selected runs.
+</source>
+        <translation>Aviso: os Title IDs estão ausentes ou são diferentes entre as execuções selecionadas.
+</translation>
+    </message>
+    <message>
+        <source>Warning: benchmark settings are missing or differ across the selected runs.
+</source>
+        <translation>Aviso: as configurações do benchmark estão ausentes ou são diferentes entre as execuções selecionadas.
+</translation>
+    </message>
+    <message>
+        <source>Warning: commit hashes differ across the selected runs. Results may include code changes beyond the build profile.
+</source>
+        <translation>Aviso: os hashes de commit são diferentes entre as execuções selecionadas. Os resultados podem incluir alterações de código além do perfil de build.
+</translation>
+    </message>
+    <message>
+        <source>Warning: benchmark durations differ by more than 5% across the set.
+</source>
+        <translation>Aviso: as durações dos benchmarks diferem em mais de 5% no conjunto.
+</translation>
+    </message>
+    <message>
+        <source>Warning: frame-time sample counts differ by more than 10% across the set.
+</source>
+        <translation>Aviso: as quantidades de amostras de tempo de quadro diferem em mais de 10% no conjunto.
+</translation>
+    </message>
+    <message>
+        <source>Warning: the build profiles have different numbers of runs.
+</source>
+        <translation>Aviso: os perfis de build possuem quantidades diferentes de execuções.
+</translation>
+    </message>
+    <message>
+        <source>Warning: at least one CSV is missing average FPS metadata. FPS aggregation uses only runs where it is available.
+</source>
+        <translation>Aviso: pelo menos um CSV não possui metadados de FPS médio. A agregação de FPS usa somente as execuções em que esse dado está disponível.
+</translation>
+    </message>
+    <message>
+        <source>Warning: shader compilation was active during at least one run. Consider warming the same route before measuring build performance.
+</source>
+        <translation>Aviso: houve compilação de shaders durante pelo menos uma execução. Considere aquecer a mesma rota antes de medir o desempenho das builds.
+</translation>
+    </message>
+    <message>
+        <source>Mean ± SD summarizes repeated runs. CV is the run-to-run coefficient of variation; lower CV means better repeatability. Delta is profile B relative to profile A. Positive frametime means B took longer; positive FPS means B was higher. No overall winner is declared automatically.</source>
+        <translation>Média ± DP resume execuções repetidas. CV é o coeficiente de variação entre execuções; CV menor significa melhor repetibilidade. O delta representa o perfil B em relação ao perfil A. Frametime positivo significa que B levou mais tempo; FPS positivo significa que B foi maior. Nenhum vencedor geral é definido automaticamente.</translation>
+    </message>
+    <message>
+        <source>Aggregate repeated benchmark CSVs from two build profiles. For the recommended A/B/A/B test, select all four CSVs together.</source>
+        <translation>Agregue CSVs de benchmarks repetidos de dois perfis de build. Para o teste A/B/A/B recomendado, selecione os quatro CSVs juntos.</translation>
+    </message>
 </context>
 <context>
     <name>PerformanceProfileDialog</name>
