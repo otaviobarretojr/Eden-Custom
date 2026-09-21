@@ -102,3 +102,16 @@ Próxima fase após a primeira build Windows validada:
 3. criar perfil de hardware Ryzen 5 5600X + RTX 5060 Ti 16 GB;
 4. comparar build MSVC padrão vs variante AVX2/Zen 3;
 5. medir frametime, stutter e estabilidade antes de promover qualquer otimização.
+
+
+## Fluxo integrado de NSZ
+
+O Eden Custom trata NSZ como formato de entrada/armazenamento, não como formato de execução.
+
+- arrastar um NSZ diretamente na janela principal abre o conversor;
+- selecionar um NSZ em Load File abre o conversor;
+- NSZ não é enviado ao loader do core;
+- BASE convertido pode adicionar sua pasta automaticamente à biblioteca;
+- UPDATE e DLC confirmados por CNMT podem ser enviados automaticamente à NAND;
+- o arquivo NSZ original é preservado;
+- a classificação final usa o parser CNMT do próprio Eden, e não apenas o nome do arquivo.
