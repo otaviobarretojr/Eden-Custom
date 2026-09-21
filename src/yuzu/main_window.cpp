@@ -3066,10 +3066,11 @@ void MainWindow::OnPerformanceProfiles() {
     PerformanceProfileDialog dialog(detected_gpu, this);
 
     connect(&dialog, &PerformanceProfileDialog::CustomRequested, this,
-            &MainWindow::OnConfigure, Qt::QueuedConnection);
+            [this] { QTimer::singleShot(0, this, &MainWindow::OnConfigure); });
 
     connect(&dialog, &PerformanceProfileDialog::ProfileSelected, this,
             [this, detected_gpu](EdenPerformanceProfile profile) {
+                QTimer::singleShot(0, this, [this, detected_gpu, profile] {
                 const bool was_global = Settings::IsConfiguringGlobal();
                 Settings::SetConfiguringGlobal(true);
 
@@ -3164,8 +3165,8 @@ void MainWindow::OnPerformanceProfiles() {
                        "The settings will be used on the next game launch. "
                        "Per-game settings can still override this global profile.")
                         .arg(profile_name, summary));
-            },
-            Qt::QueuedConnection);
+                });
+            });
 
     dialog.exec();
 }
