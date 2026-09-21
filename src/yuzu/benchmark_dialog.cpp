@@ -19,12 +19,14 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QStringList>
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QTextStream>
 #include <QVBoxLayout>
 
+#include "common/settings.h"
 #include "core/core.h"
 #include "core/perf_stats.h"
 #include "qt_common/qt_common.h"
@@ -98,10 +100,43 @@ double LowFpsFromWorstFrames(const std::vector<double>& sorted_frame_times,
 }
 
 
+
+QString CurrentBenchmarkSettingsSignature() {
+    const auto& values = Settings::values;
+    const QStringList parts{
+        QStringLiteral("backend=%1").arg(static_cast<int>(values.renderer_backend.GetValue())),
+        QStringLiteral("cpu=%1").arg(static_cast<int>(values.cpu_accuracy.GetValue())),
+        QStringLiteral("gpu=%1").arg(static_cast<int>(values.gpu_accuracy.GetValue())),
+        QStringLiteral("resolution=%1").arg(static_cast<int>(values.resolution_setup.GetValue())),
+        QStringLiteral("vram=%1").arg(static_cast<int>(values.vram_usage_mode.GetValue())),
+        QStringLiteral("anisotropy=%1").arg(static_cast<int>(values.max_anisotropy.GetValue())),
+        QStringLiteral("aa=%1").arg(static_cast<int>(values.anti_aliasing.GetValue())),
+        QStringLiteral("astc=%1").arg(static_cast<int>(values.accelerate_astc.GetValue())),
+        QStringLiteral("astc_recompression=%1")
+            .arg(static_cast<int>(values.astc_recompression.GetValue())),
+        QStringLiteral("frame_pacing=%1")
+            .arg(static_cast<int>(values.frame_pacing_mode.GetValue())),
+        QStringLiteral("async_gpu=%1")
+            .arg(values.use_asynchronous_gpu_emulation.GetValue() ? 1 : 0),
+        QStringLiteral("disk_shader_cache=%1")
+            .arg(values.use_disk_shader_cache.GetValue() ? 1 : 0),
+        QStringLiteral("driver_pipeline_cache=%1")
+            .arg(values.use_vulkan_driver_pipeline_cache.GetValue() ? 1 : 0),
+        QStringLiteral("async_shaders=%1")
+            .arg(values.use_asynchronous_shaders.GetValue() ? 1 : 0),
+        QStringLiteral("async_presentation=%1")
+            .arg(values.async_presentation.GetValue() ? 1 : 0),
+        QStringLiteral("force_max_clock=%1")
+            .arg(values.renderer_force_max_clock.GetValue() ? 1 : 0),
+    };
+    return parts.join(QLatin1Char(';'));
+}
+
 struct BenchmarkCsvData {
     QString profile;
     QString commit;
     QString title_id;
+    QString settings_signature;
     bool has_duration{};
     double duration_seconds{};
     bool has_average_game_fps{};
@@ -199,6 +234,7 @@ bool LoadBenchmarkCsv(const QString& path, BenchmarkCsvData& data, QString& erro
     data.profile = metadata.value(QStringLiteral("profile"), QFileInfo{path}.baseName());
     data.commit = metadata.value(QStringLiteral("commit"), QStringLiteral("unknown"));
     data.title_id = metadata.value(QStringLiteral("title_id")).trimmed().toUpper();
+    data.settings_signature = metadata.value(QStringLiteral("settings_signature")).trimmed();
     data.has_duration =
         ReadMetadataDouble(metadata, QStringLiteral("duration_seconds"), data.duration_seconds);
     data.has_average_game_fps = ReadMetadataDouble(
@@ -506,6 +542,7 @@ void BenchmarkDialog::SaveCsv() {
     if (!title_id_text.isEmpty()) {
         stream << "title_id," << title_id_text << '\n';
     }
+    stream << "settings_signature," << CurrentBenchmarkSettingsSignature() << '\n';
     stream << "duration_seconds," << QString::number(last_duration_seconds, 'f', 3) << '\n';
     stream << "frame_time_samples," << last_frame_times.size() << '\n';
     stream << "average_game_fps," << QString::number(average_game_fps, 'f', 6) << '\n';
@@ -611,7 +648,21 @@ void BenchmarkDialog::CompareCsvs() {
                        integer_metric(a.max_shaders_building),
                        integer_metric(b.max_shaders_building), not_available);
 
+    const bool has_settings_signatures =
+        !a.settings_signature.isEmpty() && !b.settings_signature.isEmpty();
+    const bool settings_match =
+        has_settings_signatures && a.settings_signature == b.settings_signature;
+    text += tr("Settings match: %1\n")
+                .arg(has_settings_signatures
+                         ? (settings_match ? tr("Yes") : tr("No"))
+                         : not_available);
+
     QString warnings;
+    if (has_settings_signatures && !settings_match) {
+        warnings += tr("Warning: active benchmark settings differ. Match resolution, renderer, "
+                       "accuracy, VRAM, filtering and asynchronous options before comparing "
+                       "build performance.\n");
+    }
     if (!a.title_id.isEmpty() && !b.title_id.isEmpty() && a.title_id != b.title_id) {
         warnings += tr("Warning: Title IDs differ. These benchmarks are from different games or "
                        "applications and should not be compared directly.\n");

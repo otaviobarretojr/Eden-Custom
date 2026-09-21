@@ -10987,6 +10987,26 @@ Execução B: %3 • %4
         <translation>Aviso: os Title IDs são diferentes. Esses benchmarks são de jogos ou aplicativos diferentes e não devem ser comparados diretamente.
 </translation>
     </message>
+    <message>
+        <source>Settings match: %1
+</source>
+        <translation>Configurações iguais: %1
+</translation>
+    </message>
+    <message>
+        <source>Yes</source>
+        <translation>Sim</translation>
+    </message>
+    <message>
+        <source>No</source>
+        <translation>Não</translation>
+    </message>
+    <message>
+        <source>Warning: active benchmark settings differ. Match resolution, renderer, accuracy, VRAM, filtering and asynchronous options before comparing build performance.
+</source>
+        <translation>Aviso: as configurações ativas do benchmark são diferentes. Iguale resolução, renderizador, precisão, VRAM, filtragem e opções assíncronas antes de comparar o desempenho das builds.
+</translation>
+    </message>
 </context>
 <context>
     <name>PerformanceProfileDialog</name>
