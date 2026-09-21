@@ -4,6 +4,7 @@
 #include "yuzu/content_converter_dialog.h"
 
 #include <algorithm>
+#include <optional>
 
 #include <QApplication>
 #include <QCheckBox>
@@ -42,6 +43,58 @@ constexpr auto kManagedConverterUrl =
     "https://github.com/nicoboss/nsz/releases/download/5.0.0/nsz-cli-windows-x64.exe";
 constexpr auto kManagedConverterSha256 =
     "341b395c18679bf4c01f0bf2fb0e22e315a64b34fad51064781f5155a978883d";
+
+struct ContentFileHint {
+    QString type;
+    QString title_id;
+    QString version;
+    QString base_title_id;
+};
+
+std::optional<ContentFileHint> InferContentFileHint(const QString& filename) {
+    static const QRegularExpression title_pattern{
+        QStringLiteral(R"(\[([0-9A-Fa-f]{16})\])")};
+    static const QRegularExpression version_pattern{
+        QStringLiteral(R"(\[v(\d+)\])"),
+        QRegularExpression::CaseInsensitiveOption};
+
+    const auto title_match = title_pattern.match(filename);
+    if (!title_match.hasMatch()) {
+        return std::nullopt;
+    }
+
+    const QString title_id = title_match.captured(1).toUpper();
+    bool ok = false;
+    const qulonglong numeric_id = title_id.toULongLong(&ok, 16);
+    if (!ok) {
+        return std::nullopt;
+    }
+
+    ContentFileHint hint{};
+    hint.title_id = title_id;
+
+    const auto version_match = version_pattern.match(filename);
+    hint.version = version_match.hasMatch() ? version_match.captured(1) : QStringLiteral("?");
+
+    const qulonglong suffix = numeric_id & 0xFFFULL;
+    if (suffix == 0x000ULL) {
+        hint.type = QStringLiteral("BASE");
+        hint.base_title_id = title_id;
+    } else if (suffix == 0x800ULL) {
+        hint.type = QStringLiteral("UPDATE");
+        hint.base_title_id =
+            QStringLiteral("%1").arg(numeric_id - 0x800ULL, 16, 16, QLatin1Char('0')).toUpper();
+    } else {
+        hint.type = QStringLiteral("DLC?");
+        const qulonglong aligned_id = numeric_id & ~0xFFFULL;
+        if (aligned_id >= 0x1000ULL) {
+            hint.base_title_id =
+                QStringLiteral("%1").arg(aligned_id - 0x1000ULL, 16, 16, QLatin1Char('0')).toUpper();
+        }
+    }
+
+    return hint;
+}
 } // namespace
 
 ContentConverterDialog::ContentConverterDialog(QWidget* parent)
@@ -199,12 +252,32 @@ void ContentConverterDialog::AddFile(const QString& path) {
     }
 
     for (int i = 0; i < file_list->count(); ++i) {
-        if (QFileInfo(file_list->item(i)->text()) == info) {
+        const QString existing_path = file_list->item(i)->data(Qt::UserRole).toString();
+        if (QFileInfo(existing_path) == info) {
             return;
         }
     }
 
-    file_list->addItem(info.absoluteFilePath());
+    auto* item = new QListWidgetItem(file_list);
+    item->setData(Qt::UserRole, info.absoluteFilePath());
+
+    if (const auto hint = InferContentFileHint(info.fileName())) {
+        item->setText(QStringLiteral("[%1]  %2").arg(hint->type, info.fileName()));
+
+        QString tooltip =
+            tr("Title ID: %1\nVersion: %2\nDetected type: %3")
+                .arg(hint->title_id, hint->version, hint->type);
+        if (!hint->base_title_id.isEmpty() && hint->base_title_id != hint->title_id) {
+            tooltip += tr("\nRelated base Title ID: %1").arg(hint->base_title_id);
+        }
+        if (hint->type == QStringLiteral("DLC?")) {
+            tooltip += tr("\nDLC classification will be confirmed from content metadata after conversion.");
+        }
+        item->setToolTip(tooltip);
+    } else {
+        item->setText(info.fileName());
+        item->setToolTip(info.absoluteFilePath());
+    }
 
     if (output_directory->text().isEmpty()) {
         output_directory->setText(info.absolutePath() + QDir::separator() + QStringLiteral("Converted"));
@@ -420,7 +493,10 @@ void ContentConverterDialog::StartConversion() {
 
     queue.clear();
     for (int i = 0; i < file_list->count(); ++i) {
-        queue.append(file_list->item(i)->text());
+        const QString path = file_list->item(i)->data(Qt::UserRole).toString();
+        if (!path.isEmpty()) {
+            queue.append(path);
+        }
     }
 
     queue_index = 0;
