@@ -33,6 +33,7 @@ private:
     void ResetUi();
     QString BuildResultsText(const std::vector<double>& frame_times) const;
 
+    QLabel* build_label{};
     QLabel* status_label{};
     QLabel* elapsed_label{};
     QLabel* fps_label{};
@@ -44,6 +45,8 @@ private:
     QPushButton* save_button{};
 
     QElapsedTimer elapsed_timer{};
+    QString build_profile;
+    QString build_commit;
     bool benchmark_running{};
     int shader_active_samples{};
     int max_shaders_building{};
