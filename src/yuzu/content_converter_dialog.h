@@ -31,6 +31,9 @@ protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
 
+signals:
+    void InstallConvertedContentRequested(const QStringList& files);
+
 private slots:
     void AddFiles();
     void RemoveSelectedFiles();
@@ -64,6 +67,7 @@ private:
     QProgressBar* progress_bar{};
     QPlainTextEdit* log_view{};
     QCheckBox* verify_checkbox{};
+    QCheckBox* auto_install_checkbox{};
     QPushButton* add_button{};
     QPushButton* remove_button{};
     QPushButton* clear_button{};
@@ -77,6 +81,7 @@ private:
     QNetworkAccessManager* network_manager{};
     QNetworkReply* download_reply{};
     QStringList queue{};
+    QStringList pending_install_files{};
     int queue_index{};
     bool cancel_requested{};
 };
