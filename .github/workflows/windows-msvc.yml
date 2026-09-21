@@ -40,6 +40,14 @@ jobs:
           Set-ExecutionPolicy -Scope Process Bypass
           ./tools/windows/install-vulkan-sdk.ps1
 
+      - name: Cache CPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: .cache/cpm
+          key: eden-cpm-windows-${{ hashFiles('cpmfile.json', 'CMakeLists.txt', 'CMakeModules/**/*.cmake') }}
+          restore-keys: |
+            eden-cpm-windows-
+
       - name: Configure MSVC Release
         shell: powershell
         run: |
