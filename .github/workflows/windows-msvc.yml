@@ -61,25 +61,58 @@ jobs:
       - name: Build Eden Custom
         shell: powershell
         run: |
-          cmake --build build --config Release --target yuzu --parallel 2
+          cmake --build build --config Release --target yuzu yuzu-cmd --parallel 2
 
-      - name: Locate build outputs
+      - name: Stage portable package
         shell: powershell
         run: |
-          Get-ChildItem -Path build/bin -Recurse -File | Select-Object FullName, Length
+          New-Item -ItemType Directory -Force -Path package | Out-Null
+
+          $eden = Get-ChildItem -Path build/bin -Recurse -Filter eden.exe -File | Select-Object -First 1
+          if (-not $eden) { throw "eden.exe was not produced" }
+          Copy-Item $eden.FullName package/eden.exe
+
+          $cli = Get-ChildItem -Path build/bin -Recurse -Filter yuzu-cmd.exe -File | Select-Object -First 1
+          if (-not $cli) { throw "yuzu-cmd.exe was not produced" }
+          Copy-Item $cli.FullName package/eden-cli.exe
+
+          Get-ChildItem -Path $eden.Directory.FullName -Filter *.dll -File -ErrorAction SilentlyContinue |
+            ForEach-Object { Copy-Item $_.FullName package/ }
+
+          $translations = Join-Path $eden.Directory.FullName "translations"
+          if (Test-Path $translations) {
+            Copy-Item $translations package/translations -Recurse
+          }
+
+          Copy-Item LICENSE.txt package/LICENSE.txt
+          Copy-Item LICENSES package/LICENSES -Recurse
+          Copy-Item README.md package/README.md
+          Copy-Item CUSTOM_PROJECT.md package/CUSTOM_PROJECT.md
+
+          New-Item -ItemType Directory -Force -Path package/docs/custom | Out-Null
+          Copy-Item docs/custom/NSZ_CONVERTER.md package/docs/custom/NSZ_CONVERTER.md
+
+          @(
+            "Eden Custom v0.1"
+            "Base: Eden v0.2.1"
+            "Commit: $env:GITHUB_SHA"
+            "Toolchain: MSVC / Visual Studio 2022 x64"
+            "Configuration: Release"
+          ) | Set-Content -Encoding UTF8 package/BUILD_INFO.txt
+
+      - name: Validate portable package
+        shell: powershell
+        run: |
+          Get-ChildItem -Path package -Recurse -File | Select-Object FullName, Length
+          if (-not (Test-Path package/eden.exe)) { throw "eden.exe missing from package" }
+          if (-not (Test-Path package/eden-cli.exe)) { throw "eden-cli.exe missing from package" }
+          if (-not (Test-Path package/LICENSE.txt)) { throw "LICENSE.txt missing from package" }
+          if (-not (Test-Path package/LICENSES/NSZ-MIT.txt)) { throw "NSZ MIT license missing from package" }
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
           name: Eden-Custom-v0.1-Windows-MSVC
-          path: |
-            build/bin/**/*.exe
-            build/bin/**/*.dll
-            build/bin/**/translations/**
-            LICENSE.txt
-            LICENSES/**
-            README.md
-            CUSTOM_PROJECT.md
-            docs/custom/NSZ_CONVERTER.md
+          path: package/**
           if-no-files-found: error
           retention-days: 14
