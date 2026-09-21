@@ -25,6 +25,7 @@
 
 #include "about_dialog.h"
 #include "benchmark_dialog.h"
+#include "performance_profile_dialog.h"
 #include "data_dialog.h"
 #include "deps_dialog.h"
 #include "content_converter_dialog.h"
@@ -1679,6 +1680,7 @@ void MainWindow::ConnectMenuEvents() {
     connect_menu(ui->action_Install_File_NAND, &MainWindow::OnMenuInstallToNAND);
     connect_menu(ui->action_Content_Converter, &MainWindow::OnContentConverter);
     connect_menu(ui->action_Benchmark_Tool, &MainWindow::OnBenchmarkTool);
+    connect_menu(ui->action_Performance_Profiles, &MainWindow::OnPerformanceProfiles);
     connect_menu(ui->action_Exit, &QMainWindow::close);
     connect_menu(ui->action_Load_Amiibo, &MainWindow::OnLoadAmiibo);
 
@@ -3044,6 +3046,128 @@ void MainWindow::OnMenuLoadFolder() {
 
 void MainWindow::IncrementInstallProgress() {
     install_progress->setValue(install_progress->value() + 1);
+}
+
+void MainWindow::OnPerformanceProfiles() {
+    if (emulation_running) {
+        QMessageBox::information(
+            this, tr("Performance Profiles"),
+            tr("Stop the current game before changing a performance profile. "
+               "Profiles are applied globally for the next game launch."));
+        return;
+    }
+
+    QString detected_gpu;
+    const int device_index = Settings::values.vulkan_device.GetValue();
+    if (device_index >= 0 && device_index < static_cast<int>(vk_device_records.size())) {
+        detected_gpu = QString::fromStdString(vk_device_records[device_index].name);
+    }
+
+    PerformanceProfileDialog dialog(detected_gpu, this);
+
+    connect(&dialog, &PerformanceProfileDialog::CustomRequested, this,
+            &MainWindow::OnConfigure, Qt::QueuedConnection);
+
+    connect(&dialog, &PerformanceProfileDialog::ProfileSelected, this,
+            [this, detected_gpu](EdenPerformanceProfile profile) {
+                const bool was_global = Settings::IsConfiguringGlobal();
+                Settings::SetConfiguringGlobal(true);
+
+                auto& values = Settings::values;
+
+                // Shared compatibility baseline. Profiles deliberately avoid unsafe CPU accuracy,
+                // low GPU accuracy and asynchronous shader hacks.
+                values.renderer_backend.SetValue(Settings::RendererBackend::Vulkan);
+                values.cpu_accuracy.SetValue(Settings::CpuAccuracy::Auto);
+                values.gpu_accuracy.SetValue(Settings::GpuAccuracy::Medium);
+                values.accelerate_astc.SetValue(Settings::AstcDecodeMode::Gpu);
+                values.astc_recompression.SetValue(Settings::AstcRecompression::Uncompressed);
+                values.frame_pacing_mode.SetValue(Settings::FramePacingMode::Target_Auto);
+                values.use_asynchronous_gpu_emulation.SetValue(true);
+                values.use_disk_shader_cache.SetValue(true);
+                values.use_vulkan_driver_pipeline_cache.SetValue(true);
+                values.use_asynchronous_shaders.SetValue(false);
+                values.async_presentation.SetValue(false);
+
+                QString profile_name;
+                QString summary;
+
+                switch (profile) {
+                case EdenPerformanceProfile::Auto: {
+                    const bool target_gpu =
+                        detected_gpu.contains(QStringLiteral("RTX 5060 Ti"),
+                                              Qt::CaseInsensitive);
+
+                    values.resolution_setup.SetValue(Settings::ResolutionSetup::Res1X);
+                    values.vram_usage_mode.SetValue(target_gpu
+                                                        ? Settings::VramUsageMode::Aggressive
+                                                        : Settings::VramUsageMode::Conservative);
+                    values.max_anisotropy.SetValue(Settings::AnisotropyMode::Automatic);
+                    values.anti_aliasing.SetValue(Settings::AntiAliasing::None);
+                    values.renderer_force_max_clock.SetValue(false);
+
+                    profile_name = tr("Auto");
+                    summary = target_gpu
+                                  ? tr("RTX 5060 Ti detected: native 1x, aggressive VRAM, "
+                                       "GPU Medium, CPU Auto and persistent shader caches.")
+                                  : tr("Safe automatic baseline: native 1x, conservative VRAM, "
+                                       "GPU Medium, CPU Auto and persistent shader caches.");
+                    break;
+                }
+                case EdenPerformanceProfile::Stable:
+                    values.resolution_setup.SetValue(Settings::ResolutionSetup::Res1X);
+                    values.vram_usage_mode.SetValue(Settings::VramUsageMode::Conservative);
+                    values.max_anisotropy.SetValue(Settings::AnisotropyMode::Automatic);
+                    values.anti_aliasing.SetValue(Settings::AntiAliasing::None);
+                    values.renderer_force_max_clock.SetValue(false);
+
+                    profile_name = tr("Stable");
+                    summary = tr("Native 1x, conservative VRAM, GPU Medium, CPU Auto and "
+                                 "compatibility-oriented shader settings.");
+                    break;
+                case EdenPerformanceProfile::Performance:
+                    values.resolution_setup.SetValue(Settings::ResolutionSetup::Res1X);
+                    values.vram_usage_mode.SetValue(Settings::VramUsageMode::Aggressive);
+                    values.max_anisotropy.SetValue(Settings::AnisotropyMode::Automatic);
+                    values.anti_aliasing.SetValue(Settings::AntiAliasing::None);
+                    values.renderer_force_max_clock.SetValue(true);
+
+                    profile_name = tr("Performance");
+                    summary = tr("Native 1x, aggressive VRAM and maximum renderer clock request, "
+                                 "without unsafe CPU/GPU accuracy or asynchronous shader hacks.");
+                    break;
+                case EdenPerformanceProfile::Quality:
+                    values.resolution_setup.SetValue(Settings::ResolutionSetup::Res2X);
+                    values.vram_usage_mode.SetValue(Settings::VramUsageMode::Aggressive);
+                    values.max_anisotropy.SetValue(Settings::AnisotropyMode::X16);
+                    values.anti_aliasing.SetValue(Settings::AntiAliasing::Smaa);
+                    values.renderer_force_max_clock.SetValue(false);
+
+                    profile_name = tr("Quality");
+                    summary = tr("2x resolution, 16x anisotropic filtering and SMAA, while "
+                                 "keeping GPU Medium, CPU Auto and persistent shader caches.");
+                    break;
+                case EdenPerformanceProfile::Custom:
+                    Settings::SetConfiguringGlobal(was_global);
+                    return;
+                }
+
+                Settings::UpdateRescalingInfo();
+                Settings::SetConfiguringGlobal(was_global);
+
+                OnSaveConfig();
+                UpdateStatusButtons();
+
+                QMessageBox::information(
+                    this, tr("Performance Profile Applied"),
+                    tr("%1 profile applied.\n\n%2\n\n"
+                       "The settings will be used on the next game launch. "
+                       "Per-game settings can still override this global profile.")
+                        .arg(profile_name, summary));
+            },
+            Qt::QueuedConnection);
+
+    dialog.exec();
 }
 
 void MainWindow::OnBenchmarkTool() {
