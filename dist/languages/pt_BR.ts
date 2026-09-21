@@ -6325,6 +6325,10 @@ Por favor vá para Configuração -&gt; Sistema -&gt; Rede e selecione.</transla
         <source>Play time</source>
         <translation>Tempo jogado</translation>
     </message>
+    <message>
+        <source>Shader Preparation Status</source>
+        <translation>Status da preparação de shaders</translation>
+    </message>
 </context>
 <context>
     <name>GameListItemCompat</name>
@@ -8229,6 +8233,34 @@ Would you like to bypass this and exit anyway?</source>
         <location filename="../../src/qt_common/config/shared_translation.h" line="79"/>
         <source>Null</source>
         <translation type="unfinished"/>
+    </message>
+    <message>
+        <source>Shader Preparation Status</source>
+        <translation>Status da preparação de shaders</translation>
+    </message>
+    <message>
+        <source>No known shader cache has been prepared yet.</source>
+        <translation>Nenhum cache de shader conhecido foi preparado ainda.</translation>
+    </message>
+    <message>
+        <source>Cache files exist, but Eden Custom has not measured a preparation yet.</source>
+        <translation>Existem arquivos de cache, mas o Eden Custom ainda não mediu uma preparação.</translation>
+    </message>
+    <message>
+        <source>The last preparation found no known shader pipelines.</source>
+        <translation>A última preparação não encontrou pipelines de shader conhecidos.</translation>
+    </message>
+    <message>
+        <source>The last shader preparation completed successfully.</source>
+        <translation>A última preparação de shaders foi concluída com sucesso.</translation>
+    </message>
+    <message>
+        <source>The last shader preparation did not reach completion.</source>
+        <translation>A última preparação de shaders não foi concluída.</translation>
+    </message>
+    <message>
+        <source>Not recorded</source>
+        <translation>Não registrado</translation>
     </message>
 </context>
 <context>
@@ -10680,6 +10712,77 @@ Error code: %3</source>
         <location filename="../../src/yuzu/updater/update_dialog.cpp" line="171"/>
         <source>Successfully downloaded %1. Would you like to open it?</source>
         <translation type="unfinished"/>
+    </message>
+</context>
+<context>
+    <name>BenchmarkDialog</name>
+    <message>
+        <source>Eden Custom Benchmark</source>
+        <translation>Benchmark do Eden Custom</translation>
+    </message>
+    <message>
+        <source>Run the same route or scene in each build. Eden Custom records internal emulation frame times without clearing shader caches automatically.</source>
+        <translation>Execute a mesma rota ou cena em cada build. O Eden Custom registra os tempos de quadro internos da emulação sem limpar automaticamente o cache de shaders.</translation>
+    </message>
+    <message>
+        <source>Live session</source>
+        <translation>Sessão ao vivo</translation>
+    </message>
+    <message>
+        <source>Build:</source>
+        <translation>Build:</translation>
+    </message>
+    <message>
+        <source>Status:</source>
+        <translation>Status:</translation>
+    </message>
+    <message>
+        <source>Elapsed:</source>
+        <translation>Tempo:</translation>
+    </message>
+    <message>
+        <source>Game FPS:</source>
+        <translation>FPS do jogo:</translation>
+    </message>
+    <message>
+        <source>Emulation frame:</source>
+        <translation>Quadro da emulação:</translation>
+    </message>
+    <message>
+        <source>Shaders building:</source>
+        <translation>Shaders compilando:</translation>
+    </message>
+    <message>
+        <source>Ready</source>
+        <translation>Pronto</translation>
+    </message>
+    <message>
+        <source>Start benchmark</source>
+        <translation>Iniciar benchmark</translation>
+    </message>
+    <message>
+        <source>Stop &amp;&amp; results</source>
+        <translation>Parar e ver resultados</translation>
+    </message>
+    <message>
+        <source>Save frame-time CSV</source>
+        <translation>Salvar CSV de frametime</translation>
+    </message>
+    <message>
+        <source>Benchmark results will appear here.</source>
+        <translation>Os resultados do benchmark aparecerão aqui.</translation>
+    </message>
+    <message>
+        <source>Completed</source>
+        <translation>Concluído</translation>
+    </message>
+    <message>
+        <source>CSV saved.</source>
+        <translation>CSV salvo.</translation>
+    </message>
+    <message>
+        <source>Developer build</source>
+        <translation>Build de desenvolvimento</translation>
     </message>
 </context>
 </TS>
