@@ -10969,6 +10969,14 @@ Execução B: %3 • %4
         <source>Compare two Eden Custom benchmark CSVs. New-format CSVs include FPS and shader metadata; older CSVs remain compatible for frame-time metrics.</source>
         <translation>Compare dois CSVs de benchmark do Eden Custom. Os CSVs do novo formato incluem FPS e metadados de shaders; CSVs antigos continuam compatíveis para métricas de tempo de quadro.</translation>
     </message>
+    <message>
+        <source>CSV files (*.csv)</source>
+        <translation>Arquivos CSV (*.csv)</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Fechar</translation>
+    </message>
 </context>
 <context>
     <name>PerformanceProfileDialog</name>
