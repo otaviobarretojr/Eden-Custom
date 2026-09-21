@@ -29,6 +29,7 @@ private:
     void StartBenchmark();
     void StopBenchmark();
     void SaveCsv();
+    void CompareCsvs();
     void SetRunning(bool running);
     void ResetUi();
     QString BuildResultsText(const std::vector<double>& frame_times) const;
@@ -43,11 +44,13 @@ private:
     QPushButton* start_button{};
     QPushButton* stop_button{};
     QPushButton* save_button{};
+    QPushButton* compare_button{};
 
     QElapsedTimer elapsed_timer{};
     QString build_profile;
     QString build_commit;
     bool benchmark_running{};
+    double last_duration_seconds{};
     int shader_active_samples{};
     int max_shaders_building{};
     std::vector<double> fps_samples{};

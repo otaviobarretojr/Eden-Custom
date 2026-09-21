@@ -10848,6 +10848,127 @@ Error code: %3</source>
         <source>Developer build</source>
         <translation>Build de desenvolvimento</translation>
     </message>
+
+    <message>
+        <source>Compare CSVs</source>
+        <translation>Comparar CSVs</translation>
+    </message>
+    <message>
+        <source>Could not open the file.</source>
+        <translation>Não foi possível abrir o arquivo.</translation>
+    </message>
+    <message>
+        <source>No valid frame-time samples were found.</source>
+        <translation>Nenhuma amostra válida de tempo de quadro foi encontrada.</translation>
+    </message>
+    <message>
+        <source>Select benchmark A</source>
+        <translation>Selecionar benchmark A</translation>
+    </message>
+    <message>
+        <source>Select benchmark B</source>
+        <translation>Selecionar benchmark B</translation>
+    </message>
+    <message>
+        <source>Benchmark comparison</source>
+        <translation>Comparação de benchmarks</translation>
+    </message>
+    <message>
+        <source>Could not read benchmark A:
+%1</source>
+        <translation>Não foi possível ler o benchmark A:
+%1</translation>
+    </message>
+    <message>
+        <source>Could not read benchmark B:
+%1</source>
+        <translation>Não foi possível ler o benchmark B:
+%1</translation>
+    </message>
+    <message>
+        <source>n/a</source>
+        <translation>n/d</translation>
+    </message>
+    <message>
+        <source>Run A: %1 • %2
+Run B: %3 • %4
+
+</source>
+        <translation>Execução A: %1 • %2
+Execução B: %3 • %4
+
+</translation>
+    </message>
+    <message>
+        <source>Metric | A | B | Delta B vs A
+</source>
+        <translation>Métrica | A | B | Diferença B vs A
+</translation>
+    </message>
+    <message>
+        <source>Duration (s)</source>
+        <translation>Duração (s)</translation>
+    </message>
+    <message>
+        <source>Average game FPS</source>
+        <translation>FPS médio do jogo</translation>
+    </message>
+    <message>
+        <source>Mean emulation frame (ms)</source>
+        <translation>Tempo médio de emulação por quadro (ms)</translation>
+    </message>
+    <message>
+        <source>Median emulation frame (ms)</source>
+        <translation>Mediana do tempo de emulação por quadro (ms)</translation>
+    </message>
+    <message>
+        <source>P95 emulation frame (ms)</source>
+        <translation>P95 do tempo de emulação por quadro (ms)</translation>
+    </message>
+    <message>
+        <source>P99 emulation frame (ms)</source>
+        <translation>P99 do tempo de emulação por quadro (ms)</translation>
+    </message>
+    <message>
+        <source>Derived 1% low (FPS)</source>
+        <translation>1% low derivado (FPS)</translation>
+    </message>
+    <message>
+        <source>Derived 0.1% low (FPS)</source>
+        <translation>0,1% low derivado (FPS)</translation>
+    </message>
+    <message>
+        <source>Frame-time samples</source>
+        <translation>Amostras de tempo de quadro</translation>
+    </message>
+    <message>
+        <source>Intervals with shader compilation</source>
+        <translation>Intervalos com compilação de shaders</translation>
+    </message>
+    <message>
+        <source>Maximum simultaneous shaders building</source>
+        <translation>Máximo de shaders compilando simultaneamente</translation>
+    </message>
+    <message>
+        <source>Warning: benchmark durations differ by more than 5%. Use the same route and duration for a fair comparison.
+</source>
+        <translation>Aviso: as durações dos benchmarks diferem em mais de 5%. Use o mesmo percurso e a mesma duração para uma comparação justa.
+</translation>
+    </message>
+    <message>
+        <source>Warning: frame-time sample counts differ by more than 10%. Check that both runs used the same route and duration.
+</source>
+        <translation>Aviso: a quantidade de amostras de tempo de quadro difere em mais de 10%. Confirme que as duas execuções usaram o mesmo percurso e a mesma duração.
+</translation>
+    </message>
+    <message>
+        <source>Delta is B relative to A. Positive frametime means B took longer; positive FPS means B was higher. Compare only runs made with the same game, scene, settings and route.</source>
+        <translation>A diferença mostra B em relação a A. Tempo de quadro positivo significa que B levou mais tempo; FPS positivo significa que B foi maior. Compare somente execuções feitas com o mesmo jogo, cena, configurações e percurso.</translation>
+    </message>
+    <message>
+        <source>Compare two Eden Custom benchmark CSVs. New-format CSVs include FPS and shader metadata; older CSVs remain compatible for frame-time metrics.</source>
+        <translation>Compare dois CSVs de benchmark do Eden Custom. Os CSVs do novo formato incluem FPS e metadados de shaders; CSVs antigos continuam compatíveis para métricas de tempo de quadro.</translation>
+    </message>
 </context>
 <context>
     <name>PerformanceProfileDialog</name>
