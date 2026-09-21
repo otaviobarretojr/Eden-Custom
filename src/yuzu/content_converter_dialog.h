@@ -12,6 +12,8 @@ class QDragEnterEvent;
 class QDropEvent;
 class QLabel;
 class QLineEdit;
+class QNetworkAccessManager;
+class QNetworkReply;
 class QListWidget;
 class QPlainTextEdit;
 class QProgressBar;
@@ -35,6 +37,8 @@ private slots:
     void ClearFiles();
     void ChooseOutputDirectory();
     void ChooseConverterExecutable();
+    void DownloadConverter();
+    void FinishConverterDownload();
     void StartConversion();
     void CancelConversion();
     void ReadProcessOutput();
@@ -49,6 +53,7 @@ private:
     void UpdateProgressFromText(const QString& text);
     bool ResolveConverter(QString& program, QStringList& prefix_arguments) const;
     QString EdenKeysDirectory() const;
+    QString ManagedConverterPath() const;
 
     QListWidget* file_list{};
     QLineEdit* output_directory{};
@@ -63,10 +68,13 @@ private:
     QPushButton* clear_button{};
     QPushButton* output_button{};
     QPushButton* converter_button{};
+    QPushButton* download_button{};
     QPushButton* start_button{};
     QPushButton* cancel_button{};
 
     QProcess* process{};
+    QNetworkAccessManager* network_manager{};
+    QNetworkReply* download_reply{};
     QStringList queue{};
     int queue_index{};
     bool cancel_requested{};
