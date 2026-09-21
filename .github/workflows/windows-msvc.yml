@@ -1,0 +1,68 @@
+name: Windows MSVC Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - custom-v0.1
+    paths:
+      - "CMakeLists.txt"
+      - "cpmfile.json"
+      - "src/**"
+      - "externals/**"
+      - "tools/windows/**"
+      - ".github/workflows/windows-msvc.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout Eden Custom
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Vulkan SDK
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass
+          ./tools/windows/install-vulkan-sdk.ps1
+
+      - name: Configure MSVC Release
+        shell: powershell
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+            -DYUZU_TESTS=OFF `
+            -DDYNARMIC_TESTS=OFF `
+            -DENABLE_QT=ON `
+            -DYUZU_USE_BUNDLED_QT=ON `
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Eden Custom
+        shell: powershell
+        run: |
+          cmake --build build --config Release --target yuzu --parallel 2
+
+      - name: Locate build outputs
+        shell: powershell
+        run: |
+          Get-ChildItem -Path build/bin -Recurse -File | Select-Object FullName, Length
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Eden-Custom-v0.1-Windows-MSVC
+          path: |
+            build/bin/**/*.exe
+            build/bin/**/*.dll
+            build/bin/**/translations/**
+          if-no-files-found: error
+          retention-days: 14
