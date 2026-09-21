@@ -147,7 +147,7 @@ int ReadMetadataInt(const QHash<QString, QString>& metadata, const QString& key)
 bool LoadBenchmarkCsv(const QString& path, BenchmarkCsvData& data, QString& error) {
     QFile file{path};
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        error = QObject::tr("Could not open the file.");
+        error = QCoreApplication::translate("BenchmarkDialog", "Could not open the file.");
         return false;
     }
 
@@ -190,7 +190,8 @@ bool LoadBenchmarkCsv(const QString& path, BenchmarkCsvData& data, QString& erro
     }
 
     if (data.frame_times.empty()) {
-        error = QObject::tr("No valid frame-time samples were found.");
+        error = QCoreApplication::translate("BenchmarkDialog",
+                                            "No valid frame-time samples were found.");
         return false;
     }
 
@@ -218,7 +219,7 @@ bool LoadBenchmarkCsv(const QString& path, BenchmarkCsvData& data, QString& erro
 
 QString PercentageDelta(double a, double b) {
     if (!std::isfinite(a) || !std::isfinite(b) || std::abs(a) < 0.0000001) {
-        return QObject::tr("n/a");
+        return QCoreApplication::translate("BenchmarkDialog", "n/a");
     }
 
     const double delta = ((b - a) / a) * 100.0;
