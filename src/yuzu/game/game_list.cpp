@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <functional>
+
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QDir>
@@ -35,6 +37,7 @@
 #include "yuzu/game/game_list_p.h"
 #include "yuzu/game/game_list_worker.h"
 #include "yuzu/main_window.h"
+#include "yuzu/shader_preparation_status.h"
 #include "yuzu/util/controller_navigation.h"
 
 GameListSearchField::KeyReleaseEater::KeyReleaseEater(GameList* gamelist_, QObject* parent)
@@ -1131,6 +1134,58 @@ void GameList::RefreshGameDirectory() {
         LOG_INFO(Frontend, "Change detected in the games directory. Reloading game list.");
         QtCommon::system->GetFileSystemController().CreateFactories(*QtCommon::vfs);
         PopulateAsync(UISettings::values.game_dirs);
+    }
+}
+
+void GameList::RefreshShaderPreparationStatus(u64 program_id) {
+    if (program_id == 0 || item_model == nullptr) {
+        return;
+    }
+
+    const auto status = EdenCustom::ReadShaderPreparationStatus(program_id);
+    const bool has_cache_files = status.transferable_cache_bytes > 0 ||
+                                 status.driver_cache_bytes > 0 ||
+                                 status.opengl_cache_bytes > 0;
+
+    int shader_state = 0;
+    if (!status.has_record && has_cache_files) {
+        shader_state = 4;
+    } else if (status.has_record && status.known_pipelines == 0) {
+        shader_state = 3;
+    } else if (status.has_record && status.last_completed) {
+        shader_state = 1;
+    } else if (status.has_record) {
+        shader_state = 2;
+    }
+
+    std::function<void(QStandardItem*)> update_children;
+    update_children = [&](QStandardItem* parent) {
+        if (parent == nullptr) {
+            return;
+        }
+
+        for (int row = 0; row < parent->rowCount(); ++row) {
+            auto* item = parent->child(row, 0);
+            if (item == nullptr) {
+                continue;
+            }
+
+            if (item->data(GameListItemPath::ProgramIdRole).toULongLong() == program_id) {
+                item->setData(shader_state, GameListItemPath::ShaderPreparationStateRole);
+                item->setData(static_cast<qulonglong>(status.known_pipelines),
+                              GameListItemPath::ShaderPipelineCountRole);
+            }
+
+            if (item->hasChildren()) {
+                update_children(item);
+            }
+        }
+    };
+
+    update_children(item_model->invisibleRootItem());
+
+    if (m_currentView != nullptr && m_currentView->viewport() != nullptr) {
+        m_currentView->viewport()->update();
     }
 }
 
