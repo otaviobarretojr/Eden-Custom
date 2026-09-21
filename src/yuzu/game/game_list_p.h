@@ -73,6 +73,8 @@ public:
     static constexpr int FullPathRole = SortRole + 2;
     static constexpr int ProgramIdRole = SortRole + 3;
     static constexpr int FileTypeRole = SortRole + 4;
+    static constexpr int ShaderPreparationStateRole = SortRole + 5;
+    static constexpr int ShaderPipelineCountRole = SortRole + 6;
 
     GameListItemPath() = default;
     GameListItemPath(const QString& game_path, const std::vector<u8>& picture_data,

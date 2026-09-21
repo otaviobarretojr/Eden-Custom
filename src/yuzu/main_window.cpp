@@ -2204,9 +2204,14 @@ void MainWindow::BootGame(const QString& filename, Service::AM::FrontendAppletPa
                     !shader_preparation_state->observed_build) {
                     shader_preparation_state->observed_build = true;
                     EdenCustom::RecordShaderPreparationStart(title_id, total);
-                } else if (stage == VideoCore::LoadCallbackStage::Complete &&
-                           shader_preparation_state->observed_build &&
-                           !shader_preparation_state->recorded_complete) {
+                }
+            },
+            Qt::QueuedConnection);
+
+    connect(emu_thread.get(), &EmuThread::ShaderPreparationFinished, this,
+            [title_id, shader_preparation_state](bool completed) {
+                if (completed && shader_preparation_state->observed_build &&
+                    !shader_preparation_state->recorded_complete) {
                     shader_preparation_state->recorded_complete = true;
                     EdenCustom::RecordShaderPreparationComplete(title_id);
                 }

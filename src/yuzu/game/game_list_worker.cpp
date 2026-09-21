@@ -35,6 +35,7 @@
 #include "yuzu/game/game_list.h"
 #include "yuzu/game/game_list_p.h"
 #include "yuzu/game/game_list_worker.h"
+#include "yuzu/shader_preparation_status.h"
 
 namespace {
 
@@ -218,9 +219,58 @@ QList<QStandardItem*> MakeGameListEntry(const std::string& path, const std::stri
         });
 
     u64 play_time = play_time_manager.GetPlayTime(program_id);
-    return QList<QStandardItem*>{
+
+    auto* path_item =
         new GameListItemPath(FormatGameName(path), icon, QString::fromStdString(name),
-                             file_type_string, program_id, play_time, patch_versions),
+                             file_type_string, program_id, play_time, patch_versions);
+
+    const auto shader_status = EdenCustom::ReadShaderPreparationStatus(program_id);
+    const bool has_cache_files = shader_status.transferable_cache_bytes > 0 ||
+                                 shader_status.driver_cache_bytes > 0 ||
+                                 shader_status.opengl_cache_bytes > 0;
+
+    // 0 = no cache, 1 = completed known cache, 2 = interrupted, 3 = measured empty,
+    // 4 = cache files exist but have not yet been measured by Eden Custom.
+    int shader_state = 0;
+    if (!shader_status.has_record && has_cache_files) {
+        shader_state = 4;
+    } else if (shader_status.has_record && shader_status.known_pipelines == 0) {
+        shader_state = 3;
+    } else if (shader_status.has_record && shader_status.last_completed) {
+        shader_state = 1;
+    } else if (shader_status.has_record) {
+        shader_state = 2;
+    }
+
+    path_item->setData(shader_state, GameListItemPath::ShaderPreparationStateRole);
+    path_item->setData(static_cast<qulonglong>(shader_status.known_pipelines),
+                       GameListItemPath::ShaderPipelineCountRole);
+
+    QString shader_tooltip;
+    switch (shader_state) {
+    case 1:
+        shader_tooltip =
+            QObject::tr("Known shader pipelines: %1").arg(shader_status.known_pipelines);
+        break;
+    case 2:
+        shader_tooltip = QObject::tr("Shader preparation: previous run was interrupted");
+        break;
+    case 3:
+        shader_tooltip = QObject::tr("Shader preparation: no known pipelines yet");
+        break;
+    case 4:
+        shader_tooltip = QObject::tr("Shader cache exists but has not been measured yet");
+        break;
+    default:
+        shader_tooltip = QObject::tr("Shader preparation: no cache yet");
+        break;
+    }
+    path_item->setData(
+        QStringLiteral("%1\n%2").arg(path_item->data(Qt::ToolTipRole).toString(), shader_tooltip),
+        Qt::ToolTipRole);
+
+    return QList<QStandardItem*>{
+        path_item,
         new GameListItem(file_type_string),
         new GameListItemSize(size),
         new GameListItemPlayTime(play_time),

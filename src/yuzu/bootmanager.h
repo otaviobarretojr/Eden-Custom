@@ -144,6 +144,7 @@ signals:
     void DebugModeLeft();
 
     void LoadProgress(VideoCore::LoadCallbackStage stage, std::size_t value, std::size_t total);
+    void ShaderPreparationFinished(bool completed);
 };
 
 class GRenderWindow : public QWidget, public Core::Frontend::EmuWindow {

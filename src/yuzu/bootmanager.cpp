@@ -96,6 +96,11 @@ void EmuThread::run() {
             [this](VideoCore::LoadCallbackStage stage, std::size_t value, std::size_t total) {
                 emit LoadProgress(stage, value, total);
             });
+
+        // LoadDiskResources can return early when a stop was requested. Keep this distinct from
+        // the loading-screen Complete stage so Eden Custom never records a cancelled preparation
+        // as successful.
+        emit ShaderPreparationFinished(!stop_token.stop_requested());
     }
     emit LoadProgress(VideoCore::LoadCallbackStage::Complete, 0, 0);
 

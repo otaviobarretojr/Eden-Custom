@@ -4,6 +4,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include "game_card.h"
+#include "game_list_p.h"
 #include "qt_common/config/uisettings.h"
 
 GameCard::GameCard(QObject* parent) : QStyledItemDelegate{parent} {
@@ -89,6 +90,58 @@ void GameCard::paint(QPainter* painter, const QStyleOptionViewItem& option,
     } else {
         // if there is no icon just draw a blank rect
         iconRect = QRect(cardRect.left() + margins, cardRect.top() + margins, _iconsize, _iconsize);
+    }
+
+    const int shader_state =
+        index.data(GameListItemPath::ShaderPreparationStateRole).toInt();
+    if (shader_state != 0 && !iconRect.isEmpty()) {
+        const qulonglong pipeline_count =
+            index.data(GameListItemPath::ShaderPipelineCountRole).toULongLong();
+
+        QString badge_text;
+        switch (shader_state) {
+        case 1:
+            badge_text = pipeline_count >= 1000
+                             ? tr("Shaders %1K").arg(pipeline_count / 1000.0, 0, 'f', 1)
+                             : tr("Shaders %1").arg(pipeline_count);
+            break;
+        case 2:
+            badge_text = tr("Shaders !");
+            break;
+        case 3:
+            badge_text = tr("Shaders new");
+            break;
+        case 4:
+            badge_text = tr("Shaders ?");
+            break;
+        default:
+            break;
+        }
+
+        if (!badge_text.isEmpty()) {
+            painter->save();
+
+            QFont badge_font = option.font;
+            badge_font.setBold(true);
+            badge_font.setPixelSize(std::max(8, option.font.pixelSize() > 0
+                                                   ? option.font.pixelSize() - 1
+                                                   : 9));
+            painter->setFont(badge_font);
+
+            const QFontMetrics metrics{badge_font};
+            const int badge_height = metrics.height() + 6;
+            const int badge_width = metrics.horizontalAdvance(badge_text) + 12;
+            QRect badge_rect{iconRect.right() - badge_width - 4,
+                             iconRect.bottom() - badge_height - 4, badge_width, badge_height};
+
+            painter->setBrush(palette.button());
+            painter->setPen(QPen(palette.mid().color(), 1));
+            painter->drawRoundedRect(badge_rect, badge_height / 2.0, badge_height / 2.0);
+            painter->setPen(palette.buttonText().color());
+            painter->drawText(badge_rect, Qt::AlignCenter, badge_text);
+
+            painter->restore();
+        }
     }
 
     if (UISettings::values.show_game_name.GetValue()) {
