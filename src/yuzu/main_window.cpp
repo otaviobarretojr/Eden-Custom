@@ -2949,8 +2949,27 @@ void MainWindow::IncrementInstallProgress() {
 
 void MainWindow::OnContentConverter() {
     ContentConverterDialog dialog(this);
+
     connect(&dialog, &ContentConverterDialog::InstallConvertedContentRequested, this,
             [this](const QStringList& files) { InstallFilesToNAND(files); });
+
+    connect(&dialog, &ContentConverterDialog::AddConvertedDirectoriesRequested, this,
+            [this](const QStringList& directories) {
+                bool added = false;
+                for (const QString& directory : directories) {
+                    UISettings::GameDir game_dir{directory.toStdString(), false, true};
+                    if (!UISettings::values.game_dirs.contains(game_dir)) {
+                        UISettings::values.game_dirs.append(game_dir);
+                        added = true;
+                    }
+                }
+
+                if (added) {
+                    OnSaveConfig();
+                    game_list->PopulateAsync(UISettings::values.game_dirs);
+                }
+            });
+
     dialog.exec();
 }
 
