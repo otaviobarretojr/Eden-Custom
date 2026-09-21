@@ -8,6 +8,7 @@ on:
       - profiles-v0.3
       - benchmark-compare-v0.4
       - benchmark-suite-v0.5
+      - benchmark-report-v0.6
     paths:
       - "CMakeLists.txt"
       - "cpmfile.json"
