@@ -2949,6 +2949,8 @@ void MainWindow::IncrementInstallProgress() {
 
 void MainWindow::OnContentConverter() {
     ContentConverterDialog dialog(this);
+    connect(&dialog, &ContentConverterDialog::InstallConvertedContentRequested, this,
+            [this](const QStringList& files) { InstallFilesToNAND(files); });
     dialog.exec();
 }
 
@@ -2972,15 +2974,20 @@ void MainWindow::OnMenuInstallToNAND() {
     }
 
     const QStringList files = installDialog.GetFiles();
-
     if (files.isEmpty()) {
         return;
     }
 
-    // Save folder location of the first selected file
     UISettings::values.roms_path = QFileInfo(filenames[0]).path().toStdString();
+    InstallFilesToNAND(files);
+}
 
-    int remaining = filenames.size();
+void MainWindow::InstallFilesToNAND(const QStringList& files) {
+    if (files.isEmpty()) {
+        return;
+    }
+
+    int remaining = files.size();
 
     // This would only overflow above 2^51 bytes (2.252 PB)
     int total_size = 0;
@@ -2992,17 +2999,17 @@ void MainWindow::OnMenuInstallToNAND() {
         return;
     }
 
-    QStringList new_files{};         // Newly installed files that do not yet exist in the NAND
-    QStringList overwritten_files{}; // Files that overwrote those existing in the NAND
-    QStringList failed_files{};      // Files that failed to install due to errors
-    bool detected_base_install{};    // Whether a base game was attempted to be installed
+    QStringList new_files{};
+    QStringList overwritten_files{};
+    QStringList failed_files{};
+    bool detected_base_install{};
 
     ui->action_Install_File_NAND->setEnabled(false);
 
     install_progress = new QProgressDialog(QString{}, tr("Cancel"), 0, total_size, this);
     install_progress->setWindowFlags(windowFlags() & ~Qt::WindowMaximizeButtonHint);
     install_progress->setAttribute(Qt::WA_DeleteOnClose, true);
-    install_progress->setFixedWidth(installDialog.GetMinimumWidth() + 40);
+    install_progress->setMinimumWidth(520);
     install_progress->show();
 
     for (const QString& file : files) {
@@ -3032,7 +3039,6 @@ void MainWindow::OnMenuInstallToNAND() {
             }
 
             result = future.result();
-
         } else {
             result = InstallNCA(file);
         }
@@ -3056,6 +3062,9 @@ void MainWindow::OnMenuInstallToNAND() {
         }
 
         --remaining;
+        if (install_progress->wasCanceled()) {
+            break;
+        }
     }
 
     install_progress->close();
@@ -3063,8 +3072,8 @@ void MainWindow::OnMenuInstallToNAND() {
     if (detected_base_install) {
         QMessageBox::warning(
             this, tr("Install Results"),
-            tr("To avoid possible conflicts, we discourage users from installing base games to the "
-               "NAND.\nPlease, only use this feature to install updates and DLC."));
+            tr("To avoid possible conflicts, base games are not installed automatically to NAND.\n"
+               "Use NAND installation for updates and DLC."));
     }
 
     const QString install_results =
@@ -3076,7 +3085,10 @@ void MainWindow::OnMenuInstallToNAND() {
         (failed_files.isEmpty() ? QString{}
                                 : tr("%n file(s) failed to install\n", "", failed_files.size()));
 
-    QMessageBox::information(this, tr("Install Results"), install_results);
+    if (!install_results.isEmpty()) {
+        QMessageBox::information(this, tr("Install Results"), install_results);
+    }
+
     Common::FS::RemoveDirRecursively(Common::FS::GetEdenPath(Common::FS::EdenPath::CacheDir) /
                                      "game_list");
     game_list->PopulateAsync(UISettings::values.game_dirs);
