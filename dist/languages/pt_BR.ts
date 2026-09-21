@@ -11007,6 +11007,88 @@ Execução B: %3 • %4
         <translation>Aviso: as configurações ativas do benchmark são diferentes. Iguale resolução, renderizador, precisão, VRAM, filtragem e opções assíncronas antes de comparar o desempenho das builds.
 </translation>
     </message>
+    <message>
+        <source>%1 • %2</source>
+        <translation>%1 • %2</translation>
+    </message>
+    <message>
+        <source>Benchmark</source>
+        <translation>Benchmark</translation>
+    </message>
+    <message>
+        <source>Start a game before beginning a benchmark session.</source>
+        <translation>Inicie um jogo antes de começar uma sessão de benchmark.</translation>
+    </message>
+    <message>
+        <source>Running — follow the same test route used by the other build.</source>
+        <translation>Em execução — siga a mesma rota de teste usada na outra build.</translation>
+    </message>
+    <message>
+        <source>%1 s</source>
+        <translation>%1 s</translation>
+    </message>
+    <message>
+        <source>%1 FPS</source>
+        <translation>%1 FPS</translation>
+    </message>
+    <message>
+        <source>%1 ms</source>
+        <translation>%1 ms</translation>
+    </message>
+    <message>
+        <source>Build profile: %1
+Commit: %2
+
+</source>
+        <translation>Perfil da build: %1
+Commit: %2
+
+</translation>
+    </message>
+    <message>
+        <source>Duration: %1 s
+Frame-time samples: %2
+Average game FPS: %3
+Mean emulation frame: %4 ms
+Median emulation frame: %5 ms
+P95 emulation frame: %6 ms
+P99 emulation frame: %7 ms
+Derived 1% low: %8 FPS
+Derived 0.1% low: %9 FPS
+Intervals with shader compilation: %10
+Maximum simultaneous shaders building: %11
+
+Note: low-FPS values are derived from Eden's internal emulation frame-time history. Compare them only between runs made with the same scene and settings.</source>
+        <translation>Duração: %1 s
+Amostras de tempo de quadro: %2
+FPS médio do jogo: %3
+Tempo médio de emulação por quadro: %4 ms
+Mediana do tempo de emulação por quadro: %5 ms
+P95 do tempo de emulação por quadro: %6 ms
+P99 do tempo de emulação por quadro: %7 ms
+1% low derivado: %8 FPS
+0,1% low derivado: %9 FPS
+Intervalos com compilação de shaders: %10
+Máximo de shaders compilando simultaneamente: %11
+
+Nota: os valores de low FPS são derivados do histórico interno de tempo de emulação por quadro do Eden. Compare apenas execuções feitas na mesma cena e com as mesmas configurações.</translation>
+    </message>
+    <message>
+        <source>The game stopped before benchmark results could be collected.</source>
+        <translation>O jogo foi encerrado antes que os resultados do benchmark pudessem ser coletados.</translation>
+    </message>
+    <message>
+        <source>No frame-time samples were recorded. Run the benchmark for a longer period.</source>
+        <translation>Nenhuma amostra de tempo de quadro foi registrada. Execute o benchmark por mais tempo.</translation>
+    </message>
+    <message>
+        <source>Save benchmark frame times</source>
+        <translation>Salvar tempos de quadro do benchmark</translation>
+    </message>
+    <message>
+        <source>The benchmark CSV could not be saved.</source>
+        <translation>Não foi possível salvar o CSV do benchmark.</translation>
+    </message>
 </context>
 <context>
     <name>PerformanceProfileDialog</name>
