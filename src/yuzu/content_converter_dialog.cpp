@@ -183,6 +183,11 @@ void ContentConverterDialog::BuildUi() {
     auto_install_checkbox->setToolTip(
         tr("Base games are never installed to NAND automatically."));
     paths_layout->addWidget(auto_install_checkbox, 3, 1, 1, 3);
+
+    auto_library_checkbox =
+        new QCheckBox(tr("Add converted base-game folder to the game library"), paths_group);
+    auto_library_checkbox->setChecked(true);
+    paths_layout->addWidget(auto_library_checkbox, 4, 1, 1, 3);
     root->addWidget(paths_group);
 
     auto* progress_group = new QGroupBox(tr("Progress"), this);
@@ -514,6 +519,7 @@ void ContentConverterDialog::StartConversion() {
 
     queue_index = 0;
     pending_install_files.clear();
+    pending_library_dirs.clear();
     cancel_requested = false;
     log_view->clear();
     SetBusy(true);
@@ -538,6 +544,10 @@ void ContentConverterDialog::StartNextFile() {
             AppendLog(tr("Sending %1 converted update/DLC file(s) to NAND installation.")
                           .arg(pending_install_files.size()));
             emit InstallConvertedContentRequested(pending_install_files);
+        }
+
+        if (auto_library_checkbox->isChecked() && !pending_library_dirs.isEmpty()) {
+            emit AddConvertedDirectoriesRequested(pending_library_dirs);
         }
         return;
     }
@@ -731,6 +741,13 @@ void ContentConverterDialog::InspectConvertedFile(const QString& input_path) {
                 pending_install_files.append(output_path);
             }
 
+            if (title_type == FileSys::TitleType::Application) {
+                const QString converted_dir = QFileInfo(output_path).absolutePath();
+                if (!pending_library_dirs.contains(converted_dir)) {
+                    pending_library_dirs.append(converted_dir);
+                }
+            }
+
             for (int i = 0; i < file_list->count(); ++i) {
                 auto* item = file_list->item(i);
                 if (item->data(Qt::UserRole).toString() != input_path) {
@@ -809,6 +826,7 @@ void ContentConverterDialog::SetBusy(bool busy) {
     converter_path->setEnabled(!busy);
     verify_checkbox->setEnabled(!busy);
     auto_install_checkbox->setEnabled(!busy);
+    auto_library_checkbox->setEnabled(!busy);
     start_button->setEnabled(!busy);
     cancel_button->setEnabled(busy);
     file_list->setEnabled(!busy);
