@@ -103,6 +103,7 @@ public:
 public slots:
     void RefreshGameDirectory();
     void RefreshExternalContent();
+    void RefreshShaderPreparationStatus(u64 program_id);
     void ResetExternalWatcher();
 
 signals:
