@@ -813,33 +813,11 @@ void BenchmarkDialog::CompareCsvs() {
     view->setPlainText(text);
     root->addWidget(view, 1);
 
-    auto* export_button = new QPushButton(tr("Export report CSV"), dialog);
     auto* close_button = new QPushButton(tr("Close"), dialog);
     auto* buttons = new QHBoxLayout();
-    buttons->addWidget(export_button);
     buttons->addStretch();
     buttons->addWidget(close_button);
     root->addLayout(buttons);
-    connect(export_button, &QPushButton::clicked, dialog, [this, dialog, report_csv] {
-        const QString suggested =
-            QStringLiteral("eden-benchmark-report-%1.csv")
-                .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
-        const QString report_path = QFileDialog::getSaveFileName(
-            dialog, tr("Export benchmark report"), suggested, tr("CSV files (*.csv)"));
-        if (report_path.isEmpty()) {
-            return;
-        }
-
-        QFile report_file{report_path};
-        if (!report_file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QMessageBox::critical(dialog, tr("Benchmark set comparison"),
-                                  tr("The benchmark report could not be saved."));
-            return;
-        }
-
-        QTextStream report_stream{&report_file};
-        report_stream << report_csv;
-    });
     connect(close_button, &QPushButton::clicked, dialog, &QDialog::close);
 
     dialog->show();
@@ -1249,11 +1227,33 @@ void BenchmarkDialog::CompareCsvSet() {
     view->setPlainText(text);
     root->addWidget(view, 1);
 
+    auto* export_button = new QPushButton(tr("Export report CSV"), dialog);
     auto* close_button = new QPushButton(tr("Close"), dialog);
     auto* buttons = new QHBoxLayout();
+    buttons->addWidget(export_button);
     buttons->addStretch();
     buttons->addWidget(close_button);
     root->addLayout(buttons);
+    connect(export_button, &QPushButton::clicked, dialog, [this, dialog, report_csv] {
+        const QString suggested =
+            QStringLiteral("eden-benchmark-report-%1.csv")
+                .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
+        const QString report_path = QFileDialog::getSaveFileName(
+            dialog, tr("Export benchmark report"), suggested, tr("CSV files (*.csv)"));
+        if (report_path.isEmpty()) {
+            return;
+        }
+
+        QFile report_file{report_path};
+        if (!report_file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QMessageBox::critical(dialog, tr("Benchmark set comparison"),
+                                  tr("The benchmark report could not be saved."));
+            return;
+        }
+
+        QTextStream report_stream{&report_file};
+        report_stream << report_csv;
+    });
     connect(close_button, &QPushButton::clicked, dialog, &QDialog::close);
 
     dialog->show();
