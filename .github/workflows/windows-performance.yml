@@ -91,7 +91,7 @@ jobs:
 
             $cmakeArgumentLine = (
               $cmakeArgs | ForEach-Object {
-                if ($_ -match '\\s') {
+                if ($_ -match '\s') {
                   '"' + ($_ -replace '"', '\\"') + '"'
                 } else {
                   $_
