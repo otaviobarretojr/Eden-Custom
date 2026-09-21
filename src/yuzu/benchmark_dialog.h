@@ -30,6 +30,7 @@ private:
     void StopBenchmark();
     void SaveCsv();
     void CompareCsvs();
+    void CompareCsvSet();
     void SetRunning(bool running);
     void ResetUi();
     QString BuildResultsText(const std::vector<double>& frame_times) const;
@@ -45,6 +46,7 @@ private:
     QPushButton* stop_button{};
     QPushButton* save_button{};
     QPushButton* compare_button{};
+    QPushButton* compare_set_button{};
 
     QElapsedTimer elapsed_timer{};
     QString build_profile;
