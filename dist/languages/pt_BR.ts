@@ -11319,6 +11319,18 @@ Commit: %2
         <source>The benchmark report could not be saved.</source>
         <translation>Não foi possível salvar o relatório de benchmark.</translation>
     </message>
+    <message>
+        <source>Run-to-run CV — Average FPS (%)</source>
+        <translation>CV entre execuções — FPS médio (%)</translation>
+    </message>
+    <message>
+        <source>Lower CV means better repeatability.</source>
+        <translation>CV menor significa melhor repetibilidade.</translation>
+    </message>
+    <message>
+        <source>Run-to-run CV — P99 frame (%)</source>
+        <translation>CV entre execuções — Quadro P99 (%)</translation>
+    </message>
 </context>
 <context>
     <name>PerformanceProfileDialog</name>
