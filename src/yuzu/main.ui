@@ -218,6 +218,7 @@
     <addaction name="menuInstall_Firmware"/>
     <addaction name="action_Verify_installed_contents"/>
     <addaction name="action_Data_Manager"/>
+    <addaction name="action_Content_Converter"/>
     <addaction name="separator"/>
     <addaction name="menu_cabinet_applet"/>
     <addaction name="menu_Applets"/>
@@ -287,6 +288,11 @@
   <action name="action_Verify_installed_contents">
    <property name="text">
     <string>&amp;Verify Installed Contents</string>
+   </property>
+  </action>
+  <action name="action_Content_Converter">
+   <property name="text">
+    <string>Content &amp;Converter...</string>
    </property>
   </action>
   <action name="action_About">
