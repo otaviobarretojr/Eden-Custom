@@ -548,6 +548,7 @@ private:
     std::unique_ptr<EmuThread> emu_thread;
     // The path to the game currently running
     QString current_game_path;
+    u64 current_game_title_id = 0;
     // Whether a user was set on the command line (skips UserSelector if it's forced to show up)
     bool user_flag_cmd_line = false;
 
