@@ -546,14 +546,28 @@ void ContentConverterDialog::StartNextFile() {
         AppendLog(tr("All conversions completed."));
         SetBusy(false);
 
-        if (auto_install_checkbox->isChecked() && !pending_install_files.isEmpty()) {
-            AppendLog(tr("Sending %1 converted update/DLC file(s) to NAND installation.")
-                          .arg(pending_install_files.size()));
-            emit InstallConvertedContentRequested(pending_install_files);
-        }
+        const bool install_after =
+            auto_install_checkbox->isChecked() && !pending_install_files.isEmpty();
+        const bool add_library_after =
+            auto_library_checkbox->isChecked() && !pending_library_dirs.isEmpty();
 
-        if (auto_library_checkbox->isChecked() && !pending_library_dirs.isEmpty()) {
-            emit AddConvertedDirectoriesRequested(pending_library_dirs);
+        if (install_after || add_library_after) {
+            if (install_after) {
+                AppendLog(tr("Sending %1 converted update/DLC file(s) to NAND installation.")
+                              .arg(pending_install_files.size()));
+            }
+
+            // Close the modal converter before handing work back to MainWindow. The connected
+            // handlers use queued delivery so NAND progress dialogs are never opened behind this
+            // modal dialog.
+            accept();
+
+            if (install_after) {
+                emit InstallConvertedContentRequested(pending_install_files);
+            }
+            if (add_library_after) {
+                emit AddConvertedDirectoriesRequested(pending_library_dirs);
+            }
         }
         return;
     }
