@@ -72,8 +72,8 @@ jobs:
           if (-not $eden) { throw "eden.exe was not produced" }
           Copy-Item $eden.FullName package/eden.exe
 
-          $cli = Get-ChildItem -Path build/bin -Recurse -Filter yuzu-cmd.exe -File | Select-Object -First 1
-          if (-not $cli) { throw "yuzu-cmd.exe was not produced" }
+          $cli = Get-ChildItem -Path build/bin -Recurse -Filter eden-cli.exe -File | Select-Object -First 1
+          if (-not $cli) { throw "eden-cli.exe was not produced" }
           Copy-Item $cli.FullName package/eden-cli.exe
 
           Get-ChildItem -Path $eden.Directory.FullName -Filter *.dll -File -ErrorAction SilentlyContinue |
