@@ -4,6 +4,7 @@
 #pragma once
 
 #include <QDialog>
+#include <QProcess>
 #include <QString>
 #include <QStringList>
 
@@ -13,7 +14,6 @@ class QLabel;
 class QLineEdit;
 class QListWidget;
 class QPlainTextEdit;
-class QProcess;
 class QProgressBar;
 class QPushButton;
 class QCheckBox;
