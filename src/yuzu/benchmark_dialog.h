@@ -13,6 +13,7 @@ struct PerfStatsResults;
 }
 
 class QLabel;
+class QLineEdit;
 class QPlainTextEdit;
 class QPushButton;
 
@@ -41,6 +42,8 @@ private:
     QLabel* fps_label{};
     QLabel* frametime_label{};
     QLabel* shader_label{};
+    QLineEdit* run_label_edit{};
+    QLineEdit* scene_tag_edit{};
     QPlainTextEdit* results_view{};
     QPushButton* start_button{};
     QPushButton* stop_button{};
@@ -53,6 +56,8 @@ private:
     QString build_commit;
     QString benchmark_title_id;
     QString benchmark_settings_signature;
+    QString benchmark_run_label;
+    QString benchmark_scene_tag;
     bool benchmark_running{};
     double last_duration_seconds{};
     int shader_active_samples{};
