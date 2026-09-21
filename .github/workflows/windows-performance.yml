@@ -10,6 +10,7 @@ on:
       - "CMakeLists.txt"
       - "cpmfile.json"
       - "src/**"
+      - "dist/languages/**"
       - ".github/workflows/windows-performance.yml"
 
 permissions:
