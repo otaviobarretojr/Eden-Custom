@@ -89,7 +89,17 @@ jobs:
             $configureOut = Join-Path $env:RUNNER_TEMP "eden-cmake-configure-$attempt.out.log"
             $configureErr = Join-Path $env:RUNNER_TEMP "eden-cmake-configure-$attempt.err.log"
 
-            $process = Start-Process -FilePath "cmake" -ArgumentList $cmakeArgs -Wait -PassThru -NoNewWindow `
+            $cmakeArgumentLine = (
+              $cmakeArgs | ForEach-Object {
+                if ($_ -match '\\s') {
+                  '"' + ($_ -replace '"', '\\"') + '"'
+                } else {
+                  $_
+                }
+              }
+            ) -join ' '
+
+            $process = Start-Process -FilePath "cmake" -ArgumentList $cmakeArgumentLine -Wait -PassThru -NoNewWindow `
               -RedirectStandardOutput $configureOut -RedirectStandardError $configureErr
             $configureExitCode = $process.ExitCode
 
