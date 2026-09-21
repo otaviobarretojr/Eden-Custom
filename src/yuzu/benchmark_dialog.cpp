@@ -1190,6 +1190,25 @@ void BenchmarkDialog::CompareCsvSet() {
     report_csv += CsvRow({QStringLiteral("metric"), tr("Frame-time samples"),
                           format_mean_sd(samples_a, 0), format_mean_sd(samples_b, 0),
                           mean_delta(samples_a, samples_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("metric"), tr("Intervals with shader compilation"),
+                          format_mean_sd(shaders_a, 1), format_mean_sd(shaders_b, 1),
+                          mean_delta(shaders_a, shaders_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("metric"),
+                          tr("Maximum simultaneous shaders building"),
+                          format_mean_sd(max_shaders_a, 1), format_mean_sd(max_shaders_b, 1),
+                          mean_delta(max_shaders_a, max_shaders_b), QString{}});
+    report_csv += CsvRow({QStringLiteral("repeatability"),
+                          tr("Run-to-run CV — Average FPS (%)"),
+                          fps_a.empty() ? not_available
+                                        : QString::number(CoefficientOfVariation(fps_a), 'f', 2),
+                          fps_b.empty() ? not_available
+                                        : QString::number(CoefficientOfVariation(fps_b), 'f', 2),
+                          QString{}, tr("Lower CV means better repeatability.")});
+    report_csv += CsvRow({QStringLiteral("repeatability"),
+                          tr("Run-to-run CV — P99 frame (%)"),
+                          QString::number(CoefficientOfVariation(p99_a), 'f', 2),
+                          QString::number(CoefficientOfVariation(p99_b), 'f', 2),
+                          QString{}, tr("Lower CV means better repeatability.")});
     report_csv += CsvRow({QStringLiteral("validation"), tr("Title ID match"),
                           title_ids_match ? tr("Yes") : tr("No"), QString{}, QString{},
                           title_ids.join(QStringLiteral(" | "))});
