@@ -18,6 +18,10 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QCryptographicHash>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QMimeData>
@@ -26,13 +30,22 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QUrl>
 #include <QVBoxLayout>
 
 #include "common/fs/path_util.h"
 
-ContentConverterDialog::ContentConverterDialog(QWidget* parent) : QDialog(parent), process(new QProcess(this)) {
+namespace {
+constexpr auto kManagedConverterUrl =
+    "https://github.com/nicoboss/nsz/releases/download/5.0.0/nsz-cli-windows-x64.exe";
+constexpr auto kManagedConverterSha256 =
+    "341b395c18679bf4c01f0bf2fb0e22e315a64b34fad51064781f5155a978883d";
+} // namespace
+
+ContentConverterDialog::ContentConverterDialog(QWidget* parent)
+    : QDialog(parent), process(new QProcess(this)), network_manager(new QNetworkAccessManager(this)) {
     BuildUi();
     setAcceptDrops(true);
 
@@ -47,7 +60,7 @@ ContentConverterDialog::ContentConverterDialog(QWidget* parent) : QDialog(parent
         converter_path->setText(program);
         status_label->setText(tr("NSZ converter detected."));
     } else {
-        status_label->setText(tr("NSZ converter not found. Select nsz-cli-windows-x64.exe."));
+        status_label->setText(tr("NSZ converter not found. You can install the verified official tool automatically."));
     }
 }
 
@@ -96,8 +109,10 @@ void ContentConverterDialog::BuildUi() {
     paths_layout->addWidget(new QLabel(tr("NSZ converter:"), paths_group), 1, 0);
     converter_path = new QLineEdit(paths_group);
     converter_button = new QPushButton(tr("Browse..."), paths_group);
+    download_button = new QPushButton(tr("Install official"), paths_group);
     paths_layout->addWidget(converter_path, 1, 1);
     paths_layout->addWidget(converter_button, 1, 2);
+    paths_layout->addWidget(download_button, 1, 3);
 
     verify_checkbox = new QCheckBox(tr("Verify integrity during conversion"), paths_group);
     verify_checkbox->setChecked(true);
@@ -138,6 +153,8 @@ void ContentConverterDialog::BuildUi() {
     connect(output_button, &QPushButton::clicked, this, &ContentConverterDialog::ChooseOutputDirectory);
     connect(converter_button, &QPushButton::clicked, this,
             &ContentConverterDialog::ChooseConverterExecutable);
+    connect(download_button, &QPushButton::clicked, this,
+            &ContentConverterDialog::DownloadConverter);
     connect(start_button, &QPushButton::clicked, this, &ContentConverterDialog::StartConversion);
     connect(cancel_button, &QPushButton::clicked, this, &ContentConverterDialog::CancelConversion);
 }
@@ -228,6 +245,113 @@ QString ContentConverterDialog::EdenKeysDirectory() const {
     return QString::fromStdString(keys.string());
 }
 
+QString ContentConverterDialog::ManagedConverterPath() const {
+    const auto eden_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::EdenDir);
+    const auto converter =
+        eden_dir / "tools" / "nsz" / "nsz-cli-windows-x64.exe";
+    return QString::fromStdString(converter.string());
+}
+
+void ContentConverterDialog::DownloadConverter() {
+    if (download_reply != nullptr) {
+        return;
+    }
+
+    const QString target = ManagedConverterPath();
+    const QFileInfo target_info(target);
+    if (!QDir().mkpath(target_info.absolutePath())) {
+        QMessageBox::critical(this, tr("NSZ converter"),
+                              tr("The converter folder could not be created."));
+        return;
+    }
+
+    QNetworkRequest request{QUrl{QString::fromLatin1(kManagedConverterUrl)}};
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    progress_bar->setValue(0);
+    current_file_label->setText(tr("Downloading NSZ converter"));
+    status_label->setText(tr("Downloading the pinned official NSZ 5.0.0 Windows x64 tool..."));
+    AppendLog(tr("Downloading official NSZ 5.0.0 converter."));
+    download_button->setEnabled(false);
+    converter_button->setEnabled(false);
+    start_button->setEnabled(false);
+
+    download_reply = network_manager->get(request);
+
+    connect(download_reply, &QNetworkReply::downloadProgress, this,
+            [this](qint64 received, qint64 total) {
+                if (total > 0) {
+                    const int percent =
+                        qBound(0, static_cast<int>((received * 100) / total), 100);
+                    progress_bar->setValue(percent);
+                    status_label->setText(
+                        tr("Downloading converter... %1 / %2 MB")
+                            .arg(QString::number(received / 1024.0 / 1024.0, 'f', 1))
+                            .arg(QString::number(total / 1024.0 / 1024.0, 'f', 1)));
+                }
+            });
+
+    connect(download_reply, &QNetworkReply::finished, this,
+            &ContentConverterDialog::FinishConverterDownload);
+}
+
+void ContentConverterDialog::FinishConverterDownload() {
+    QNetworkReply* reply = download_reply;
+    download_reply = nullptr;
+
+    download_button->setEnabled(true);
+    converter_button->setEnabled(true);
+    start_button->setEnabled(true);
+
+    if (reply == nullptr) {
+        return;
+    }
+
+    const auto cleanup = qScopeGuard([reply] { reply->deleteLater(); });
+
+    if (reply->error() != QNetworkReply::NoError) {
+        status_label->setText(tr("Converter download failed."));
+        AppendLog(tr("Download error: %1").arg(reply->errorString()));
+        QMessageBox::critical(this, tr("NSZ converter"),
+                              tr("The official converter could not be downloaded.\n\n%1")
+                                  .arg(reply->errorString()));
+        return;
+    }
+
+    const QByteArray payload = reply->readAll();
+    const QByteArray digest =
+        QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex();
+
+    if (digest != QByteArray{kManagedConverterSha256}) {
+        status_label->setText(tr("Downloaded converter failed SHA-256 validation."));
+        AppendLog(tr("Security validation failed. Expected %1, received %2.")
+                      .arg(QString::fromLatin1(kManagedConverterSha256),
+                           QString::fromLatin1(digest)));
+        QMessageBox::critical(
+            this, tr("NSZ converter"),
+            tr("The downloaded converter did not match the pinned SHA-256 checksum and was not "
+               "saved."));
+        return;
+    }
+
+    const QString target = ManagedConverterPath();
+    QSaveFile output{target};
+    if (!output.open(QIODevice::WriteOnly) || output.write(payload) != payload.size() ||
+        !output.commit()) {
+        status_label->setText(tr("Converter could not be saved."));
+        QMessageBox::critical(this, tr("NSZ converter"),
+                              tr("The verified converter could not be saved to:\n%1").arg(target));
+        return;
+    }
+
+    converter_path->setText(QDir::toNativeSeparators(target));
+    progress_bar->setValue(100);
+    current_file_label->setText(tr("NSZ converter ready"));
+    status_label->setText(tr("Official NSZ 5.0.0 converter installed and SHA-256 verified."));
+    AppendLog(tr("Installed verified NSZ converter: %1").arg(target));
+}
+
 bool ContentConverterDialog::ResolveConverter(QString& program, QStringList& prefix_arguments) const {
     prefix_arguments.clear();
 
@@ -239,6 +363,7 @@ bool ContentConverterDialog::ResolveConverter(QString& program, QStringList& pre
 
     const QString app_dir = QCoreApplication::applicationDirPath();
     const QStringList candidates{
+        ManagedConverterPath(),
         app_dir + QStringLiteral("/tools/nsz/nsz-cli-windows-x64.exe"),
         app_dir + QStringLiteral("/nsz-cli-windows-x64.exe"),
         app_dir + QStringLiteral("/nsz.exe"),
@@ -286,12 +411,10 @@ void ContentConverterDialog::StartConversion() {
     if (!ResolveConverter(program, prefix_arguments)) {
         QMessageBox::warning(
             this, tr("NSZ converter not found"),
-            tr("Select nsz-cli-windows-x64.exe. Eden Custom does not include console keys or game "
-               "content."));
-        ChooseConverterExecutable();
-        if (!ResolveConverter(program, prefix_arguments)) {
-            return;
-        }
+            tr("The NSZ converter is not installed yet. Use 'Install official' to download the "
+               "pinned and checksum-verified NSZ 5.0.0 tool. Eden Custom does not include console "
+               "keys or game content."));
+        return;
     }
     converter_path->setText(QDir::toNativeSeparators(program));
 
@@ -439,6 +562,7 @@ void ContentConverterDialog::SetBusy(bool busy) {
     clear_button->setEnabled(!busy);
     output_button->setEnabled(!busy);
     converter_button->setEnabled(!busy);
+    download_button->setEnabled(!busy);
     output_directory->setEnabled(!busy);
     converter_path->setEnabled(!busy);
     verify_checkbox->setEnabled(!busy);
