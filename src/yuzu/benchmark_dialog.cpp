@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <numeric>
 
 #include <QDateTime>
@@ -224,8 +225,8 @@ QString BenchmarkDialog::BuildResultsText(const std::vector<double>& frame_times
                "Median emulation frame: %5 ms\n"
                "P95 emulation frame: %6 ms\n"
                "P99 emulation frame: %7 ms\n"
-               "Derived 1%% low: %8 FPS\n"
-               "Derived 0.1%% low: %9 FPS\n"
+               "Derived 1% low: %8 FPS\n"
+               "Derived 0.1% low: %9 FPS\n"
                "Intervals with shader compilation: %10\n"
                "Maximum simultaneous shaders building: %11\n\n"
                "Note: low-FPS values are derived from Eden's internal emulation frame-time "
