@@ -190,6 +190,8 @@ public:
         bool persistent{};
         bool fragment_shader_writes_slot{};
         u64 fragment_shader_hash{};
+        u32 producer_consecutive_frames{};
+        bool producer_stable{};
         bool semantic_evidence{};
         DlssMotionConfidence confidence{DlssMotionConfidence::None};
     };
