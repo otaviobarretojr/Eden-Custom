@@ -2153,6 +2153,16 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
                         : 0,
                 .producer_consecutive_frames = 0,
                 .producer_stable = false,
+                .semantic_signature = {
+                    .title_id = dlss_semantic_title_id,
+                    .fragment_shader_hash =
+                        candidate.slot < dlss_fragment_output_hashes.size() &&
+                                !dlss_fragment_output_ambiguous[candidate.slot]
+                            ? dlss_fragment_output_hashes[candidate.slot]
+                            : 0,
+                    .slot = candidate.slot,
+                    .format = candidate.format,
+                },
                 .semantic_evidence = false,
                 .confidence = DlssMotionConfidence::None,
             });
