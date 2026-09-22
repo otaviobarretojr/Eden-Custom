@@ -244,6 +244,9 @@ public:
         u32 size{};
         u64 title_id{};
         u64 bind_sequence{};
+        u64 frame_index{};
+        u64 fragment_shader_hash{};
+        bool fragment_producer_unambiguous{};
     };
 
     void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
@@ -348,6 +351,7 @@ private:
     std::array<bool, 8> dlss_fragment_output_ambiguous{};
     u64 dlss_semantic_title_id{};
     u64 dlss_uniform_bind_sequence{};
+    u64 dlss_temporal_frame_index{};
     std::array<DlssUniformBindingObservation, 64> dlss_uniform_observations{};
     size_t dlss_uniform_observation_cursor{};
     u32 draw_counter = 0;
