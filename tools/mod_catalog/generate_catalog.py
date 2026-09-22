@@ -36,6 +36,14 @@ def normalize_path(path: str) -> str:
     return path.replace("\\\\", "/").strip("/")
 
 
+def repository_relative_path(path: str) -> str:
+    normalized = normalize_path(path)
+    parts = normalized.split("/")
+    if parts and parts[0].lower().startswith("switch-emulator-mod-database-"):
+        return "/".join(parts[1:])
+    return normalized
+
+
 def infer_category(text: str) -> tuple[str, str | None]:
     value = text.lower()
 
@@ -165,8 +173,8 @@ def make_record(
         "source_repository": SOURCE_REPOSITORY,
         "source_branch": SOURCE_BRANCH,
         "source_commit": SOURCE_COMMIT,
-        "source_path": source_path,
-        "container": container,
+        "source_path": repository_relative_path(source_path) if container is None else normalize_path(source_path),
+        "container": repository_relative_path(container) if container else None,
     }
 
 
