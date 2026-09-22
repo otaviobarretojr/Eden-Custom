@@ -45,7 +45,7 @@
 #include "core/file_sys/submission_package.h"
 #include "core/loader/loader.h"
 #include "qt_common/qt_common.h"
-#include "qt_common/util/compress.h"
+#include "qt_common/util/archive_extract.h"
 
 namespace {
 constexpr auto kManagedConverterUrl =
@@ -465,7 +465,7 @@ bool ContentConverterDialog::InstallCompatibilityFallback(const QByteArray& payl
     }
 
     progress_bar->setRange(0, 100);
-    const QStringList extracted = QtCommon::Compress::extractDir(
+    const QStringList extracted = QtCommon::Archive::ExtractZip(
         archive, CompatibilityFallbackRootPath(),
         [this](std::size_t total, std::size_t progress) {
             if (total > 0) {
