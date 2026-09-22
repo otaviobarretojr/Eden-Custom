@@ -431,6 +431,10 @@ target_link_libraries(video_core PRIVATE sirit::sirit)
 target_link_libraries(video_core PUBLIC Vulkan::Headers Vulkan::UtilityHeaders GPUOpen::VulkanMemoryAllocator)
 
 if (ENABLE_NVIDIA_STREAMLINE AND WIN32)
+    target_sources(video_core PRIVATE
+        vulkan_common/streamline_runtime.cpp
+        vulkan_common/streamline_runtime.h
+    )
     target_link_libraries(video_core PRIVATE wintrust)
 endif()
 
