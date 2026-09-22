@@ -27,7 +27,7 @@ BUILD_ID_RE = re.compile(r"(?im)^\s*@nsobid[-\s]+([0-9a-f]{16,64})\s*$")
 VERSION_RE = re.compile(r"(?i)\bv(?:ersion)?\.?\s*([0-9]+(?:\.[0-9]+){1,4})")
 CHEAT_FILE_RE = re.compile(r"(?i)^([0-9a-f]{16})\.txt$")
 ARCHIVE_TITLE_RE = re.compile(
-    r"^(.*?)\\s*\\[(010[0-9A-Fa-f]{13})\\].*\\.zip$",
+    r"^(.*?)\s*\[(010[0-9A-Fa-f]{13})\].*\.zip$",
     re.I,
 )
 
