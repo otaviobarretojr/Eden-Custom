@@ -127,7 +127,11 @@ QJsonObject PackageToJson(const PackageInfo& package) {
     object.insert(QStringLiteral("entry_count"), package.entry_count);
 
     QJsonArray titles;
-    QStringList sorted_titles{package.title_ids.begin(), package.title_ids.end()};
+    QStringList sorted_titles;
+    sorted_titles.reserve(package.title_ids.size());
+    for (const QString& title : package.title_ids) {
+        sorted_titles.push_back(title);
+    }
     std::sort(sorted_titles.begin(), sorted_titles.end());
     for (const QString& title : sorted_titles) {
         titles.append(title);
@@ -135,7 +139,11 @@ QJsonObject PackageToJson(const PackageInfo& package) {
     object.insert(QStringLiteral("title_ids"), titles);
 
     QJsonArray entries;
-    QStringList sorted_entries{package.entries.begin(), package.entries.end()};
+    QStringList sorted_entries;
+    sorted_entries.reserve(package.entries.size());
+    for (const QString& entry : package.entries) {
+        sorted_entries.push_back(entry);
+    }
     std::sort(sorted_entries.begin(), sorted_entries.end());
     for (const QString& entry : sorted_entries) {
         entries.append(entry);
@@ -333,7 +341,9 @@ bool ImportPackage(const QString& source_zip, PackageInfo& package, QString* err
     package.size_bytes = static_cast<quint64>(source_info.size());
     package.entry_count = normalized_entries.size();
     package.title_ids = title_ids;
-    package.entries = QSet<QString>{normalized_entries.begin(), normalized_entries.end()};
+    for (const QString& entry : normalized_entries) {
+        package.entries.insert(entry);
+    }
     package.already_imported = false;
 
     packages.push_back(package);
