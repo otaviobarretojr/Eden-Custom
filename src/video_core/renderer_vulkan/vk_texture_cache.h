@@ -250,6 +250,20 @@ public:
         return image_ranges;
     }
 
+    [[nodiscard]] VkImage ColorImage(size_t index) const noexcept {
+        if (index >= NUM_RT || rt_map[index] >= num_images) {
+            return VK_NULL_HANDLE;
+        }
+        return images[rt_map[index]];
+    }
+
+    [[nodiscard]] const VkImageSubresourceRange* ColorImageRange(size_t index) const noexcept {
+        if (index >= NUM_RT || rt_map[index] >= num_images) {
+            return nullptr;
+        }
+        return &image_ranges[rt_map[index]];
+    }
+
     [[nodiscard]] bool HasAspectColorBit(size_t index) const noexcept {
         return (image_ranges.at(rt_map[index]).aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0;
     }
