@@ -25,6 +25,7 @@ SOURCE_COMMIT = "abd55774c369b9c3a4df960e7afdb0391cb52056"
 TITLE_ID_RE = re.compile(r"(?i)(?<![0-9a-f])(010[0-9a-f]{13})(?![0-9a-f])")
 BUILD_ID_RE = re.compile(r"(?im)^\s*@nsobid[-\s]+([0-9a-f]{16,64})\s*$")
 VERSION_RE = re.compile(r"(?i)\bv(?:ersion)?\.?\s*([0-9]+(?:\.[0-9]+){1,4})")
+PATH_VERSION_RE = re.compile(r"(?<![0-9])([0-9]+(?:\.[0-9]+){1,4})(?![0-9])")
 CHEAT_FILE_RE = re.compile(r"(?i)^([0-9a-f]{16})\.txt$")
 ARCHIVE_TITLE_RE = re.compile(
     r"^(.*?)\s*\[([0-9A-Fa-f]{16})\](?:\[[^]]+\])*\s*(?:\[mods\])?\.zip$",
@@ -136,13 +137,28 @@ def mod_name_from_path(path: str, title_id: str) -> str:
     return candidates[-1] if candidates else PurePosixPath(path).stem
 
 
-def parse_pchtxt(data: bytes) -> tuple[str | None, str | None]:
+def parse_pchtxt(path: str, data: bytes) -> tuple[str | None, str | None]:
     text = data.decode("utf-8", "replace")
     build_match = BUILD_ID_RE.search(text)
-    version_match = VERSION_RE.search(text)
+
+    # Prefer the patch filename because database packs commonly keep multiple
+    # game versions inside the same mod folder. A filename such as
+    # 3.0.1-4.0.0.pchtxt therefore describes compatibility more accurately
+    # than a generic version comment inside the patch body.
+    path_versions = list(
+        dict.fromkeys(PATH_VERSION_RE.findall(PurePosixPath(path).stem))
+    )
+    if len(path_versions) >= 2:
+        version = f"{path_versions[0]}–{path_versions[1]}"
+    elif path_versions:
+        version = path_versions[0]
+    else:
+        version_match = VERSION_RE.search(text)
+        version = version_match.group(1) if version_match else None
+
     return (
         build_match.group(1).upper() if build_match else None,
-        version_match.group(1) if version_match else None,
+        version,
     )
 
 
@@ -201,7 +217,7 @@ def scan_member(
     name = mod_name_from_path(path, title_id)
 
     if lower.endswith(".pchtxt"):
-        build_id, version = parse_pchtxt(data)
+        build_id, version = parse_pchtxt(path, data)
         return [
             make_record(
                 title_id,
