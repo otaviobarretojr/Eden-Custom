@@ -263,6 +263,7 @@ public:
         u32 finite_float_count{};
         u32 normalized_float_count{};
         bool matrix_shape_candidate{};
+        bool semantic_probe_candidate{};
     };
 
     void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
