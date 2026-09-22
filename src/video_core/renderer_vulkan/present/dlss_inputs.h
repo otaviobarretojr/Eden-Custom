@@ -146,6 +146,22 @@ struct DlssTemporalGameProfile {
     return nullptr;
 }
 
+struct DlssVulkanResourcePlan {
+    DlssImageInput color_in{};
+    DlssImageInput color_out{};
+    DlssImageInput depth{};
+    DlssImageInput motion_vectors{};
+    bool valid{};
+
+    [[nodiscard]] bool IsReady() const noexcept {
+        return valid && color_in.IsValid() && color_out.IsValid() && depth.IsValid() &&
+               motion_vectors.IsValid() && color_in.layout != VK_IMAGE_LAYOUT_UNDEFINED &&
+               color_out.layout != VK_IMAGE_LAYOUT_UNDEFINED &&
+               depth.layout != VK_IMAGE_LAYOUT_UNDEFINED &&
+               motion_vectors.layout != VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+};
+
 struct DlssTemporalInputs {
     DlssImageInput color_in{};
     DlssImageInput color_out{};
@@ -187,6 +203,21 @@ struct DlssTemporalInputs {
         return plan;
     }
 };
+
+[[nodiscard]] inline DlssVulkanResourcePlan BuildDlssVulkanResourcePlan(
+    const DlssTemporalInputs& inputs) {
+    const auto tag_plan = inputs.BuildTagPlan();
+    if (!tag_plan.IsReady()) {
+        return {};
+    }
+    return {
+        .color_in = inputs.color_in,
+        .color_out = inputs.color_out,
+        .depth = inputs.depth,
+        .motion_vectors = inputs.motion_vectors,
+        .valid = true,
+    };
+}
 
 [[nodiscard]] inline DlssTemporalInputs MakeDlssTemporalInputs(
     const DlssTemporalSnapshot& snapshot, const DlssImageInput& color_out) {
