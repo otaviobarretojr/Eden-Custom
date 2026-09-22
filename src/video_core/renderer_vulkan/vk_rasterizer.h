@@ -238,6 +238,9 @@ public:
     };
 
     void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
+    void SetDlssSemanticTitleId(u64 title_id) noexcept {
+        dlss_semantic_title_id = title_id;
+    }
     void TrackDlssTemporalCandidates(u64 frame_index);
     [[nodiscard]] std::vector<DlssMotionCandidateHistory> GetDlssMotionCandidateHistory() const;
     [[nodiscard]] std::vector<DlssMotionCandidateHistory> GetDlssLikelyMotionCandidates() const;
@@ -334,6 +337,7 @@ private:
     std::array<bool, 8> dlss_fragment_output_slots{};
     std::array<u64, 8> dlss_fragment_output_hashes{};
     std::array<bool, 8> dlss_fragment_output_ambiguous{};
+    u64 dlss_semantic_title_id{};
     u32 draw_counter = 0;
 };
 
