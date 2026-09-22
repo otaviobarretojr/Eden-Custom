@@ -13,6 +13,7 @@ struct DlssProbeResult {
     bool nvidia{};
     bool vulkan_compatible{};
     bool streamline_runtime_present{};
+    bool temporal_inputs_available{};
     StreamlineBootstrapState bootstrap_state{StreamlineBootstrapState::Unavailable};
     std::string reason;
 };
