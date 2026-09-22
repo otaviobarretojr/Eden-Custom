@@ -168,6 +168,18 @@ public:
 
     [[nodiscard]] std::vector<DlssColorCandidate> GetDlssColorCandidates() const;
 
+    struct DlssMotionCandidateHistory {
+        VkImage image{};
+        VkFormat format{VK_FORMAT_UNDEFINED};
+        VkExtent2D extent{};
+        u32 slot{};
+        u32 consecutive_frames{};
+        u64 last_frame{};
+    };
+
+    void TrackDlssTemporalCandidates(u64 frame_index);
+    [[nodiscard]] std::vector<DlssMotionCandidateHistory> GetDlssMotionCandidateHistory() const;
+
 private:
     static constexpr const u64 NEEDS_D24[] = {
         0x01006A800016E000ULL, // SSBU
@@ -254,6 +266,8 @@ private:
     std::array<VideoCommon::ImageViewId, MAX_IMAGE_VIEWS> image_view_ids;
     boost::container::static_vector<VkSampler, MAX_TEXTURES> sampler_handles;
 
+    mutable std::mutex dlss_candidate_mutex;
+    std::vector<DlssMotionCandidateHistory> dlss_motion_history;
     u32 draw_counter = 0;
 };
 
