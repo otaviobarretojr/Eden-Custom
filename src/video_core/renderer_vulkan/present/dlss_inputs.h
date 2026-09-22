@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <array>
+
 #include <vulkan/vulkan_core.h>
 
 #include "common/common_types.h"
@@ -125,6 +127,19 @@ struct DlssTemporalGameProfile {
                constants.IsReady();
     }
 };
+
+[[nodiscard]] inline const DlssTemporalGameProfile* FindValidatedDlssTemporalGameProfile(
+    u64 title_id, u64 fragment_shader_hash, u32 slot, VkFormat format) noexcept {
+    // Intentionally empty until a game's temporal data has been independently validated.
+    // Do not add heuristic or guessed profiles here.
+    static constexpr std::array<DlssTemporalGameProfile, 0> validated_profiles{};
+    for (const auto& profile : validated_profiles) {
+        if (profile.Matches(title_id, fragment_shader_hash, slot, format)) {
+            return &profile;
+        }
+    }
+    return nullptr;
+}
 
 struct DlssTemporalInputs {
     DlssImageInput color_in{};
