@@ -733,6 +733,29 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
         observation.sample_count = sample_count;
         observation.fingerprint_change_count = fingerprint_change_count;
         observation.temporally_dynamic = sample_count >= 3 && fingerprint_change_count >= 2;
+
+        // Retain only coarse structural metrics from the bounded sample. These are diagnostic
+        // heuristics, never semantic proof that the block contains camera or jitter constants.
+        const size_t float_count = sample_size / sizeof(float);
+        u32 finite_float_count = 0;
+        u32 normalized_float_count = 0;
+        for (size_t offset = 0; offset + sizeof(float) <= sample_size; offset += sizeof(float)) {
+            float value{};
+            std::memcpy(&value, sample.data() + offset, sizeof(value));
+            if (!std::isfinite(value)) {
+                continue;
+            }
+            ++finite_float_count;
+            if (std::abs(value) <= 1.0F) {
+                ++normalized_float_count;
+            }
+        }
+        observation.sampled_float_count = static_cast<u32>(float_count);
+        observation.finite_float_count = finite_float_count;
+        observation.normalized_float_count = normalized_float_count;
+        observation.matrix_shape_candidate =
+            float_count >= 16 && finite_float_count * 4 >= float_count * 3 &&
+            normalized_float_count * 2 >= finite_float_count;
         observation.sampled = true;
     }
 
