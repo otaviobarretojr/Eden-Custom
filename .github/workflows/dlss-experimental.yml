@@ -11,6 +11,26 @@ on:
       - 'exp/dlss-*'
 
 jobs:
+  dlss-header-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile DLSS metadata header
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/dlss_header_smoke.cpp <<'EOF'
+          #include "video_core/renderer_vulkan/present/dlss_inputs.h"
+          int main() {
+              Vulkan::DlssTemporalSnapshot snapshot{};
+              Vulkan::DlssImageInput output{};
+              const auto inputs = Vulkan::MakeDlssTemporalInputs(snapshot, output);
+              const auto plan = Vulkan::BuildDlssVulkanResourcePlan(inputs);
+              return plan.IsReady() ? 1 : 0;
+          }
+          EOF
+          c++ -std=c++20 -fsyntax-only /tmp/dlss_header_smoke.cpp -Isrc
+
   dlss-source-guards:
     runs-on: ubuntu-latest
     steps:
