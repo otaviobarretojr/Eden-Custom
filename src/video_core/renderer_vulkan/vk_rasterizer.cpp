@@ -698,6 +698,24 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
         .plausible_temporal_size = plausible_temporal_size,
         .temporal_diagnostic_candidate = consecutive_frames >= 8 && plausible_temporal_size,
     };
+    // Sample only mature diagnostic candidates, at most once every 120 temporal frames. Keep
+    // only a compact fingerprint: raw guest constant bytes are never retained by the probe.
+    if (observation.temporal_diagnostic_candidate && gpu_addr != 0 && size != 0 &&
+        (dlss_temporal_frame_index % 120) == 0) {
+        constexpr size_t MaxSampleBytes = 512;
+        std::array<u8, MaxSampleBytes> sample{};
+        const size_t sample_size = std::min<size_t>(size, sample.size());
+        device_memory.ReadBlock(gpu_addr, sample.data(), sample_size);
+        u64 fingerprint = 1469598103934665603ULL;
+        for (size_t i = 0; i < sample_size; ++i) {
+            fingerprint ^= sample[i];
+            fingerprint *= 1099511628211ULL;
+        }
+        observation.last_sampled_frame = dlss_temporal_frame_index;
+        observation.sample_fingerprint = fingerprint;
+        observation.sampled = true;
+    }
+
     // Shader correlation is filled only when a single fragment producer is known for the frame.
     // Multiple fragment producers deliberately leave the observation unverified.
     for (u32 slot = 0; slot < dlss_fragment_output_slots.size(); ++slot) {
