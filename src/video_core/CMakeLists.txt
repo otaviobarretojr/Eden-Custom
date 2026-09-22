@@ -435,7 +435,10 @@ if (ENABLE_NVIDIA_STREAMLINE AND WIN32)
         vulkan_common/streamline_runtime.cpp
         vulkan_common/streamline_runtime.h
     )
-    target_link_libraries(video_core PRIVATE wintrust)
+    target_link_libraries(video_core PRIVATE
+        wintrust
+        "${STREAMLINE_SDK_ROOT}/lib/x64/sl.interposer.lib"
+    )
 endif()
 
 if (ENABLE_NSIGHT_AFTERMATH)
