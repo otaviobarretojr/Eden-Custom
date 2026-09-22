@@ -3,6 +3,7 @@
 
 #include "yuzu/mod_catalog.h"
 
+#include <algorithm>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -50,6 +51,12 @@ QString NormalizeBuildId(QString build_id) {
 }
 
 QString BuildIdToString(const std::array<u8, 0x20>& build_id) {
+    const bool is_empty =
+        std::all_of(build_id.cbegin(), build_id.cend(), [](u8 value) { return value == 0; });
+    if (is_empty) {
+        return {};
+    }
+
     return NormalizeBuildId(QString::fromStdString(Common::HexToString(build_id)));
 }
 
