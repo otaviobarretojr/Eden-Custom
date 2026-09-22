@@ -116,6 +116,8 @@ jobs:
           grep -q 'BuildTagPlan' src/video_core/renderer_vulkan/present/dlss_inputs.h
           grep -q 'dst->layout = VK_IMAGE_LAYOUT_GENERAL' src/video_core/renderer_vulkan/present/window_adapt_pass.cpp
           grep -q 'GetDlssFramebufferSnapshot' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'IsVerifiedDlssMotionSignature(inserted.semantic_signature)' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'return false;' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q 'IsVerifiedDlssMotionSignature' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q 'dlss_semantic_title_id' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q 'SetDlssSemanticTitleId' src/video_core/renderer_vulkan/renderer_vulkan.cpp
