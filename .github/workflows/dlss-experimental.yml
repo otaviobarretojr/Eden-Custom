@@ -27,5 +27,8 @@ jobs:
           grep -q 'ENABLE_NVIDIA_STREAMLINE' CMakeLists.txt
           grep -q 'STREAMLINE_SDK_ROOT' CMakeLists.txt
           grep -q 'ENABLE_NVIDIA_STREAMLINE.*OFF' CMakeLists.txt
+          grep -q 'WinVerifyTrust' src/video_core/vulkan_common/vulkan_library.cpp
+          grep -q 'HAS_NVIDIA_STREAMLINE' src/video_core/vulkan_common/vulkan_library.cpp
+          grep -q 'target_link_libraries(video_core PRIVATE wintrust)' src/video_core/CMakeLists.txt
           ! grep -R --line-number --include='dlss_probe.*' 'slInit[[:space:]]*(' src/video_core/renderer_vulkan/present
           echo "DLSS bootstrap source guards passed"
