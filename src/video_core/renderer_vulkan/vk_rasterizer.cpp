@@ -711,8 +711,21 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
             fingerprint ^= sample[i];
             fingerprint *= 1099511628211ULL;
         }
+        const bool has_previous_sample = previous != dlss_uniform_observations.end() &&
+                                         previous->sampled;
+        const u32 sample_count = has_previous_sample ? previous->sample_count + 1 : 1;
+        const bool fingerprint_changed = has_previous_sample &&
+                                         previous->sample_fingerprint != fingerprint;
+        const u32 fingerprint_change_count =
+            (has_previous_sample ? previous->fingerprint_change_count : 0) +
+            (fingerprint_changed ? 1 : 0);
         observation.last_sampled_frame = dlss_temporal_frame_index;
+        observation.previous_sample_fingerprint =
+            has_previous_sample ? previous->sample_fingerprint : 0;
         observation.sample_fingerprint = fingerprint;
+        observation.sample_count = sample_count;
+        observation.fingerprint_change_count = fingerprint_change_count;
+        observation.temporally_dynamic = sample_count >= 3 && fingerprint_change_count >= 2;
         observation.sampled = true;
     }
 
