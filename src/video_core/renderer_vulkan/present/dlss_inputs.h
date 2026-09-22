@@ -63,6 +63,17 @@ struct DlssTagPlan {
     }
 };
 
+[[nodiscard]] inline DlssImageInput MakeDlssPresentationOutput(
+    VkImage image, VkImageView view, VkFormat format, VkExtent2D extent, VkImageLayout layout) {
+    return DlssImageInput{
+        .image = image,
+        .view = view,
+        .format = format,
+        .extent = extent,
+        .layout = layout,
+    };
+}
+
 struct DlssTemporalInputs {
     DlssImageInput color_in{};
     DlssImageInput color_out{};
