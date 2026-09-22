@@ -8,6 +8,7 @@
 #include <sl_consts.h>
 
 #include "common/logging.h"
+#include "video_core/vulkan_common/vulkan_device.h"
 #endif
 
 namespace Vulkan {
@@ -30,6 +31,34 @@ StreamlineRuntime::StreamlineRuntime() {
 
     initialized = true;
     LOG_INFO(Render_Vulkan, "Streamline initialized before Vulkan startup");
+#endif
+}
+
+
+void StreamlineRuntime::BindVulkanDevice(const vk::Instance& instance, const Device& device) {
+#ifdef HAS_NVIDIA_STREAMLINE
+    if (!initialized) {
+        return;
+    }
+
+    sl::VulkanInfo info{};
+    info.instance = *instance;
+    info.physicalDevice = *device.GetPhysical();
+    info.device = *device.GetLogical();
+    info.graphicsQueueFamily = device.GetGraphicsFamily();
+    info.graphicsQueueIndex = 0;
+
+    const sl::Result result = slSetVulkanInfo(info);
+    if (result != sl::Result::eOk) {
+        LOG_WARNING(Render_Vulkan, "Streamline Vulkan device binding failed: {}",
+                    static_cast<int>(result));
+        return;
+    }
+
+    LOG_INFO(Render_Vulkan, "Streamline bound to Eden Vulkan device");
+#else
+    (void)instance;
+    (void)device;
 #endif
 }
 
