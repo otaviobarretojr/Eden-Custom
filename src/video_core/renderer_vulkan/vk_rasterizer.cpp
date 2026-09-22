@@ -2035,8 +2035,10 @@ std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColor
 void RasterizerVulkan::TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline) {
     std::scoped_lock lock{dlss_candidate_mutex};
     for (u32 slot = 0; slot < dlss_fragment_output_slots.size(); ++slot) {
-        dlss_fragment_output_slots[slot] =
-            dlss_fragment_output_slots[slot] || pipeline.FragmentStoresColor(slot);
+        if (pipeline.FragmentStoresColor(slot)) {
+            dlss_fragment_output_slots[slot] = true;
+            dlss_fragment_output_hashes[slot] = pipeline.FragmentShaderHash();
+        }
     }
 }
 
@@ -2083,6 +2085,10 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
                 .fragment_shader_writes_slot =
                     candidate.slot < dlss_fragment_output_slots.size() &&
                     dlss_fragment_output_slots[candidate.slot],
+                .fragment_shader_hash =
+                    candidate.slot < dlss_fragment_output_hashes.size()
+                        ? dlss_fragment_output_hashes[candidate.slot]
+                        : 0,
                 .semantic_evidence = false,
                 .confidence = DlssMotionConfidence::None,
             });
@@ -2102,6 +2108,10 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
         it->fragment_shader_writes_slot =
             candidate.slot < dlss_fragment_output_slots.size() &&
             dlss_fragment_output_slots[candidate.slot];
+        it->fragment_shader_hash =
+            candidate.slot < dlss_fragment_output_hashes.size()
+                ? dlss_fragment_output_hashes[candidate.slot]
+                : 0;
         // Format, extent and persistence are heuristic evidence only. A guest MRT must not
         // become a verified motion-vector input without independent semantic evidence.
         it->confidence = it->semantic_evidence
@@ -2114,6 +2124,7 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
 
     // This evidence is frame-local: only pipelines observed since the previous sample count.
     dlss_fragment_output_slots.fill(false);
+    dlss_fragment_output_hashes.fill(0);
 
     std::erase_if(dlss_motion_history, [frame_index](const DlssMotionCandidateHistory& history) {
         return frame_index > history.last_frame && frame_index - history.last_frame > 120;
