@@ -9,6 +9,7 @@ namespace Vulkan {
 DlssProbeResult ProbeDlssSupport(const Device& device) {
     DlssProbeResult result{};
     result.nvidia = device.GetDriverID() == VK_DRIVER_ID_NVIDIA_PROPRIETARY;
+    // Streamline 2.14.x requires Vulkan 1.2+ for Vulkan integrations.
     result.vulkan_compatible = device.ApiVersion() >= VK_API_VERSION_1_2;
     if (!result.nvidia) {
         result.reason = "DLSS probe disabled: selected Vulkan device is not using the NVIDIA proprietary driver.";
@@ -20,8 +21,7 @@ DlssProbeResult ProbeDlssSupport(const Device& device) {
     }
 #ifdef _WIN32
     HMODULE module = LoadLibraryExW(L"sl.interposer.dll", nullptr,
-                                    LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
-                                    LOAD_LIBRARY_SEARCH_SYSTEM32);
+                                    LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
     if (module) {
         result.streamline_runtime_present = true;
         FreeLibrary(module);
