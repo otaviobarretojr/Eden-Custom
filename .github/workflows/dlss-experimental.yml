@@ -35,5 +35,7 @@ jobs:
           grep -q 'slShutdown()' src/video_core/vulkan_common/streamline_runtime.cpp
           grep -q 'slSetVulkanInfo(info)' src/video_core/vulkan_common/streamline_runtime.cpp
           grep -q 'BindVulkanDevice(instance, device)' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'slIsFeatureSupported(sl::kFeatureDLSS' src/video_core/vulkan_common/streamline_runtime.cpp
+          grep -q 'temporal_inputs_available' src/video_core/renderer_vulkan/present/dlss_probe.h
           ! grep -R --line-number --include='dlss_probe.*' 'slInit[[:space:]]*(' src/video_core/renderer_vulkan/present
           echo "DLSS bootstrap source guards passed"
