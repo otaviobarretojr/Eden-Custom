@@ -60,6 +60,9 @@ jobs:
           grep -q 'GetDlssColorCandidates' src/video_core/renderer_vulkan/vk_rasterizer.h
           grep -q 'ColorImageRange' src/video_core/renderer_vulkan/vk_texture_cache.h
           grep -q 'ColorFormat' src/video_core/renderer_vulkan/vk_texture_cache.h
+          grep -q 'color_present' src/video_core/renderer_vulkan/vk_texture_cache.h
+          grep -q 'color_present.fill(false)' src/video_core/renderer_vulkan/vk_texture_cache.cpp
+          grep -q 'color_present\[index\] = true' src/video_core/renderer_vulkan/vk_texture_cache.cpp
           grep -q 'DlssMotionConfidence::Verified' src/video_core/renderer_vulkan/present/dlss_inputs.h
           grep -q 'TrackDlssTemporalCandidates' src/video_core/renderer_vulkan/renderer_vulkan.cpp
           grep -q 'consecutive_frames' src/video_core/renderer_vulkan/vk_rasterizer.h
