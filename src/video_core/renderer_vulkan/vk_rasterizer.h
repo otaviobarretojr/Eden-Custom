@@ -142,6 +142,18 @@ public:
                                                             VAddr framebuffer_addr,
                                                             u32 pixel_stride);
 
+    struct DlssDepthCandidate {
+        VkImage image{};
+        VkExtent2D extent{};
+        VkImageSubresourceRange range{};
+
+        [[nodiscard]] bool IsValid() const {
+            return image != VK_NULL_HANDLE && extent.width != 0 && extent.height != 0;
+        }
+    };
+
+    [[nodiscard]] DlssDepthCandidate GetDlssDepthCandidate() const;
+
 private:
     static constexpr const u64 NEEDS_D24[] = {
         0x01006A800016E000ULL, // SSBU
