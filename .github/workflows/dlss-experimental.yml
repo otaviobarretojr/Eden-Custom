@@ -76,6 +76,8 @@ jobs:
           grep -q 'dlss_semantic_title_id' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q 'SetDlssSemanticTitleId' src/video_core/renderer_vulkan/renderer_vulkan.cpp
           grep -q 'struct DlssTemporalConstants' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'DlssTemporalConstantsSource' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'source != DlssTemporalConstantsSource::None' src/video_core/renderer_vulkan/present/dlss_inputs.h
           grep -q 'constants.IsReady()' src/video_core/renderer_vulkan/present/dlss_inputs.h
           ! grep -q 'camera_constants_valid' src/video_core/renderer_vulkan/present/dlss_inputs.h
           grep -q 'oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL' src/video_core/renderer_vulkan/vk_texture_cache.cpp
