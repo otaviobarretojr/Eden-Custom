@@ -32,7 +32,9 @@ struct DlssTemporalSnapshot {
     DlssImageInput color_in{};
     DlssImageInput depth{};
     VkImage motion_candidate{};
+    VkImageView motion_candidate_view{};
     VkFormat motion_candidate_format{VK_FORMAT_UNDEFINED};
+    VkImageLayout motion_candidate_layout{VK_IMAGE_LAYOUT_UNDEFINED};
     VkExtent2D render_extent{};
     u32 motion_candidate_slot{};
     u32 motion_candidate_persistence{};
