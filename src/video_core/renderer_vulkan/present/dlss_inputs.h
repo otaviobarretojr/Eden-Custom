@@ -108,6 +108,24 @@ struct DlssTemporalConstants {
     }
 };
 
+struct DlssTemporalGameProfile {
+    u64 title_id{};
+    u64 motion_fragment_shader_hash{};
+    u32 motion_slot{};
+    VkFormat motion_format{VK_FORMAT_UNDEFINED};
+    DlssTemporalConstants constants{};
+
+    [[nodiscard]] bool Matches(u64 current_title_id, u64 fragment_shader_hash, u32 slot,
+                               VkFormat format) const noexcept {
+        return title_id != 0 && title_id == current_title_id &&
+               motion_fragment_shader_hash != 0 &&
+               motion_fragment_shader_hash == fragment_shader_hash &&
+               motion_slot == slot && motion_format == format &&
+               constants.source == DlssTemporalConstantsSource::ValidatedGameProfile &&
+               constants.IsReady();
+    }
+};
+
 struct DlssTemporalInputs {
     DlssImageInput color_in{};
     DlssImageInput color_out{};
