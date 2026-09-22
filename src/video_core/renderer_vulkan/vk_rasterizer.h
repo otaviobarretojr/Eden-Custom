@@ -147,6 +147,7 @@ public:
 
     struct DlssDepthCandidate {
         VkImage image{};
+        VkImageView view{};
         VkExtent2D extent{};
         VkImageSubresourceRange range{};
 
@@ -159,6 +160,7 @@ public:
 
     struct DlssColorCandidate {
         VkImage image{};
+        VkImageView view{};
         VkExtent2D extent{};
         VkImageSubresourceRange range{};
         VkFormat format{VK_FORMAT_UNDEFINED};
