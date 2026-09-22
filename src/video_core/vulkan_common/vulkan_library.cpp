@@ -58,29 +58,21 @@ std::shared_ptr<Common::DynamicLibrary> OpenLibrary(
                 const bool signature_valid =
                     sl::security::verifyEmbeddedSignature(interposer_path.c_str());
                 if (signature_valid) {
-                    const int utf8_size =
-                        WideCharToMultiByte(CP_UTF8, 0, interposer_path.c_str(), -1, nullptr, 0,
-                                            nullptr, nullptr);
-                    std::string interposer_utf8(static_cast<size_t>(utf8_size), '\0');
-                    if (utf8_size > 0) {
-                        WideCharToMultiByte(CP_UTF8, 0, interposer_path.c_str(), -1,
-                                            interposer_utf8.data(), utf8_size, nullptr, nullptr);
-                        auto streamline = std::make_shared<Common::DynamicLibrary>();
-                        if (streamline->Open(interposer_utf8.c_str())) {
-                            PFN_vkGetInstanceProcAddr sl_get_instance_proc_addr{};
-                            PFN_vkGetDeviceProcAddr sl_get_device_proc_addr{};
-                            const bool has_instance = streamline->GetSymbol(
-                                "vkGetInstanceProcAddr", &sl_get_instance_proc_addr);
-                            const bool has_device = streamline->GetSymbol(
-                                "vkGetDeviceProcAddr", &sl_get_device_proc_addr);
-                            if (has_instance && has_device) {
-                                LOG_INFO(Render_Vulkan,
-                                         "Using verified application-local Streamline Vulkan interposer");
-                                return streamline;
-                            }
-                            LOG_WARNING(Render_Vulkan,
-                                        "Verified Streamline interposer is missing Vulkan exports; falling back");
+                    auto streamline = std::make_shared<Common::DynamicLibrary>();
+                    if (streamline->Open(std::wstring_view{interposer_path})) {
+                        PFN_vkGetInstanceProcAddr sl_get_instance_proc_addr{};
+                        PFN_vkGetDeviceProcAddr sl_get_device_proc_addr{};
+                        const bool has_instance = streamline->GetSymbol(
+                            "vkGetInstanceProcAddr", &sl_get_instance_proc_addr);
+                        const bool has_device = streamline->GetSymbol(
+                            "vkGetDeviceProcAddr", &sl_get_device_proc_addr);
+                        if (has_instance && has_device) {
+                            LOG_INFO(Render_Vulkan,
+                                     "Using verified application-local Streamline Vulkan interposer");
+                            return streamline;
                         }
+                        LOG_WARNING(Render_Vulkan,
+                                    "Verified Streamline interposer is missing Vulkan exports; falling back");
                     }
                 } else {
                     LOG_WARNING(Render_Vulkan,
