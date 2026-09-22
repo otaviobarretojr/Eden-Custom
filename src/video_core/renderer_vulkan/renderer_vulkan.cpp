@@ -215,6 +215,7 @@ RendererVulkan::~RendererVulkan() {
 }
 
 void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebuffers) {
+    rasterizer.SetDlssSemanticTitleId(Settings::GetCurrentProgramID());
     rasterizer.TrackDlssTemporalCandidates(++dlss_frame_index);
     const auto dlss_snapshot = rasterizer.CaptureDlssTemporalSnapshot(dlss_frame_index);
     if (dlss_snapshot.motion_confidence == DlssMotionConfidence::Candidate &&
