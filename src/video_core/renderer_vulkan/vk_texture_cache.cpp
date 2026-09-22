@@ -3003,6 +3003,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                                                             false, color_buffer->format).format;
         num_layers = (std::max)(num_layers, color_buffer->range.extent.layers);
         images[num_images] = color_buffer->ImageHandle();
+        image_views[num_images] = color_buffer->RenderTarget();
         image_ranges[num_images] = MakeSubresourceRange(color_buffer);
         rt_map[index] = num_images;
         color_present[index] = true;
@@ -3021,6 +3022,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         renderpass_key.depth_format = depth_buffer->format;
         num_layers = (std::max)(num_layers, depth_buffer->range.extent.layers);
         images[num_images] = depth_buffer->ImageHandle();
+        image_views[num_images] = depth_buffer->RenderTarget();
         const VkImageSubresourceRange subresource_range = MakeSubresourceRange(depth_buffer);
         image_ranges[num_images] = subresource_range;
         samples = depth_buffer->Samples();
