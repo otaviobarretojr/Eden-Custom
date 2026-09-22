@@ -679,7 +679,23 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
         .size = size,
         .title_id = dlss_semantic_title_id,
         .bind_sequence = ++dlss_uniform_bind_sequence,
+        .frame_index = dlss_temporal_frame_index,
     };
+    // Shader correlation is filled only when a single fragment producer is known for the frame.
+    // Multiple fragment producers deliberately leave the observation unverified.
+    for (u32 slot = 0; slot < dlss_fragment_output_slots.size(); ++slot) {
+        if (!dlss_fragment_output_slots[slot] || dlss_fragment_output_ambiguous[slot]) {
+            continue;
+        }
+        const u64 producer_hash = dlss_fragment_output_hashes[slot];
+        if (producer_hash == 0 || observation.fragment_producer_unambiguous) {
+            observation.fragment_shader_hash = 0;
+            observation.fragment_producer_unambiguous = false;
+            break;
+        }
+        observation.fragment_shader_hash = producer_hash;
+        observation.fragment_producer_unambiguous = true;
+    }
     buffer_cache.BindGraphicsUniformBuffer(stage, index, gpu_addr, size);
 }
 
@@ -2116,6 +2132,7 @@ void RasterizerVulkan::TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline
 }
 
 void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
+    dlss_temporal_frame_index = frame_index;
     const auto framebuffer_snapshot = GetDlssFramebufferSnapshot();
     const auto& candidates = framebuffer_snapshot.colors;
     const auto& depth = framebuffer_snapshot.depth;
