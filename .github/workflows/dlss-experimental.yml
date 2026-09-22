@@ -82,7 +82,9 @@ jobs:
           grep -q 'CaptureDlssTemporalSnapshot(dlss_frame_index)' src/video_core/renderer_vulkan/renderer_vulkan.cpp
           grep -q 'dlss_frame_index % 120 == 0' src/video_core/renderer_vulkan/renderer_vulkan.cpp
           ! grep -q 'slEvaluateFeature' src/video_core/renderer_vulkan/renderer_vulkan.cpp
-          grep -q 'motion_confidence = DlssMotionConfidence::Candidate' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'candidate.confidence' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'IsHeuristicCandidate' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q 'IsVerified' src/video_core/renderer_vulkan/vk_rasterizer.h
           grep -q '#include <iterator>' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q '#include <mutex>' src/video_core/renderer_vulkan/vk_rasterizer.h
           grep -q '#include <vector>' src/video_core/renderer_vulkan/vk_rasterizer.h
