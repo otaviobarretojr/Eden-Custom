@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <iterator>
 #include <memory>
 #include <mutex>
 
@@ -2078,7 +2079,7 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
     }
 
     std::erase_if(dlss_motion_history, [frame_index](const DlssMotionCandidateHistory& history) {
-        return history.last_frame + 120 < frame_index;
+        return frame_index > history.last_frame && frame_index - history.last_frame > 120;
     });
 }
 
