@@ -2017,6 +2017,7 @@ std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColor
             .image = image,
             .extent = framebuffer->RenderArea(),
             .range = *range,
+            .format = framebuffer->ColorFormat(slot),
             .slot = slot,
         });
     }
