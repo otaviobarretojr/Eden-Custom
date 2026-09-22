@@ -2025,4 +2025,46 @@ std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColor
 }
 
 
+void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
+    const auto candidates = GetDlssColorCandidates();
+    std::scoped_lock lock{dlss_candidate_mutex};
+
+    for (const auto& candidate : candidates) {
+        auto it = std::find_if(dlss_motion_history.begin(), dlss_motion_history.end(),
+                               [&candidate](const DlssMotionCandidateHistory& history) {
+                                   return history.image == candidate.image &&
+                                          history.slot == candidate.slot &&
+                                          history.format == candidate.format &&
+                                          history.extent.width == candidate.extent.width &&
+                                          history.extent.height == candidate.extent.height;
+                               });
+        if (it == dlss_motion_history.end()) {
+            dlss_motion_history.push_back({
+                .image = candidate.image,
+                .format = candidate.format,
+                .extent = candidate.extent,
+                .slot = candidate.slot,
+                .consecutive_frames = 1,
+                .last_frame = frame_index,
+            });
+            continue;
+        }
+
+        it->consecutive_frames =
+            it->last_frame + 1 == frame_index ? it->consecutive_frames + 1 : 1;
+        it->last_frame = frame_index;
+    }
+
+    std::erase_if(dlss_motion_history, [frame_index](const DlssMotionCandidateHistory& history) {
+        return history.last_frame + 120 < frame_index;
+    });
+}
+
+std::vector<RasterizerVulkan::DlssMotionCandidateHistory>
+RasterizerVulkan::GetDlssMotionCandidateHistory() const {
+    std::scoped_lock lock{dlss_candidate_mutex};
+    return dlss_motion_history;
+}
+
+
 } // namespace Vulkan
