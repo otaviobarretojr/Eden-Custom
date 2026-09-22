@@ -2071,6 +2071,8 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
                     depth.IsValid() && candidate.extent.width == depth.extent.width &&
                     candidate.extent.height == depth.extent.height,
                 .persistent = false,
+                .semantic_evidence = false,
+                .confidence = DlssMotionConfidence::None,
             });
             continue;
         }
@@ -2085,6 +2087,14 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
             depth.IsValid() && candidate.extent.width == depth.extent.width &&
             candidate.extent.height == depth.extent.height;
         it->persistent = it->consecutive_frames >= 8;
+        // Format, extent and persistence are heuristic evidence only. A guest MRT must not
+        // become a verified motion-vector input without independent semantic evidence.
+        it->confidence = it->semantic_evidence
+                             ? DlssMotionConfidence::Verified
+                             : (it->motion_format_compatible &&
+                                        it->render_resolution_compatible && it->persistent
+                                    ? DlssMotionConfidence::Candidate
+                                    : DlssMotionConfidence::None);
     }
 
     std::erase_if(dlss_motion_history, [frame_index](const DlssMotionCandidateHistory& history) {
@@ -2105,8 +2115,8 @@ RasterizerVulkan::GetDlssLikelyMotionCandidates() const {
     std::vector<DlssMotionCandidateHistory> candidates;
     std::copy_if(history.begin(), history.end(), std::back_inserter(candidates),
                  [](const DlssMotionCandidateHistory& item) {
-                     return item.motion_format_compatible &&
-                            item.render_resolution_compatible && item.persistent;
+                     return item.confidence == DlssMotionConfidence::Candidate ||
+                            item.confidence == DlssMotionConfidence::Verified;
                  });
     return candidates;
 }
@@ -2148,7 +2158,7 @@ DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_ind
         snapshot.motion_candidate_layout = candidate.layout;
         snapshot.motion_candidate_slot = candidate.slot;
         snapshot.motion_candidate_persistence = candidate.consecutive_frames;
-        snapshot.motion_confidence = DlssMotionConfidence::Candidate;
+        snapshot.motion_confidence = candidate.confidence;
     }
     return snapshot;
 }
