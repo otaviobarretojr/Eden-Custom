@@ -81,6 +81,8 @@ jobs:
           grep -q 'struct DlssTemporalGameProfile' src/video_core/renderer_vulkan/present/dlss_inputs.h
           grep -q 'validated_profiles' src/video_core/renderer_vulkan/present/dlss_inputs.h
           grep -q 'std::array<DlssTemporalGameProfile, 0>' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'FindValidatedDlssTemporalGameProfile' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'temporal_profile_valid = true' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q 'constants.IsReady()' src/video_core/renderer_vulkan/present/dlss_inputs.h
           ! grep -q 'camera_constants_valid' src/video_core/renderer_vulkan/present/dlss_inputs.h
           grep -q 'oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL' src/video_core/renderer_vulkan/vk_texture_cache.cpp
