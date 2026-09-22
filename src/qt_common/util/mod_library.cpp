@@ -63,6 +63,24 @@ QString HashFile(const QString& path, QString* error) {
     return QString::fromLatin1(hash.result().toHex());
 }
 
+bool IsUnsafeArchiveEntry(QString path) {
+    path.replace(QLatin1Char('\\'), QLatin1Char('/'));
+
+    if (path.startsWith(QLatin1Char('/')) ||
+        QRegularExpression(QStringLiteral("^[A-Za-z]:")).match(path).hasMatch()) {
+        return true;
+    }
+
+    const QString cleaned = QDir::cleanPath(path);
+    return cleaned == QStringLiteral("..") ||
+           cleaned.startsWith(QStringLiteral("../"));
+}
+
+bool HasUnsafeArchiveEntries(const QStringList& entries) {
+    return std::any_of(entries.cbegin(), entries.cend(),
+                       [](const QString& entry) { return IsUnsafeArchiveEntry(entry); });
+}
+
 QStringList NormalizeEntries(const QStringList& raw_entries) {
     QStringList files;
     files.reserve(raw_entries.size());
@@ -297,6 +315,20 @@ bool ImportPackage(const QString& source_zip, PackageInfo& package, QString* err
 
     for (const auto& existing : packages) {
         if (QString::compare(existing.id, hash, Qt::CaseInsensitive) == 0) {
+            const QString existing_path =
+                QDir{PackagesPath()}.filePath(existing.file_name);
+
+            if (!QFileInfo::exists(existing_path)) {
+                QDir().mkpath(PackagesPath());
+                if (!QFile::copy(source_zip, existing_path)) {
+                    if (error) {
+                        *error = QObject::tr(
+                            "The package is indexed, but Eden could not restore the missing ZIP.");
+                    }
+                    return false;
+                }
+            }
+
             package = existing;
             package.already_imported = true;
             return true;
@@ -307,6 +339,13 @@ bool ImportPackage(const QString& source_zip, PackageInfo& package, QString* err
     if (raw_entries.isEmpty()) {
         if (error) {
             *error = QObject::tr("The ZIP is empty or could not be read.");
+        }
+        return false;
+    }
+    if (HasUnsafeArchiveEntries(raw_entries)) {
+        if (error) {
+            *error = QObject::tr(
+                "The ZIP contains unsafe paths and was rejected.");
         }
         return false;
     }
