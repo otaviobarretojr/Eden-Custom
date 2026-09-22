@@ -311,6 +311,7 @@ private:
     std::vector<DlssMotionCandidateHistory> dlss_motion_history;
     std::array<bool, 8> dlss_fragment_output_slots{};
     std::array<u64, 8> dlss_fragment_output_hashes{};
+    std::array<bool, 8> dlss_fragment_output_ambiguous{};
     u32 draw_counter = 0;
 };
 
