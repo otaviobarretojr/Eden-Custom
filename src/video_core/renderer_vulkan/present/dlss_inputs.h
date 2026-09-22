@@ -7,6 +7,12 @@
 
 namespace Vulkan {
 
+enum class DlssMotionConfidence {
+    None,
+    Candidate,
+    Verified,
+};
+
 struct DlssImageInput {
     VkImage image{};
     VkImageView view{};
@@ -27,10 +33,12 @@ struct DlssTemporalInputs {
     DlssImageInput motion_vectors{};
     bool camera_constants_valid{};
     bool jitter_valid{};
+    DlssMotionConfidence motion_confidence{DlssMotionConfidence::None};
 
     [[nodiscard]] bool IsReady() const {
         return color_in.IsValid() && color_out.IsValid() && depth.IsValid() &&
-               motion_vectors.IsValid() && camera_constants_valid && jitter_valid;
+               motion_vectors.IsValid() && camera_constants_valid && jitter_valid &&
+               motion_confidence == DlssMotionConfidence::Verified;
     }
 };
 
