@@ -2075,6 +2075,18 @@ RasterizerVulkan::DlssFramebufferSnapshot RasterizerVulkan::GetDlssFramebufferSn
 }
 
 
+bool RasterizerVulkan::IsVerifiedDlssMotionSignature(
+    const DlssMotionSemanticSignature& signature) noexcept {
+    // Semantic verification is intentionally opt-in. A heuristic candidate must never promote
+    // itself to Verified merely because its resource identity remains stable. Future entries
+    // require an independently validated title/shader/MRT/format signature.
+    if (!signature.IsComplete()) {
+        return false;
+    }
+    return false;
+}
+
+
 void RasterizerVulkan::TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline) {
     std::scoped_lock lock{dlss_candidate_mutex};
     for (u32 slot = 0; slot < dlss_fragment_output_slots.size(); ++slot) {
