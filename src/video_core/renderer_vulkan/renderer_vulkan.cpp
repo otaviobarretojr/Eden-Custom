@@ -182,6 +182,8 @@ try
 #endif
 {
 
+    streamline_runtime.BindVulkanDevice(instance, device);
+
     if (Settings::values.renderer_force_max_clock.GetValue() && device.ShouldBoostClocks()) {
         turbo_mode.emplace(instance, dld);
         scheduler.RegisterOnSubmit([this] { turbo_mode->QueueSubmitted(); });
