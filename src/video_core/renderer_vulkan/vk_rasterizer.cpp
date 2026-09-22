@@ -2204,6 +2204,11 @@ DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_ind
         snapshot.motion_candidate_layout = candidate.layout;
         snapshot.motion_candidate_slot = candidate.slot;
         snapshot.motion_candidate_persistence = candidate.consecutive_frames;
+        snapshot.motion_fragment_shader_hash = candidate.fragment_shader_hash;
+        snapshot.motion_producer_persistence = candidate.producer_consecutive_frames;
+        snapshot.motion_fragment_shader_writes_slot = candidate.fragment_shader_writes_slot;
+        snapshot.motion_producer_stable = candidate.producer_stable;
+        snapshot.motion_semantic_evidence = candidate.semantic_evidence;
         snapshot.motion_confidence = candidate.confidence;
     }
     return snapshot;
