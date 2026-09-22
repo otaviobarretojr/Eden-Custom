@@ -25,6 +25,8 @@
 
 #include "about_dialog.h"
 #include "benchmark_dialog.h"
+#include "mod_catalog.h"
+#include "mod_catalog_dialog.h"
 #include "performance_profile_dialog.h"
 #include "data_dialog.h"
 #include "deps_dialog.h"
@@ -1623,6 +1625,11 @@ void MainWindow::ConnectWidgetEvents() {
 
                 QMessageBox::information(this, tr("Shader Preparation Status"), details);
             });
+    connect(game_list, &GameList::ModCatalogRequested, this, [this](u64 program_id) {
+        const QString build_id = EdenCustom::ReadObservedBuildId(program_id);
+        ModCatalogDialog dialog(program_id, build_id, this);
+        dialog.exec();
+    });
     connect(game_list, &GameList::RemoveInstalledEntryRequested, this,
             &MainWindow::OnGameListRemoveInstalledEntry);
     connect(game_list, &GameList::RemoveFileRequested, this, &MainWindow::OnGameListRemoveFile);
@@ -3510,6 +3517,11 @@ bool MainWindow::ConfirmShutdownGame() {
 
 void MainWindow::OnLoadComplete() {
     loading_screen->OnLoadComplete();
+
+    if (current_game_title_id != 0) {
+        EdenCustom::RecordObservedBuildId(current_game_title_id,
+                                          QtCommon::system->GetApplicationProcessBuildID());
+    }
 
     perf_overlay = new PerformanceOverlay(this);
     perf_overlay->setVisible(ui->action_Show_Performance_Overlay->isChecked());
