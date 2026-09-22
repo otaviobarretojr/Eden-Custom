@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <QByteArray>
 #include <QDialog>
 #include <QProcess>
 #include <QString>
@@ -57,9 +58,17 @@ private:
     void AppendLog(const QString& text);
     void UpdateProgressFromText(const QString& text);
     void InspectConvertedFile(const QString& input_path);
+    void BeginCompatibilityFallback();
+    bool InstallCompatibilityFallback(const QByteArray& payload, QString* error);
+    bool PrepareCompatibilityFallbackKeys(QString* error);
+    void CleanupCompatibilityFallbackKeys();
+    bool IsCompatibilityFallbackProgram(const QString& program) const;
     bool ResolveConverter(QString& program, QStringList& prefix_arguments) const;
     QString EdenKeysDirectory() const;
     QString ManagedConverterPath() const;
+    QString CompatibilityFallbackRootPath() const;
+    QString CompatibilityFallbackArchivePath() const;
+    QString CompatibilityFallbackConverterPath() const;
 
     QListWidget* file_list{};
     QLineEdit* output_directory{};
@@ -84,8 +93,13 @@ private:
     QNetworkAccessManager* network_manager{};
     QNetworkReply* download_reply{};
     QStringList queue{};
+    QString compatibility_fallback_keys_path{};
     QStringList pending_install_files{};
     QStringList pending_library_dirs{};
     int queue_index{};
     bool cancel_requested{};
+    bool downloading_compatibility_fallback{};
+    bool force_compatibility_fallback{};
+    bool fallback_retry_attempted{};
+    bool current_process_uses_fallback{};
 };

@@ -44,12 +44,17 @@
 #include "core/file_sys/submission_package.h"
 #include "core/loader/loader.h"
 #include "qt_common/qt_common.h"
+#include "qt_common/util/compress.h"
 
 namespace {
 constexpr auto kManagedConverterUrl =
     "https://github.com/nicoboss/nsz/releases/download/5.0.0/nsz-cli-windows-x64.exe";
 constexpr auto kManagedConverterSha256 =
     "341b395c18679bf4c01f0bf2fb0e22e315a64b34fad51064781f5155a978883d";
+constexpr auto kCompatibilityFallbackUrl =
+    "https://github.com/nicoboss/nsz/releases/download/4.6.1/nsz_v4.6.1_win64_portable.zip";
+constexpr auto kCompatibilityFallbackSha256 =
+    "9ebf9e717db54918cbae3db9ec8befe3c12b90bd8d5f3059991deeb2b659889e";
 
 struct ContentFileHint {
     QString type;
@@ -129,7 +134,9 @@ ContentConverterDialog::ContentConverterDialog(QWidget* parent, const QStringLis
     }
 }
 
-ContentConverterDialog::~ContentConverterDialog() = default;
+ContentConverterDialog::~ContentConverterDialog() {
+    CleanupCompatibilityFallbackKeys();
+}
 
 void ContentConverterDialog::BuildUi() {
     setWindowTitle(tr("Content Converter — NSZ to NSP"));
@@ -333,6 +340,7 @@ void ContentConverterDialog::ChooseConverterExecutable() {
         this, tr("Select NSZ converter"), converter_path->text(),
         tr("NSZ CLI (nsz-cli-windows-x64.exe nsz.exe);;Executable files (*.exe);;All files (*.*)"));
     if (!executable.isEmpty()) {
+        force_compatibility_fallback = false;
         converter_path->setText(QDir::toNativeSeparators(executable));
         status_label->setText(tr("NSZ converter selected."));
     }
@@ -350,10 +358,193 @@ QString ContentConverterDialog::ManagedConverterPath() const {
     return QString::fromStdString(converter.string());
 }
 
+QString ContentConverterDialog::CompatibilityFallbackRootPath() const {
+    const auto eden_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::EdenDir);
+    const auto root = eden_dir / "tools" / "nsz" / "compat" / "4.6.1";
+    return QString::fromStdString(root.string());
+}
+
+QString ContentConverterDialog::CompatibilityFallbackArchivePath() const {
+    const auto eden_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::EdenDir);
+    const auto archive = eden_dir / "tools" / "nsz" / "nsz_v4.6.1_win64_portable.zip";
+    return QString::fromStdString(archive.string());
+}
+
+QString ContentConverterDialog::CompatibilityFallbackConverterPath() const {
+    return QDir(CompatibilityFallbackRootPath())
+        .filePath(QStringLiteral("nsz_v4.6.1_win64_portable/nsz.exe"));
+}
+
+bool ContentConverterDialog::IsCompatibilityFallbackProgram(const QString& program) const {
+    const QString lhs = QDir::cleanPath(QFileInfo(program).absoluteFilePath());
+    const QString rhs =
+        QDir::cleanPath(QFileInfo(CompatibilityFallbackConverterPath()).absoluteFilePath());
+    return QString::compare(lhs, rhs, Qt::CaseInsensitive) == 0;
+}
+
+bool ContentConverterDialog::PrepareCompatibilityFallbackKeys(QString* error) {
+    CleanupCompatibilityFallbackKeys();
+
+    const QString source =
+        QDir(EdenKeysDirectory()).filePath(QStringLiteral("prod.keys"));
+    if (!QFileInfo::exists(source)) {
+        if (error != nullptr) {
+            *error = tr("Eden's prod.keys file was not found. The NSZ 4.6.1 compatibility "
+                        "fallback needs the same keys already used by Eden.");
+        }
+        return false;
+    }
+
+    const QString target =
+        QDir(QFileInfo(CompatibilityFallbackConverterPath()).absolutePath())
+            .filePath(QStringLiteral("keys.txt"));
+    QFile::remove(target);
+    if (!QFile::copy(source, target)) {
+        if (error != nullptr) {
+            *error = tr("Eden could not prepare the temporary keys.txt file for the NSZ "
+                        "compatibility fallback.");
+        }
+        return false;
+    }
+
+    compatibility_fallback_keys_path = target;
+    return true;
+}
+
+void ContentConverterDialog::CleanupCompatibilityFallbackKeys() {
+    if (!compatibility_fallback_keys_path.isEmpty()) {
+        QFile::remove(compatibility_fallback_keys_path);
+        compatibility_fallback_keys_path.clear();
+    }
+}
+
+bool ContentConverterDialog::InstallCompatibilityFallback(const QByteArray& payload,
+                                                          QString* error) {
+    const QByteArray digest =
+        QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex();
+    if (digest != QByteArray{kCompatibilityFallbackSha256}) {
+        if (error != nullptr) {
+            *error = tr("The NSZ 4.6.1 compatibility package failed SHA-256 validation.");
+        }
+        return false;
+    }
+
+    const QString archive = CompatibilityFallbackArchivePath();
+    const QFileInfo archive_info{archive};
+    if (!QDir().mkpath(archive_info.absolutePath())) {
+        if (error != nullptr) {
+            *error = tr("The NSZ compatibility folder could not be created.");
+        }
+        return false;
+    }
+
+    QSaveFile output{archive};
+    if (!output.open(QIODevice::WriteOnly) || output.write(payload) != payload.size() ||
+        !output.commit()) {
+        if (error != nullptr) {
+            *error = tr("The verified NSZ compatibility package could not be saved.");
+        }
+        return false;
+    }
+
+    QDir fallback_root{CompatibilityFallbackRootPath()};
+    if (fallback_root.exists() && !fallback_root.removeRecursively()) {
+        QFile::remove(archive);
+        if (error != nullptr) {
+            *error = tr("The previous NSZ compatibility folder could not be replaced.");
+        }
+        return false;
+    }
+    if (!QDir().mkpath(CompatibilityFallbackRootPath())) {
+        QFile::remove(archive);
+        if (error != nullptr) {
+            *error = tr("The NSZ compatibility folder could not be created.");
+        }
+        return false;
+    }
+
+    progress_bar->setRange(0, 100);
+    const QStringList extracted = QtCommon::Compress::extractDir(
+        archive, CompatibilityFallbackRootPath(),
+        [this](std::size_t total, std::size_t progress) {
+            if (total > 0) {
+                progress_bar->setValue(
+                    qBound(0, static_cast<int>((progress * 100) / total), 100));
+            }
+            QApplication::processEvents();
+            return !cancel_requested;
+        });
+    QFile::remove(archive);
+
+    if (cancel_requested) {
+        fallback_root.removeRecursively();
+        return false;
+    }
+
+    if (extracted.isEmpty() || !QFileInfo::exists(CompatibilityFallbackConverterPath())) {
+        fallback_root.removeRecursively();
+        if (error != nullptr) {
+            *error = tr("The NSZ 4.6.1 compatibility package could not be extracted correctly.");
+        }
+        return false;
+    }
+
+    return true;
+}
+
+void ContentConverterDialog::BeginCompatibilityFallback() {
+    fallback_retry_attempted = true;
+    force_compatibility_fallback = true;
+
+    const QString fallback = CompatibilityFallbackConverterPath();
+    if (QFileInfo::exists(fallback)) {
+        converter_path->setText(QDir::toNativeSeparators(fallback));
+        AppendLog(tr("Retrying with official NSZ 4.6.1 portable compatibility fallback."));
+        status_label->setText(tr("Retrying with NSZ 4.6.1 portable compatibility fallback..."));
+        StartNextFile();
+        return;
+    }
+
+    if (download_reply != nullptr) {
+        SetBusy(false);
+        status_label->setText(tr("Another converter download is already in progress."));
+        return;
+    }
+
+    downloading_compatibility_fallback = true;
+    QNetworkRequest request{QUrl{QString::fromLatin1(kCompatibilityFallbackUrl)}};
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+
+    progress_bar->setRange(0, 100);
+    progress_bar->setValue(0);
+    current_file_label->setText(tr("Installing NSZ compatibility fallback"));
+    status_label->setText(tr("Downloading verified official NSZ 4.6.1 portable fallback..."));
+    AppendLog(tr("NSZ 5.0.0 embedded runtime failed; downloading official NSZ 4.6.1 "
+                 "portable compatibility fallback."));
+
+    download_reply = network_manager->get(request);
+    connect(download_reply, &QNetworkReply::downloadProgress, this,
+            [this](qint64 received, qint64 total) {
+                if (total > 0) {
+                    progress_bar->setValue(
+                        qBound(0, static_cast<int>((received * 100) / total), 100));
+                    status_label->setText(
+                        tr("Downloading compatibility fallback... %1 / %2 MB")
+                            .arg(QString::number(received / 1024.0 / 1024.0, 'f', 1))
+                            .arg(QString::number(total / 1024.0 / 1024.0, 'f', 1)));
+                }
+            });
+    connect(download_reply, &QNetworkReply::finished, this,
+            &ContentConverterDialog::FinishConverterDownload);
+}
+
 void ContentConverterDialog::DownloadConverter() {
     if (download_reply != nullptr) {
         return;
     }
+
+    downloading_compatibility_fallback = false;
 
     const QString target = ManagedConverterPath();
     const QFileInfo target_info(target);
@@ -398,9 +589,14 @@ void ContentConverterDialog::FinishConverterDownload() {
     QNetworkReply* reply = download_reply;
     download_reply = nullptr;
 
-    download_button->setEnabled(true);
-    converter_button->setEnabled(true);
-    start_button->setEnabled(true);
+    const bool compatibility_download = downloading_compatibility_fallback;
+    downloading_compatibility_fallback = false;
+
+    if (!compatibility_download) {
+        download_button->setEnabled(true);
+        converter_button->setEnabled(true);
+        start_button->setEnabled(true);
+    }
 
     if (reply == nullptr) {
         return;
@@ -408,16 +604,58 @@ void ContentConverterDialog::FinishConverterDownload() {
 
     reply->deleteLater();
 
+    if (compatibility_download && cancel_requested) {
+        SetBusy(false);
+        progress_bar->setRange(0, 100);
+        progress_bar->setValue(0);
+        status_label->setText(tr("Conversion cancelled. Original files were preserved."));
+        return;
+    }
+
     if (reply->error() != QNetworkReply::NoError) {
-        status_label->setText(tr("Converter download failed."));
-        AppendLog(tr("Download error: %1").arg(reply->errorString()));
-        QMessageBox::critical(this, tr("NSZ converter"),
-                              tr("The official converter could not be downloaded.\n\n%1")
-                                  .arg(reply->errorString()));
+        if (compatibility_download) {
+            SetBusy(false);
+            status_label->setText(tr("NSZ compatibility fallback download failed."));
+            AppendLog(tr("Compatibility fallback download error: %1").arg(reply->errorString()));
+            QMessageBox::critical(
+                this, tr("NSZ compatibility fallback"),
+                tr("The official NSZ 4.6.1 portable fallback could not be downloaded.\n\n%1")
+                    .arg(reply->errorString()));
+        } else {
+            status_label->setText(tr("Converter download failed."));
+            AppendLog(tr("Download error: %1").arg(reply->errorString()));
+            QMessageBox::critical(this, tr("NSZ converter"),
+                                  tr("The official converter could not be downloaded.\n\n%1")
+                                      .arg(reply->errorString()));
+        }
         return;
     }
 
     const QByteArray payload = reply->readAll();
+
+    if (compatibility_download) {
+        QString error;
+        if (!InstallCompatibilityFallback(payload, &error)) {
+            SetBusy(false);
+            status_label->setText(tr("NSZ compatibility fallback installation failed."));
+            if (!cancel_requested) {
+                AppendLog(error);
+                QMessageBox::critical(this, tr("NSZ compatibility fallback"), error);
+            }
+            return;
+        }
+
+        const QString fallback = CompatibilityFallbackConverterPath();
+        converter_path->setText(QDir::toNativeSeparators(fallback));
+        progress_bar->setRange(0, 100);
+        progress_bar->setValue(100);
+        AppendLog(tr("Installed and SHA-256 verified official NSZ 4.6.1 portable fallback."));
+        status_label->setText(
+            tr("NSZ 4.6.1 portable fallback installed. Retrying conversion..."));
+        StartNextFile();
+        return;
+    }
+
     const QByteArray digest =
         QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex();
 
@@ -453,6 +691,15 @@ void ContentConverterDialog::FinishConverterDownload() {
 bool ContentConverterDialog::ResolveConverter(QString& program, QStringList& prefix_arguments) const {
     prefix_arguments.clear();
 
+    if (force_compatibility_fallback) {
+        const QString fallback = CompatibilityFallbackConverterPath();
+        if (QFileInfo::exists(fallback)) {
+            program = fallback;
+            return true;
+        }
+        return false;
+    }
+
     const QString configured = converter_path ? converter_path->text().trimmed() : QString{};
     if (!configured.isEmpty() && QFileInfo::exists(configured)) {
         program = configured;
@@ -462,6 +709,7 @@ bool ContentConverterDialog::ResolveConverter(QString& program, QStringList& pre
     const QString app_dir = QCoreApplication::applicationDirPath();
     const QStringList candidates{
         ManagedConverterPath(),
+        CompatibilityFallbackConverterPath(),
         app_dir + QStringLiteral("/tools/nsz/nsz-cli-windows-x64.exe"),
         app_dir + QStringLiteral("/nsz-cli-windows-x64.exe"),
         app_dir + QStringLiteral("/nsz.exe"),
@@ -475,7 +723,8 @@ bool ContentConverterDialog::ResolveConverter(QString& program, QStringList& pre
     }
 
     for (const QString& executable :
-         {QStringLiteral("nsz-cli-windows-x64.exe"), QStringLiteral("nsz.exe"), QStringLiteral("nsz")}) {
+         {QStringLiteral("nsz-cli-windows-x64.exe"), QStringLiteral("nsz.exe"),
+          QStringLiteral("nsz")}) {
         const QString found = QStandardPaths::findExecutable(executable);
         if (!found.isEmpty()) {
             program = found;
@@ -525,6 +774,8 @@ void ContentConverterDialog::StartConversion() {
     }
 
     queue_index = 0;
+    fallback_retry_attempted = false;
+    current_process_uses_fallback = false;
     pending_install_files.clear();
     pending_library_dirs.clear();
     cancel_requested = false;
@@ -541,6 +792,7 @@ void ContentConverterDialog::StartNextFile() {
     }
 
     if (queue_index >= queue.size()) {
+        progress_bar->setRange(0, 100);
         progress_bar->setValue(100);
         current_file_label->setText(tr("Completed"));
         status_label->setText(tr("All files were converted successfully."));
@@ -558,9 +810,6 @@ void ContentConverterDialog::StartNextFile() {
                               .arg(pending_install_files.size()));
             }
 
-            // Close the modal converter before handing work back to MainWindow. The connected
-            // handlers use queued delivery so NAND progress dialogs are never opened behind this
-            // modal dialog.
             accept();
 
             if (install_after) {
@@ -582,23 +831,42 @@ void ContentConverterDialog::StartNextFile() {
         return;
     }
 
+    current_process_uses_fallback = IsCompatibilityFallbackProgram(program);
+
     const QString input = queue.at(queue_index);
     current_file_label->setText(
         tr("%1 of %2 — %3").arg(queue_index + 1).arg(queue.size()).arg(QFileInfo(input).fileName()));
-    status_label->setText(tr("Converting..."));
-    progress_bar->setValue(0);
+    status_label->setText(current_process_uses_fallback
+                              ? tr("Converting with compatibility fallback...")
+                              : tr("Converting..."));
+    if (current_process_uses_fallback) {
+        progress_bar->setRange(0, 0);
+    } else {
+        progress_bar->setRange(0, 100);
+        progress_bar->setValue(0);
+    }
 
     QStringList arguments = prefix_arguments;
-    // Conversion must be deterministic: if a prior converted NSP exists, replace it rather
-    // than silently inspecting/installing stale output. The source NSZ is never removed.
     arguments << QStringLiteral("--overwrite");
-    arguments << QStringLiteral("--minimal-output");
+    if (!current_process_uses_fallback) {
+        arguments << QStringLiteral("--minimal-output");
+    }
     if (verify_checkbox->isChecked()) {
         arguments << QStringLiteral("--verify");
     }
 
     const QString keys_dir = EdenKeysDirectory();
-    if (QFileInfo::exists(QDir(keys_dir).filePath(QStringLiteral("prod.keys")))) {
+    const QString prod_keys = QDir(keys_dir).filePath(QStringLiteral("prod.keys"));
+    if (current_process_uses_fallback) {
+        QString keys_error;
+        if (!PrepareCompatibilityFallbackKeys(&keys_error)) {
+            progress_bar->setRange(0, 100);
+            SetBusy(false);
+            status_label->setText(keys_error);
+            QMessageBox::critical(this, tr("NSZ compatibility fallback"), keys_error);
+            return;
+        }
+    } else if (QFileInfo::exists(prod_keys)) {
         arguments << QStringLiteral("--keys") << keys_dir;
     }
 
@@ -607,38 +875,48 @@ void ContentConverterDialog::StartNextFile() {
 
     AppendLog(tr("Starting: %1").arg(QFileInfo(input).fileName()));
 
-    // PyInstaller one-file builds unpack their embedded Python runtime into the process
-    // temporary directory. Some Windows security configurations reject loading python311.dll
-    // from the shared %TEMP% path. Keep the NSZ runtime in an Eden-owned, per-process directory
-    // instead so extraction and DLL loading happen from a stable writable location.
-    const auto eden_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::EdenDir);
-    const QString runtime_directory =
-        QDir(QString::fromStdString(eden_dir.string()))
-            .filePath(QStringLiteral("tools/nsz/runtime/%1").arg(QCoreApplication::applicationPid()));
-
-    if (!QDir().mkpath(runtime_directory)) {
-        AppendLog(tr("Failed to create converter runtime directory: %1").arg(runtime_directory));
-        status_label->setText(tr("Converter runtime directory could not be created."));
-        SetBusy(false);
-        return;
-    }
-
     QProcessEnvironment converter_environment = QProcessEnvironment::systemEnvironment();
-    converter_environment.insert(QStringLiteral("TEMP"), QDir::toNativeSeparators(runtime_directory));
-    converter_environment.insert(QStringLiteral("TMP"), QDir::toNativeSeparators(runtime_directory));
-    process->setProcessEnvironment(converter_environment);
-
     const QFileInfo program_info{program};
-    if (program_info.isAbsolute()) {
+
+    if (current_process_uses_fallback) {
+        process->setProcessEnvironment(converter_environment);
         process->setWorkingDirectory(program_info.absolutePath());
+        AppendLog(tr("Converter compatibility mode: official NSZ 4.6.1 portable."));
+    } else {
+        const auto eden_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::EdenDir);
+        const QString runtime_directory =
+            QDir(QString::fromStdString(eden_dir.string()))
+                .filePath(QStringLiteral("tools/nsz/runtime/%1")
+                              .arg(QCoreApplication::applicationPid()));
+
+        if (!QDir().mkpath(runtime_directory)) {
+            AppendLog(tr("Failed to create converter runtime directory: %1")
+                          .arg(runtime_directory));
+            status_label->setText(tr("Converter runtime directory could not be created."));
+            SetBusy(false);
+            return;
+        }
+
+        converter_environment.insert(QStringLiteral("TEMP"),
+                                     QDir::toNativeSeparators(runtime_directory));
+        converter_environment.insert(QStringLiteral("TMP"),
+                                     QDir::toNativeSeparators(runtime_directory));
+        process->setProcessEnvironment(converter_environment);
+
+        if (program_info.isAbsolute()) {
+            process->setWorkingDirectory(program_info.absolutePath());
+        }
+
+        AppendLog(tr("Converter runtime directory: %1")
+                      .arg(QDir::toNativeSeparators(runtime_directory)));
     }
 
-    AppendLog(tr("Converter runtime directory: %1")
-                  .arg(QDir::toNativeSeparators(runtime_directory)));
     process->setProcessChannelMode(QProcess::SeparateChannels);
     process->start(program, arguments);
 
     if (!process->waitForStarted(5000)) {
+        CleanupCompatibilityFallbackKeys();
+        progress_bar->setRange(0, 100);
         AppendLog(tr("Failed to start converter: %1").arg(process->errorString()));
         status_label->setText(tr("Converter could not be started."));
         SetBusy(false);
@@ -648,12 +926,19 @@ void ContentConverterDialog::StartNextFile() {
 void ContentConverterDialog::CancelConversion() {
     cancel_requested = true;
     status_label->setText(tr("Cancelling..."));
+
+    if (download_reply != nullptr && downloading_compatibility_fallback) {
+        download_reply->abort();
+    }
+
     if (process->state() != QProcess::NotRunning) {
         process->terminate();
         if (!process->waitForFinished(2500)) {
             process->kill();
         }
-    } else {
+    } else if (download_reply == nullptr) {
+        CleanupCompatibilityFallbackKeys();
+        progress_bar->setRange(0, 100);
         SetBusy(false);
     }
 }
@@ -683,6 +968,9 @@ void ContentConverterDialog::UpdateProgressFromText(const QString& text) {
     }
 
     if (newest_progress >= 0) {
+        if (progress_bar->maximum() == 0) {
+            progress_bar->setRange(0, 100);
+        }
         progress_bar->setValue(newest_progress);
     }
 }
@@ -834,8 +1122,15 @@ void ContentConverterDialog::InspectConvertedFile(const QString& input_path) {
 void ContentConverterDialog::ProcessFinished(int exit_code, QProcess::ExitStatus exit_status) {
     ReadProcessOutput();
 
+    const bool used_fallback = current_process_uses_fallback;
+    current_process_uses_fallback = false;
+    if (used_fallback) {
+        CleanupCompatibilityFallbackKeys();
+    }
+
     if (cancel_requested) {
         SetBusy(false);
+        progress_bar->setRange(0, 100);
         progress_bar->setValue(0);
         current_file_label->setText(tr("Cancelled"));
         status_label->setText(tr("Conversion cancelled. Original files were preserved."));
@@ -843,35 +1138,51 @@ void ContentConverterDialog::ProcessFinished(int exit_code, QProcess::ExitStatus
     }
 
     if (exit_status != QProcess::NormalExit || exit_code != 0) {
-        SetBusy(false);
-
         const QString converter_log = log_view->toPlainText();
         const bool python_runtime_failure =
-            converter_log.contains(QStringLiteral("Failed to load Python DLL"),
-                                   Qt::CaseInsensitive) ||
-            (converter_log.contains(QStringLiteral("python311.dll"), Qt::CaseInsensitive) &&
-             converter_log.contains(QStringLiteral("_MEI"), Qt::CaseInsensitive));
+            !used_fallback &&
+            (converter_log.contains(QStringLiteral("Failed to load Python DLL"),
+                                    Qt::CaseInsensitive) ||
+             (converter_log.contains(QStringLiteral("python311.dll"), Qt::CaseInsensitive) &&
+              converter_log.contains(QStringLiteral("_MEI"), Qt::CaseInsensitive)));
+
+        if (python_runtime_failure && !fallback_retry_attempted) {
+            AppendLog(tr("Detected NSZ 5.0.0 embedded Python runtime incompatibility."));
+            BeginCompatibilityFallback();
+            return;
+        }
+
+        SetBusy(false);
+        progress_bar->setRange(0, 100);
 
         if (python_runtime_failure) {
             status_label->setText(tr("NSZ embedded Python runtime failed to start."));
             QMessageBox::critical(
                 this, tr("NSZ runtime failed"),
                 tr("NSZ 5.0.0 could not load its embedded Python runtime while processing %1. "
-                   "Eden already isolated the converter from the shared Windows TEMP folder. "
-                   "The original NSZ file was not modified.\n\n"
-                   "Please keep this log for the compatibility fallback check.")
+                   "The automatic portable fallback was already attempted. The original NSZ "
+                   "file was not modified.\n\nPlease keep this log for compatibility analysis.")
+                    .arg(QFileInfo(queue.value(queue_index)).fileName()));
+        } else if (used_fallback) {
+            status_label->setText(
+                tr("NSZ 4.6.1 compatibility conversion failed. Check the log for details."));
+            QMessageBox::critical(
+                this, tr("Compatibility conversion failed"),
+                tr("The NSZ 4.6.1 portable fallback returned an error while processing %1. "
+                   "The original NSZ file was not modified.")
                     .arg(QFileInfo(queue.value(queue_index)).fileName()));
         } else {
             status_label->setText(tr("Conversion failed. Check the log for details."));
             QMessageBox::critical(
                 this, tr("Conversion failed"),
-                tr("The converter returned an error while processing %1. The original NSZ file was "
-                   "not modified.")
+                tr("The converter returned an error while processing %1. The original NSZ file "
+                   "was not modified.")
                     .arg(QFileInfo(queue.value(queue_index)).fileName()));
         }
         return;
     }
 
+    progress_bar->setRange(0, 100);
     progress_bar->setValue(100);
     const QString completed_input = queue.at(queue_index);
     AppendLog(tr("Completed: %1").arg(QFileInfo(completed_input).fileName()));
