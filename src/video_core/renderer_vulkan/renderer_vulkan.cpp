@@ -208,6 +208,9 @@ try
 RendererVulkan::~RendererVulkan() {
     scheduler.RegisterOnSubmit([] {});
     void(device.GetLogical().WaitIdle());
+
+    // Streamline must shut down while the Vulkan device and instance are still alive.
+    streamline_runtime.Shutdown();
 }
 
 void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebuffers) {
