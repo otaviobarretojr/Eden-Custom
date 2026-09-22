@@ -2253,6 +2253,7 @@ RasterizerVulkan::GetDlssLikelyMotionCandidates() const {
 DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_index) const {
     DlssTemporalSnapshot snapshot{};
     snapshot.frame_index = frame_index;
+    snapshot.title_id = dlss_semantic_title_id;
 
     const auto framebuffer_snapshot = GetDlssFramebufferSnapshot();
     const auto& colors = framebuffer_snapshot.colors;
@@ -2294,6 +2295,12 @@ DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_ind
         snapshot.motion_producer_stable = candidate.producer_stable;
         snapshot.motion_semantic_evidence = candidate.semantic_evidence;
         snapshot.motion_confidence = candidate.confidence;
+        if (const auto* profile = FindValidatedDlssTemporalGameProfile(
+                dlss_semantic_title_id, candidate.fragment_shader_hash, candidate.slot,
+                candidate.format)) {
+            snapshot.temporal_constants = profile->constants;
+            snapshot.temporal_profile_valid = true;
+        }
     }
     return snapshot;
 }
