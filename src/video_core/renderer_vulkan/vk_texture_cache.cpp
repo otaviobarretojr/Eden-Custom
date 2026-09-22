@@ -2980,6 +2980,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
     // absent slot never aliases the zero-initialized rt_map[slot] to images[0].
     color_present.fill(false);
     color_formats.fill(VK_FORMAT_UNDEFINED);
+    depth_format = VK_FORMAT_UNDEFINED;
     s32 num_layers = 1;
 
     is_rescaled = is_rescaled_;
@@ -3020,6 +3021,8 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                                               : depth_buffer->size.height);
         attachments.push_back(depth_buffer->RenderTarget());
         renderpass_key.depth_format = depth_buffer->format;
+        depth_format = MaxwellToVK::SurfaceFormat(runtime.device, FormatType::Optimal, false,
+                                                   depth_buffer->format).format;
         num_layers = (std::max)(num_layers, depth_buffer->range.extent.layers);
         images[num_images] = depth_buffer->ImageHandle();
         image_views[num_images] = depth_buffer->RenderTarget();
