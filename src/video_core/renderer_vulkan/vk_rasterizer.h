@@ -158,6 +158,7 @@ public:
         VkImage image{};
         VkExtent2D extent{};
         VkImageSubresourceRange range{};
+        VkFormat format{VK_FORMAT_UNDEFINED};
         u32 slot{};
 
         [[nodiscard]] bool IsValid() const {
