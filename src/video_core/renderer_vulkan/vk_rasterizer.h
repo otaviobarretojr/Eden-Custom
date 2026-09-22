@@ -237,6 +237,15 @@ public:
         DlssMotionConfidence confidence{DlssMotionConfidence::None};
     };
 
+    struct DlssUniformBindingObservation {
+        size_t stage{};
+        u32 index{};
+        GPUVAddr gpu_addr{};
+        u32 size{};
+        u64 title_id{};
+        u64 bind_sequence{};
+    };
+
     void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
     void SetDlssSemanticTitleId(u64 title_id) noexcept {
         dlss_semantic_title_id = title_id;
@@ -338,6 +347,9 @@ private:
     std::array<u64, 8> dlss_fragment_output_hashes{};
     std::array<bool, 8> dlss_fragment_output_ambiguous{};
     u64 dlss_semantic_title_id{};
+    u64 dlss_uniform_bind_sequence{};
+    std::array<DlssUniformBindingObservation, 64> dlss_uniform_observations{};
+    size_t dlss_uniform_observation_cursor{};
     u32 draw_counter = 0;
 };
 
