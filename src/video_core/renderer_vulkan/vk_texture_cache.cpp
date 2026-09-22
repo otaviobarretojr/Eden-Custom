@@ -2975,6 +2975,11 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                                     ImageView* depth_buffer, bool is_rescaled_) {
     boost::container::small_vector<VkImageView, NUM_RT * 2 + 2> attachments;
     RenderPassKey renderpass_key{};
+
+    // A framebuffer can have sparse MRT slots. Keep explicit presence state so an
+    // absent slot never aliases the zero-initialized rt_map[slot] to images[0].
+    color_present.fill(false);
+    color_formats.fill(VK_FORMAT_UNDEFINED);
     s32 num_layers = 1;
 
     is_rescaled = is_rescaled_;
@@ -3000,6 +3005,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         images[num_images] = color_buffer->ImageHandle();
         image_ranges[num_images] = MakeSubresourceRange(color_buffer);
         rt_map[index] = num_images;
+        color_present[index] = true;
         samples = color_buffer->Samples();
         ++num_images;
     }
