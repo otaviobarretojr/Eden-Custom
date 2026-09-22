@@ -68,8 +68,14 @@ QStringList NormalizeEntries(const QStringList& raw_entries) {
     files.reserve(raw_entries.size());
 
     for (const QString& raw : raw_entries) {
-        QString entry = NormalizeEntryPath(raw);
-        if (entry.isEmpty() || entry.endsWith(QLatin1Char('/'))) {
+        QString raw_path = raw;
+        raw_path.replace(QLatin1Char('\\'), QLatin1Char('/'));
+        if (raw_path.endsWith(QLatin1Char('/'))) {
+            continue;
+        }
+
+        QString entry = NormalizeEntryPath(raw_path);
+        if (entry.isEmpty()) {
             continue;
         }
         files.push_back(entry);
