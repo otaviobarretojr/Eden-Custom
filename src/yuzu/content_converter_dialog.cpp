@@ -12,6 +12,7 @@
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QDropEvent>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QGridLayout>
