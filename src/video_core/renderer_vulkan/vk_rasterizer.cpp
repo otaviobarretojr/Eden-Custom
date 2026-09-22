@@ -668,6 +668,18 @@ void RasterizerVulkan::Query(GPUVAddr gpu_addr, VideoCommon::QueryType type,
 
 void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAddr gpu_addr,
                                                  u32 size) {
+    // Passive DLSS temporal discovery only: retain binding metadata, never interpret guest bytes as
+    // camera matrices or jitter until a title-specific semantic profile has been validated.
+    auto& observation =
+        dlss_uniform_observations[dlss_uniform_observation_cursor++ % dlss_uniform_observations.size()];
+    observation = {
+        .stage = stage,
+        .index = index,
+        .gpu_addr = gpu_addr,
+        .size = size,
+        .title_id = dlss_semantic_title_id,
+        .bind_sequence = ++dlss_uniform_bind_sequence,
+    };
     buffer_cache.BindGraphicsUniformBuffer(stage, index, gpu_addr, size);
 }
 
