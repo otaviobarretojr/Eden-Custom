@@ -150,6 +150,7 @@ public:
         VkImageView view{};
         VkExtent2D extent{};
         VkImageSubresourceRange range{};
+        VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
 
         [[nodiscard]] bool IsValid() const {
             return image != VK_NULL_HANDLE && extent.width != 0 && extent.height != 0;
@@ -163,6 +164,7 @@ public:
         VkImageView view{};
         VkExtent2D extent{};
         VkImageSubresourceRange range{};
+        VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
         VkFormat format{VK_FORMAT_UNDEFINED};
         u32 slot{};
 
