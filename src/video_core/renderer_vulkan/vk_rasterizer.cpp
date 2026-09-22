@@ -2186,6 +2186,13 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
                           : (current_producer_hash != 0 ? 1 : 0);
         it->fragment_shader_hash = current_producer_hash;
         it->producer_stable = it->producer_consecutive_frames >= 8;
+        it->semantic_signature = {
+            .title_id = dlss_semantic_title_id,
+            .fragment_shader_hash = current_producer_hash,
+            .slot = candidate.slot,
+            .format = candidate.format,
+        };
+        it->semantic_evidence = IsVerifiedDlssMotionSignature(it->semantic_signature);
         it->last_frame = frame_index;
         it->evidence = {
             .format_compatible = it->motion_format_compatible,
