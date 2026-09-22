@@ -24,5 +24,8 @@ jobs:
           grep -q 'StreamlineBootstrapState' src/video_core/renderer_vulkan/present/dlss_probe.h
           grep -q 'sl.interposer.dll' src/video_core/vulkan_common/vulkan_library.cpp
           grep -q 'falling back' src/video_core/vulkan_common/vulkan_library.cpp
+          grep -q 'ENABLE_NVIDIA_STREAMLINE' CMakeLists.txt
+          grep -q 'STREAMLINE_SDK_ROOT' CMakeLists.txt
+          grep -q 'ENABLE_NVIDIA_STREAMLINE.*OFF' CMakeLists.txt
           ! grep -R --line-number --include='dlss_probe.*' 'slInit[[:space:]]*(' src/video_core/renderer_vulkan/present
           echo "DLSS bootstrap source guards passed"
