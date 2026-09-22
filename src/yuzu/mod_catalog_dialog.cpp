@@ -194,10 +194,6 @@ void ModCatalogDialog::ReloadTable() {
             continue;
         }
 
-        if (IsExactMatch(entry)) {
-            ++exact_matches;
-        }
-
         const int row = table->rowCount();
         table->insertRow(row);
 
