@@ -7,6 +7,8 @@
 #pragma once
 
 #include <array>
+#include <mutex>
+#include <vector>
 
 #include <boost/container/static_vector.hpp>
 
