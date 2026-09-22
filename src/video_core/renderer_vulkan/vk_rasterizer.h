@@ -247,6 +247,8 @@ public:
         u64 frame_index{};
         u64 fragment_shader_hash{};
         bool fragment_producer_unambiguous{};
+        u32 consecutive_frames{};
+        bool stable_binding{};
     };
 
     void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
