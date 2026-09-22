@@ -29,6 +29,10 @@ jobs:
           grep -q 'ENABLE_NVIDIA_STREAMLINE.*OFF' CMakeLists.txt
           grep -q 'verifyEmbeddedSignature' src/video_core/vulkan_common/vulkan_library.cpp
           grep -q 'GetModuleFileNameW' src/video_core/vulkan_common/vulkan_library.cpp
+          grep -q 'LoadLibraryW' src/common/dynamic_library.cpp
+          grep -q 'Open(std::wstring_view' src/common/dynamic_library.h
+          grep -q 'streamline->Open(std::wstring_view{interposer_path})' src/video_core/vulkan_common/vulkan_library.cpp
+          ! grep -q 'WideCharToMultiByte' src/video_core/vulkan_common/vulkan_library.cpp
           grep -q 'HAS_NVIDIA_STREAMLINE' src/video_core/vulkan_common/vulkan_library.cpp
           grep -q 'target_link_libraries(video_core PRIVATE wintrust)' src/video_core/CMakeLists.txt
           grep -q 'StreamlineRuntime streamline_runtime' src/video_core/renderer_vulkan/renderer_vulkan.h
