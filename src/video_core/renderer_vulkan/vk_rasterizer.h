@@ -18,6 +18,7 @@
 #include "video_core/host1x/gpu_device_memory_manager.h"
 #include "video_core/rasterizer_interface.h"
 #include "video_core/renderer_vulkan/blit_image.h"
+#include "video_core/renderer_vulkan/present/dlss_inputs.h"
 #include "video_core/renderer_vulkan/vk_buffer_cache.h"
 #include "video_core/renderer_vulkan/vk_descriptor_buffer.h"
 #include "video_core/renderer_vulkan/vk_descriptor_pool.h"
@@ -185,6 +186,7 @@ public:
     void TrackDlssTemporalCandidates(u64 frame_index);
     [[nodiscard]] std::vector<DlssMotionCandidateHistory> GetDlssMotionCandidateHistory() const;
     [[nodiscard]] std::vector<DlssMotionCandidateHistory> GetDlssLikelyMotionCandidates() const;
+    [[nodiscard]] DlssTemporalSnapshot CaptureDlssTemporalSnapshot(u64 frame_index) const;
 
 private:
     static constexpr const u64 NEEDS_D24[] = {
