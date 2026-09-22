@@ -182,6 +182,7 @@ public:
 
     void TrackDlssTemporalCandidates(u64 frame_index);
     [[nodiscard]] std::vector<DlssMotionCandidateHistory> GetDlssMotionCandidateHistory() const;
+    [[nodiscard]] std::vector<DlssMotionCandidateHistory> GetDlssLikelyMotionCandidates() const;
 
 private:
     static constexpr const u64 NEEDS_D24[] = {
