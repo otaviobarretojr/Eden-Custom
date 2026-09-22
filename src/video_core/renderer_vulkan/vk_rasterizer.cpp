@@ -670,13 +670,19 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
                                                  u32 size) {
     // Passive DLSS temporal discovery only: retain binding metadata, never interpret guest bytes as
     // camera matrices or jitter until a title-specific semantic profile has been validated.
-    const auto previous = std::find_if(
-        dlss_uniform_observations.begin(), dlss_uniform_observations.end(),
-        [stage, index, title_id = dlss_semantic_title_id](const auto& entry) {
-            return entry.bind_sequence != 0 && entry.stage == stage && entry.index == index &&
-                   entry.title_id == title_id;
-        });
-    const bool consecutive = previous != dlss_uniform_observations.end() &&
+    // The observation store is a ring. Always select the newest matching binding instead of the
+    // first physical slot, otherwise persistence and sample history become stale after wraparound.
+    const DlssUniformBindingObservation* previous = nullptr;
+    for (const auto& entry : dlss_uniform_observations) {
+        if (entry.bind_sequence == 0 || entry.stage != stage || entry.index != index ||
+            entry.title_id != dlss_semantic_title_id) {
+            continue;
+        }
+        if (previous == nullptr || entry.bind_sequence > previous->bind_sequence) {
+            previous = &entry;
+        }
+    }
+    const bool consecutive = previous != nullptr &&
                              previous->frame_index + 1 == dlss_temporal_frame_index &&
                              previous->gpu_addr == gpu_addr && previous->size == size;
     const u32 consecutive_frames = consecutive ? previous->consecutive_frames + 1 : 1;
@@ -701,7 +707,8 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
     // Sample only mature diagnostic candidates, at most once every 120 temporal frames. Keep
     // only a compact fingerprint: raw guest constant bytes are never retained by the probe.
     if (observation.temporal_diagnostic_candidate && gpu_addr != 0 && size != 0 &&
-        (dlss_temporal_frame_index % 120) == 0) {
+        (dlss_temporal_frame_index % 120) == 0 &&
+        (previous == nullptr || previous->last_sampled_frame != dlss_temporal_frame_index)) {
         constexpr size_t MaxSampleBytes = 512;
         std::array<u8, MaxSampleBytes> sample{};
         const size_t sample_size = std::min<size_t>(size, sample.size());
@@ -711,7 +718,7 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
             fingerprint ^= sample[i];
             fingerprint *= 1099511628211ULL;
         }
-        const bool has_previous_sample = previous != dlss_uniform_observations.end() &&
+        const bool has_previous_sample = previous != nullptr &&
                                          previous->sampled;
         const u32 sample_count = has_previous_sample ? previous->sample_count + 1 : 1;
         const bool fingerprint_changed = has_previous_sample &&
