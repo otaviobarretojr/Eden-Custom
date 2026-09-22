@@ -67,6 +67,9 @@ jobs:
           grep -q 'TrackDlssTemporalCandidates' src/video_core/renderer_vulkan/renderer_vulkan.cpp
           grep -q 'consecutive_frames' src/video_core/renderer_vulkan/vk_rasterizer.h
           grep -q 'GetDlssLikelyMotionCandidates' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'DlssTemporalSnapshot' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'CaptureDlssTemporalSnapshot' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'motion_confidence = DlssMotionConfidence::Candidate' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q '#include <iterator>' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q '#include <mutex>' src/video_core/renderer_vulkan/vk_rasterizer.h
           grep -q '#include <vector>' src/video_core/renderer_vulkan/vk_rasterizer.h
