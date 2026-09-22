@@ -218,7 +218,7 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
     rasterizer.TrackDlssTemporalCandidates(++dlss_frame_index);
     const auto dlss_snapshot = rasterizer.CaptureDlssTemporalSnapshot(dlss_frame_index);
     if (dlss_snapshot.motion_confidence == DlssMotionConfidence::Candidate &&
-        (dlss_frame_index == 1 || dlss_frame_index % 120 == 0)) {
+        dlss_frame_index % 120 == 0) {
         LOG_DEBUG(Render_Vulkan,
                   "DLSS temporal diagnostic: frame={} extent={}x{} motion_slot={} format={} "
                   "persistence={} confidence=candidate",
