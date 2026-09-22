@@ -5,6 +5,8 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include "common/common_types.h"
+
 namespace Vulkan {
 
 enum class DlssMotionConfidence {
@@ -22,7 +24,7 @@ struct DlssImageInput {
 
     [[nodiscard]] bool IsValid() const {
         return image != VK_NULL_HANDLE && view != VK_NULL_HANDLE &&
-               extent.width != 0 && extent.height != 0;
+               format != VK_FORMAT_UNDEFINED && extent.width != 0 && extent.height != 0;
     }
 };
 
