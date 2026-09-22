@@ -259,6 +259,10 @@ public:
         u32 fingerprint_change_count{};
         bool temporally_dynamic{};
         bool strong_temporal_candidate{};
+        u32 sampled_float_count{};
+        u32 finite_float_count{};
+        u32 normalized_float_count{};
+        bool matrix_shape_candidate{};
     };
 
     void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
