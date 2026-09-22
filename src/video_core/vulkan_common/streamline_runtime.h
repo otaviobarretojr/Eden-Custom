@@ -17,6 +17,7 @@ public:
     StreamlineRuntime& operator=(const StreamlineRuntime&) = delete;
 
     void BindVulkanDevice(const vk::Instance& instance, const Device& device);
+    void Shutdown();
     [[nodiscard]] bool IsDlssSupported() const {
         return dlss_supported;
     }
