@@ -83,18 +83,34 @@ struct DlssTagPlan {
     };
 }
 
+struct DlssTemporalConstants {
+    float jitter_x{};
+    float jitter_y{};
+    float camera_near{};
+    float camera_far{};
+    float camera_fov_vertical{};
+    float camera_aspect_ratio{};
+    bool jitter_valid{};
+    bool camera_valid{};
+
+    [[nodiscard]] bool IsReady() const noexcept {
+        return jitter_valid && camera_valid && camera_near > 0.0f &&
+               camera_far > camera_near && camera_fov_vertical > 0.0f &&
+               camera_aspect_ratio > 0.0f;
+    }
+};
+
 struct DlssTemporalInputs {
     DlssImageInput color_in{};
     DlssImageInput color_out{};
     DlssImageInput depth{};
     DlssImageInput motion_vectors{};
-    bool camera_constants_valid{};
-    bool jitter_valid{};
+    DlssTemporalConstants constants{};
     DlssMotionConfidence motion_confidence{DlssMotionConfidence::None};
 
     [[nodiscard]] bool IsReady() const {
         return color_in.IsValid() && color_out.IsValid() && depth.IsValid() &&
-               motion_vectors.IsValid() && camera_constants_valid && jitter_valid &&
+               motion_vectors.IsValid() && constants.IsReady() &&
                motion_confidence == DlssMotionConfidence::Verified;
     }
 
@@ -112,7 +128,7 @@ struct DlssTemporalInputs {
             plan.readiness = DlssTagReadiness::MissingVulkanMetadata;
             return plan;
         }
-        if (!camera_constants_valid || !jitter_valid ||
+        if (!constants.IsReady() ||
             motion_confidence != DlssMotionConfidence::Verified) {
             plan.readiness = DlssTagReadiness::MissingTemporalValidation;
             return plan;
