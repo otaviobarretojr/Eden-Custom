@@ -56,6 +56,16 @@ void StreamlineRuntime::BindVulkanDevice(const vk::Instance& instance, const Dev
     }
 
     LOG_INFO(Render_Vulkan, "Streamline bound to Eden Vulkan device");
+    sl::AdapterInfo adapter_info{};
+    adapter_info.vkPhysicalDevice = *device.GetPhysical();
+    const sl::Result support = slIsFeatureSupported(sl::kFeatureDLSS, adapter_info);
+    dlss_supported = support == sl::Result::eOk;
+    if (dlss_supported) {
+        LOG_INFO(Render_Vulkan, "DLSS is supported on the selected Vulkan adapter");
+    } else {
+        LOG_WARNING(Render_Vulkan, "DLSS is unavailable on the selected Vulkan adapter: {}",
+                    static_cast<int>(support));
+    }
 #else
     (void)instance;
     (void)device;
