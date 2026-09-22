@@ -100,6 +100,10 @@ public:
         return index < info.stores_frag_color.size() && info.stores_frag_color[index];
     }
 
+    [[nodiscard]] u64 FragmentShaderHash() const noexcept {
+        return key.unique_hashes[Tegra::Engines::Maxwell3D::Regs::ShaderStage::Fragment];
+    }
+
     bool UsesExtendedDynamicState() const noexcept {
         return key.state.extended_dynamic_state != 0;
     }
