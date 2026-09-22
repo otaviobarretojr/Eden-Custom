@@ -254,6 +254,10 @@ public:
         u64 last_sampled_frame{};
         u64 sample_fingerprint{};
         bool sampled{};
+        u64 previous_sample_fingerprint{};
+        u32 sample_count{};
+        u32 fingerprint_change_count{};
+        bool temporally_dynamic{};
     };
 
     void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
