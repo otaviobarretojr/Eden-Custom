@@ -2166,6 +2166,22 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
                 .semantic_evidence = false,
                 .confidence = DlssMotionConfidence::None,
             });
+            auto& inserted = dlss_motion_history.back();
+            inserted.semantic_evidence =
+                IsVerifiedDlssMotionSignature(inserted.semantic_signature);
+            inserted.evidence = {
+                .format_compatible = inserted.motion_format_compatible,
+                .render_resolution_compatible = inserted.render_resolution_compatible,
+                .resource_persistent = inserted.persistent,
+                .fragment_shader_writes_slot = inserted.fragment_shader_writes_slot,
+                .producer_stable = inserted.producer_stable,
+                .semantic_evidence = inserted.semantic_evidence,
+            };
+            inserted.confidence = inserted.evidence.IsVerified()
+                                      ? DlssMotionConfidence::Verified
+                                      : (inserted.evidence.IsHeuristicCandidate()
+                                             ? DlssMotionConfidence::Candidate
+                                             : DlssMotionConfidence::None);
             continue;
         }
 
