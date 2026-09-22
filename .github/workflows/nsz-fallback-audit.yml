@@ -36,4 +36,4 @@ jobs:
           if (-not $nsz) { throw "nsz.exe not found" }
 
           Write-Host "NSZ461_EXE=$($nsz.FullName)"
-          & $nsz.FullName --help | Select-Object -First 80
+          Write-Host "NSZ461_EXE_SIZE=$((Get-Item $nsz.FullName).Length)"
