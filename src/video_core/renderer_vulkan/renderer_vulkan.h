@@ -107,6 +107,7 @@ private:
 #ifdef HAS_LSFG
     FrameGen frame_gen;
 #endif
+    u64 dlss_frame_index{};
     std::optional<TurboMode> turbo_mode;
 
     Frame applet_frame;
