@@ -95,6 +95,11 @@ public:
         return fragment_has_color0_output;
     }
 
+    [[nodiscard]] bool FragmentStoresColor(u32 index) const noexcept {
+        const auto& info = stage_infos[Tegra::Engines::Maxwell3D::Regs::ShaderStage::Fragment];
+        return index < info.stores_frag_color.size() && info.stores_frag_color[index];
+    }
+
     bool UsesExtendedDynamicState() const noexcept {
         return key.state.extended_dynamic_state != 0;
     }
