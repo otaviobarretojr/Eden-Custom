@@ -6,6 +6,7 @@
 #ifdef HAS_NVIDIA_STREAMLINE
 #include <sl.h>
 #include <sl_consts.h>
+#include <sl_helpers_vk.h>
 
 #include "common/logging.h"
 #include "video_core/vulkan_common/vulkan_device.h"
