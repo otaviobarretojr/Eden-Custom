@@ -2122,12 +2122,19 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
                           : (current_producer_hash != 0 ? 1 : 0);
         it->fragment_shader_hash = current_producer_hash;
         it->producer_stable = it->producer_consecutive_frames >= 8;
-        // Format, extent and persistence are heuristic evidence only. A guest MRT must not
-        // become a verified motion-vector input without independent semantic evidence.
-        it->confidence = it->semantic_evidence
+        it->evidence = {
+            .format_compatible = it->motion_format_compatible,
+            .render_resolution_compatible = it->render_resolution_compatible,
+            .resource_persistent = it->persistent,
+            .fragment_shader_writes_slot = it->fragment_shader_writes_slot,
+            .producer_stable = it->producer_stable,
+            .semantic_evidence = it->semantic_evidence,
+        };
+        // Heuristic evidence may nominate a candidate, but only independent semantic evidence
+        // can promote that candidate to a verified motion-vector input.
+        it->confidence = it->evidence.IsVerified()
                              ? DlssMotionConfidence::Verified
-                             : (it->motion_format_compatible &&
-                                        it->render_resolution_compatible && it->persistent
+                             : (it->evidence.IsHeuristicCandidate()
                                     ? DlssMotionConfidence::Candidate
                                     : DlssMotionConfidence::None);
     }
