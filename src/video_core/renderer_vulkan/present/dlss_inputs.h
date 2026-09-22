@@ -26,6 +26,23 @@ struct DlssImageInput {
     }
 };
 
+struct DlssTemporalSnapshot {
+    VkImage color{};
+    VkImage depth{};
+    VkImage motion_candidate{};
+    VkFormat motion_candidate_format{VK_FORMAT_UNDEFINED};
+    VkExtent2D render_extent{};
+    u32 motion_candidate_slot{};
+    u32 motion_candidate_persistence{};
+    u64 frame_index{};
+    DlssMotionConfidence motion_confidence{DlssMotionConfidence::None};
+
+    [[nodiscard]] bool HasGuestTemporalPair() const {
+        return color != VK_NULL_HANDLE && depth != VK_NULL_HANDLE &&
+               render_extent.width != 0 && render_extent.height != 0;
+    }
+};
+
 struct DlssTemporalInputs {
     DlssImageInput color_in{};
     DlssImageInput color_out{};
