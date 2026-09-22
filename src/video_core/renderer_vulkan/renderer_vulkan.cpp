@@ -257,6 +257,7 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
         VkExtent2D{frame->width, frame->height}, frame->layout);
     const auto dlss_inputs = MakeDlssTemporalInputs(dlss_snapshot, dlss_color_out);
     const auto dlss_tag_plan = dlss_inputs.BuildTagPlan();
+    const auto dlss_resource_plan = BuildDlssVulkanResourcePlan(dlss_inputs);
     if (!dlss_color_out.IsValid()) {
         LOG_DEBUG(Render_Vulkan, "DLSS presentation output metadata is not ready");
     } else if (!dlss_tag_plan.IsReady() && dlss_frame_index % 120 == 0) {
@@ -266,6 +267,9 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
                   dlss_frame_index, static_cast<int>(dlss_tag_plan.readiness),
                   dlss_snapshot.title_id, static_cast<int>(dlss_snapshot.motion_confidence),
                   dlss_snapshot.temporal_profile_valid);
+    } else if (dlss_tag_plan.IsReady() && !dlss_resource_plan.IsReady()) {
+        LOG_ERROR(Render_Vulkan,
+                  "DLSS resource plan rejected metadata after temporal gate; evaluation remains disabled");
     }
 
 #ifdef HAS_LSFG
