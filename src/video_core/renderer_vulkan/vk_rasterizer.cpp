@@ -1995,6 +1995,7 @@ RasterizerVulkan::DlssDepthCandidate RasterizerVulkan::GetDlssDepthCandidate() c
         .view = framebuffer->DepthImageView(),
         .extent = framebuffer->RenderArea(),
         .range = *range,
+        .layout = VK_IMAGE_LAYOUT_GENERAL,
     };
 }
 
@@ -2020,6 +2021,7 @@ std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColor
             .view = framebuffer->ColorImageView(slot),
             .extent = framebuffer->RenderArea(),
             .range = *range,
+            .layout = VK_IMAGE_LAYOUT_GENERAL,
             .format = framebuffer->ColorFormat(slot),
             .slot = slot,
         });
