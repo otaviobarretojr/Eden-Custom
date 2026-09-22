@@ -2089,4 +2089,17 @@ RasterizerVulkan::GetDlssMotionCandidateHistory() const {
 }
 
 
+std::vector<RasterizerVulkan::DlssMotionCandidateHistory>
+RasterizerVulkan::GetDlssLikelyMotionCandidates() const {
+    const auto history = GetDlssMotionCandidateHistory();
+    std::vector<DlssMotionCandidateHistory> candidates;
+    std::copy_if(history.begin(), history.end(), std::back_inserter(candidates),
+                 [](const DlssMotionCandidateHistory& item) {
+                     return item.motion_format_compatible &&
+                            item.render_resolution_compatible && item.persistent;
+                 });
+    return candidates;
+}
+
+
 } // namespace Vulkan
