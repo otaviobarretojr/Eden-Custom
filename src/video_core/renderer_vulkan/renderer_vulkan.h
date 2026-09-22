@@ -25,6 +25,7 @@
 #include "video_core/renderer_vulkan/vk_turbo_mode.h"
 #include "video_core/vulkan_common/vulkan_device.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
+#include "video_core/vulkan_common/streamline_runtime.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
 
 namespace Core::Memory {
@@ -81,6 +82,8 @@ private:
     Tegra::MaxwellDeviceMemoryManager& device_memory;
     Tegra::GPU& gpu;
 
+    // Must precede all Vulkan objects: constructed before Vulkan and destroyed after them.
+    StreamlineRuntime streamline_runtime;
     std::shared_ptr<Common::DynamicLibrary> library;
     vk::InstanceDispatch dld;
 
