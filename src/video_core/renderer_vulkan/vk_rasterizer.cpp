@@ -744,6 +744,11 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
         observation.fragment_shader_hash = producer_hash;
         observation.fragment_producer_unambiguous = true;
     }
+    observation.strong_temporal_candidate =
+        observation.stable_binding && observation.plausible_temporal_size &&
+        observation.temporally_dynamic && observation.title_id != 0 &&
+        observation.fragment_producer_unambiguous && observation.fragment_shader_hash != 0;
+
     buffer_cache.BindGraphicsUniformBuffer(stage, index, gpu_addr, size);
 }
 
