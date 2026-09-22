@@ -72,7 +72,7 @@ void StreamlineRuntime::BindVulkanDevice(const vk::Instance& instance, const Dev
 #endif
 }
 
-StreamlineRuntime::~StreamlineRuntime() {
+void StreamlineRuntime::Shutdown() {
 #ifdef HAS_NVIDIA_STREAMLINE
     if (!initialized) {
         return;
@@ -82,7 +82,13 @@ StreamlineRuntime::~StreamlineRuntime() {
     if (result != sl::Result::eOk) {
         LOG_WARNING(Render_Vulkan, "Streamline shutdown failed: {}", static_cast<int>(result));
     }
+    initialized = false;
+    dlss_supported = false;
 #endif
+}
+
+StreamlineRuntime::~StreamlineRuntime() {
+    Shutdown();
 }
 
 } // namespace Vulkan
