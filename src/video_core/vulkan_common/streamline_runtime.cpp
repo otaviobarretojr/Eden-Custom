@@ -16,9 +16,12 @@ namespace Vulkan {
 StreamlineRuntime::StreamlineRuntime() {
 #ifdef HAS_NVIDIA_STREAMLINE
     sl::Preferences preferences{};
+#if NVIDIA_STREAMLINE_APPLICATION_ID > 0
     const sl::Feature features[] = {sl::kFeatureDLSS};
     preferences.featuresToLoad = features;
     preferences.numFeaturesToLoad = 1;
+    preferences.applicationId = NVIDIA_STREAMLINE_APPLICATION_ID;
+#endif
     preferences.engine = sl::EngineType::eCustom;
     preferences.engineVersion = "Eden-Custom";
     preferences.renderAPI = sl::RenderAPI::eVulkan;
@@ -47,6 +50,12 @@ void StreamlineRuntime::BindVulkanDevice(const vk::Instance& instance, const Dev
     // when those creation proxies are NOT used, so no manual device binding is needed.
 
     LOG_INFO(Render_Vulkan, "Streamline Vulkan proxies created the Eden device");
+#if NVIDIA_STREAMLINE_APPLICATION_ID == 0
+    LOG_WARNING(Render_Vulkan,
+                "DLSS capability query skipped: no NVIDIA-provided application ID is configured");
+    dlss_supported = false;
+    return;
+#endif
     sl::AdapterInfo adapter_info{};
     adapter_info.vkPhysicalDevice = *device.GetPhysical();
     const sl::Result support = slIsFeatureSupported(sl::kFeatureDLSS, adapter_info);
