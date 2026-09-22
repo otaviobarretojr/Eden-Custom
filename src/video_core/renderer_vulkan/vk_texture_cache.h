@@ -264,6 +264,10 @@ public:
         return &image_ranges[rt_map[index]];
     }
 
+    [[nodiscard]] VkFormat ColorFormat(size_t index) const noexcept {
+        return index < NUM_RT ? color_formats[index] : VK_FORMAT_UNDEFINED;
+    }
+
     [[nodiscard]] bool HasAspectColorBit(size_t index) const noexcept {
         return (image_ranges.at(rt_map[index]).aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0;
     }
@@ -318,6 +322,7 @@ private:
     std::array<VkImage, 9> images{};
     std::array<VkImageSubresourceRange, 9> image_ranges{};
     std::array<size_t, NUM_RT> rt_map{};
+    std::array<VkFormat, NUM_RT> color_formats{};
     bool has_depth{};
     bool has_stencil{};
     bool is_rescaled{};
