@@ -2032,6 +2032,49 @@ std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColor
 }
 
 
+RasterizerVulkan::DlssFramebufferSnapshot RasterizerVulkan::GetDlssFramebufferSnapshot() const {
+    std::scoped_lock lock{texture_cache.mutex};
+    DlssFramebufferSnapshot snapshot{};
+    const Framebuffer* const framebuffer = texture_cache.GetFramebuffer();
+    if (!framebuffer) {
+        return snapshot;
+    }
+
+    if (framebuffer->HasAspectDepthBit()) {
+        if (const VkImageSubresourceRange* const range = framebuffer->DepthImageRange()) {
+            snapshot.depth = {
+                .image = framebuffer->DepthImage(),
+                .view = framebuffer->DepthImageView(),
+                .extent = framebuffer->RenderArea(),
+                .range = *range,
+                .layout = VK_IMAGE_LAYOUT_GENERAL,
+                .format = framebuffer->DepthFormat(),
+            };
+        }
+    }
+
+    snapshot.colors.reserve(NUM_RT);
+    for (u32 slot = 0; slot < NUM_RT; ++slot) {
+        const VkImage image = framebuffer->ColorImage(slot);
+        const VkImageSubresourceRange* const range = framebuffer->ColorImageRange(slot);
+        if (image == VK_NULL_HANDLE || !range ||
+            (range->aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) == 0) {
+            continue;
+        }
+        snapshot.colors.push_back({
+            .image = image,
+            .view = framebuffer->ColorImageView(slot),
+            .extent = framebuffer->RenderArea(),
+            .range = *range,
+            .layout = VK_IMAGE_LAYOUT_GENERAL,
+            .format = framebuffer->ColorFormat(slot),
+            .slot = slot,
+        });
+    }
+    return snapshot;
+}
+
+
 void RasterizerVulkan::TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline) {
     std::scoped_lock lock{dlss_candidate_mutex};
     for (u32 slot = 0; slot < dlss_fragment_output_slots.size(); ++slot) {
@@ -2049,8 +2092,9 @@ void RasterizerVulkan::TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline
 }
 
 void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
-    const auto candidates = GetDlssColorCandidates();
-    const auto depth = GetDlssDepthCandidate();
+    const auto framebuffer_snapshot = GetDlssFramebufferSnapshot();
+    const auto& candidates = framebuffer_snapshot.colors;
+    const auto& depth = framebuffer_snapshot.depth;
     const auto IsMotionCompatibleFormat = [](VkFormat format) {
         switch (format) {
         case VK_FORMAT_R16G16_SFLOAT:
@@ -2181,8 +2225,9 @@ DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_ind
     DlssTemporalSnapshot snapshot{};
     snapshot.frame_index = frame_index;
 
-    const auto colors = GetDlssColorCandidates();
-    const auto depth = GetDlssDepthCandidate();
+    const auto framebuffer_snapshot = GetDlssFramebufferSnapshot();
+    const auto& colors = framebuffer_snapshot.colors;
+    const auto& depth = framebuffer_snapshot.depth;
     if (colors.empty() || !depth.IsValid()) {
         return snapshot;
     }
