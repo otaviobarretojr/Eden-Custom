@@ -2036,8 +2036,14 @@ void RasterizerVulkan::TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline
     std::scoped_lock lock{dlss_candidate_mutex};
     for (u32 slot = 0; slot < dlss_fragment_output_slots.size(); ++slot) {
         if (pipeline.FragmentStoresColor(slot)) {
+            const u64 producer_hash = pipeline.FragmentShaderHash();
+            if (dlss_fragment_output_slots[slot] &&
+                dlss_fragment_output_hashes[slot] != producer_hash) {
+                dlss_fragment_output_ambiguous[slot] = true;
+            } else if (!dlss_fragment_output_slots[slot]) {
+                dlss_fragment_output_hashes[slot] = producer_hash;
+            }
             dlss_fragment_output_slots[slot] = true;
-            dlss_fragment_output_hashes[slot] = pipeline.FragmentShaderHash();
         }
     }
 }
@@ -2099,9 +2105,9 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
 
         it->view = candidate.view;
         it->layout = candidate.layout;
+        const bool consecutive_frame = it->last_frame + 1 == frame_index;
         it->consecutive_frames =
-            it->last_frame + 1 == frame_index ? it->consecutive_frames + 1 : 1;
-        it->last_frame = frame_index;
+            consecutive_frame ? it->consecutive_frames + 1 : 1;
         it->motion_format_compatible = IsMotionCompatibleFormat(candidate.format);
         it->render_resolution_compatible =
             depth.IsValid() && candidate.extent.width == depth.extent.width &&
@@ -2110,18 +2116,21 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
         it->fragment_shader_writes_slot =
             candidate.slot < dlss_fragment_output_slots.size() &&
             dlss_fragment_output_slots[candidate.slot];
+        const bool producer_unambiguous =
+            candidate.slot < dlss_fragment_output_hashes.size() &&
+            dlss_fragment_output_slots[candidate.slot] &&
+            !dlss_fragment_output_ambiguous[candidate.slot] &&
+            dlss_fragment_output_hashes[candidate.slot] != 0;
         const u64 current_producer_hash =
-            candidate.slot < dlss_fragment_output_hashes.size()
-                ? dlss_fragment_output_hashes[candidate.slot]
-                : 0;
-        const bool same_producer = current_producer_hash != 0 &&
-                                   current_producer_hash == it->fragment_shader_hash &&
-                                   it->last_frame == frame_index;
+            producer_unambiguous ? dlss_fragment_output_hashes[candidate.slot] : 0;
+        const bool same_producer = consecutive_frame && producer_unambiguous &&
+                                   current_producer_hash == it->fragment_shader_hash;
         it->producer_consecutive_frames =
             same_producer ? it->producer_consecutive_frames + 1
                           : (current_producer_hash != 0 ? 1 : 0);
         it->fragment_shader_hash = current_producer_hash;
         it->producer_stable = it->producer_consecutive_frames >= 8;
+        it->last_frame = frame_index;
         it->evidence = {
             .format_compatible = it->motion_format_compatible,
             .render_resolution_compatible = it->render_resolution_compatible,
@@ -2142,6 +2151,7 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
     // This evidence is frame-local: only pipelines observed since the previous sample count.
     dlss_fragment_output_slots.fill(false);
     dlss_fragment_output_hashes.fill(0);
+    dlss_fragment_output_ambiguous.fill(false);
 
     std::erase_if(dlss_motion_history, [frame_index](const DlssMotionCandidateHistory& history) {
         return frame_index > history.last_frame && frame_index - history.last_frame > 120;
