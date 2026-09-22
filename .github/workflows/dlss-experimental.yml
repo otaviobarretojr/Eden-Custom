@@ -26,6 +26,9 @@ jobs:
           grep -q 'falling back' src/video_core/vulkan_common/vulkan_library.cpp
           grep -q 'ENABLE_NVIDIA_STREAMLINE' CMakeLists.txt
           grep -q 'STREAMLINE_SDK_ROOT' CMakeLists.txt
+          grep -q 'NVIDIA_STREAMLINE_APPLICATION_ID "0"' CMakeLists.txt
+          grep -q 'preferences.applicationId = NVIDIA_STREAMLINE_APPLICATION_ID' src/video_core/vulkan_common/streamline_runtime.cpp
+          grep -q 'DLSS capability query skipped' src/video_core/vulkan_common/streamline_runtime.cpp
           grep -q 'sl.interposer.lib' CMakeLists.txt
           grep -q 'sl.interposer.lib' src/video_core/CMakeLists.txt
           grep -q 'copy_if_different' src/video_core/CMakeLists.txt
