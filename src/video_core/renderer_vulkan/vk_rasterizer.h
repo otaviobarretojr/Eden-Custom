@@ -189,6 +189,7 @@ public:
         bool render_resolution_compatible{};
         bool persistent{};
         bool fragment_shader_writes_slot{};
+        u64 fragment_shader_hash{};
         bool semantic_evidence{};
         DlssMotionConfidence confidence{DlssMotionConfidence::None};
     };
@@ -288,6 +289,7 @@ private:
     mutable std::mutex dlss_candidate_mutex;
     std::vector<DlssMotionCandidateHistory> dlss_motion_history;
     std::array<bool, 8> dlss_fragment_output_slots{};
+    std::array<u64, 8> dlss_fragment_output_hashes{};
     u32 draw_counter = 0;
 };
 
