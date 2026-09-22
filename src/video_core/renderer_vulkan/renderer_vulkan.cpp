@@ -245,6 +245,13 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
                                render_window.GetFramebufferLayout(), swapchain.GetImageCount(),
                                swapchain.GetImageViewFormat());
 
+    const auto dlss_color_out = MakeDlssPresentationOutput(
+        *frame->image, *frame->image_view, frame->format,
+        VkExtent2D{frame->width, frame->height}, frame->layout);
+    if (!dlss_color_out.IsValid()) {
+        LOG_DEBUG(Render_Vulkan, "DLSS presentation output metadata is not ready");
+    }
+
 #ifdef HAS_LSFG
     void(frame_gen.WantedGenerations(present_manager.MaxExtraFrames()));
 
