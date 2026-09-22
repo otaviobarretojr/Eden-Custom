@@ -252,6 +252,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
     if (!pipeline->Configure(is_indexed))
         return;
 
+    TrackDlssFragmentOutputs(*pipeline);
     UpdateDynamicStates();
 
     query_cache.NotifySegment(true);
@@ -2031,6 +2032,14 @@ std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColor
 }
 
 
+void RasterizerVulkan::TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline) {
+    std::scoped_lock lock{dlss_candidate_mutex};
+    for (u32 slot = 0; slot < dlss_fragment_output_slots.size(); ++slot) {
+        dlss_fragment_output_slots[slot] =
+            dlss_fragment_output_slots[slot] || pipeline.FragmentStoresColor(slot);
+    }
+}
+
 void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
     const auto candidates = GetDlssColorCandidates();
     const auto depth = GetDlssDepthCandidate();
@@ -2071,6 +2080,9 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
                     depth.IsValid() && candidate.extent.width == depth.extent.width &&
                     candidate.extent.height == depth.extent.height,
                 .persistent = false,
+                .fragment_shader_writes_slot =
+                    candidate.slot < dlss_fragment_output_slots.size() &&
+                    dlss_fragment_output_slots[candidate.slot],
                 .semantic_evidence = false,
                 .confidence = DlssMotionConfidence::None,
             });
@@ -2087,6 +2099,9 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
             depth.IsValid() && candidate.extent.width == depth.extent.width &&
             candidate.extent.height == depth.extent.height;
         it->persistent = it->consecutive_frames >= 8;
+        it->fragment_shader_writes_slot =
+            candidate.slot < dlss_fragment_output_slots.size() &&
+            dlss_fragment_output_slots[candidate.slot];
         // Format, extent and persistence are heuristic evidence only. A guest MRT must not
         // become a verified motion-vector input without independent semantic evidence.
         it->confidence = it->semantic_evidence
@@ -2096,6 +2111,9 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
                                     ? DlssMotionConfidence::Candidate
                                     : DlssMotionConfidence::None);
     }
+
+    // This evidence is frame-local: only pipelines observed since the previous sample count.
+    dlss_fragment_output_slots.fill(false);
 
     std::erase_if(dlss_motion_history, [frame_index](const DlssMotionCandidateHistory& history) {
         return frame_index > history.last_frame && frame_index - history.last_frame > 120;
