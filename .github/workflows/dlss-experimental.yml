@@ -54,7 +54,8 @@ jobs:
           cmake -S . -B build/dlss-ci -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DENABLE_NVIDIA_STREAMLINE=OFF \
-            -DENABLE_QT=OFF
+            -DENABLE_QT=OFF \
+            -DYUZU_USE_BUNDLED_FFMPEG=ON
 
   dlss-source-guards:
     runs-on: ubuntu-latest
