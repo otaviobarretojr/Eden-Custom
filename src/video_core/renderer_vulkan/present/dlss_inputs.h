@@ -27,8 +27,8 @@ struct DlssImageInput {
 };
 
 struct DlssTemporalSnapshot {
-    VkImage color{};
-    VkImage depth{};
+    DlssImageInput color_in{};
+    DlssImageInput depth{};
     VkImage motion_candidate{};
     VkFormat motion_candidate_format{VK_FORMAT_UNDEFINED};
     VkExtent2D render_extent{};
@@ -38,7 +38,7 @@ struct DlssTemporalSnapshot {
     DlssMotionConfidence motion_confidence{DlssMotionConfidence::None};
 
     [[nodiscard]] bool HasGuestTemporalPair() const {
-        return color != VK_NULL_HANDLE && depth != VK_NULL_HANDLE &&
+        return color_in.IsValid() && depth.IsValid() &&
                render_extent.width != 0 && render_extent.height != 0;
     }
 };
