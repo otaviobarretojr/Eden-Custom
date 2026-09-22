@@ -30,32 +30,7 @@ struct DlssImageInput {
     }
 };
 
-struct DlssTemporalSnapshot {
-    DlssImageInput color_in{};
-    DlssImageInput depth{};
-    VkImage motion_candidate{};
-    VkImageView motion_candidate_view{};
-    VkFormat motion_candidate_format{VK_FORMAT_UNDEFINED};
-    VkImageLayout motion_candidate_layout{VK_IMAGE_LAYOUT_UNDEFINED};
-    VkExtent2D render_extent{};
-    u32 motion_candidate_slot{};
-    u32 motion_candidate_persistence{};
-    u64 motion_fragment_shader_hash{};
-    u32 motion_producer_persistence{};
-    bool motion_fragment_shader_writes_slot{};
-    bool motion_producer_stable{};
-    bool motion_semantic_evidence{};
-    u64 title_id{};
-    DlssTemporalConstants temporal_constants{};
-    bool temporal_profile_valid{};
-    u64 frame_index{};
-    DlssMotionConfidence motion_confidence{DlssMotionConfidence::None};
 
-    [[nodiscard]] bool HasGuestTemporalPair() const {
-        return color_in.IsValid() && depth.IsValid() &&
-               render_extent.width != 0 && render_extent.height != 0;
-    }
-};
 
 enum class DlssTagReadiness {
     MissingResources,
@@ -110,6 +85,33 @@ struct DlssTemporalConstants {
                camera_near > 0.0f &&
                camera_far > camera_near && camera_fov_vertical > 0.0f &&
                camera_aspect_ratio > 0.0f;
+    }
+};
+
+struct DlssTemporalSnapshot {
+    DlssImageInput color_in{};
+    DlssImageInput depth{};
+    VkImage motion_candidate{};
+    VkImageView motion_candidate_view{};
+    VkFormat motion_candidate_format{VK_FORMAT_UNDEFINED};
+    VkImageLayout motion_candidate_layout{VK_IMAGE_LAYOUT_UNDEFINED};
+    VkExtent2D render_extent{};
+    u32 motion_candidate_slot{};
+    u32 motion_candidate_persistence{};
+    u64 motion_fragment_shader_hash{};
+    u32 motion_producer_persistence{};
+    bool motion_fragment_shader_writes_slot{};
+    bool motion_producer_stable{};
+    bool motion_semantic_evidence{};
+    u64 title_id{};
+    DlssTemporalConstants temporal_constants{};
+    bool temporal_profile_valid{};
+    u64 frame_index{};
+    DlssMotionConfidence motion_confidence{DlssMotionConfidence::None};
+
+    [[nodiscard]] bool HasGuestTemporalPair() const {
+        return color_in.IsValid() && depth.IsValid() &&
+               render_extent.width != 0 && render_extent.height != 0;
     }
 };
 
