@@ -2027,6 +2027,18 @@ std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColor
 
 void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
     const auto candidates = GetDlssColorCandidates();
+    const auto depth = GetDlssDepthCandidate();
+    const auto IsMotionCompatibleFormat = [](VkFormat format) {
+        switch (format) {
+        case VK_FORMAT_R16G16_SFLOAT:
+        case VK_FORMAT_R32G32_SFLOAT:
+        case VK_FORMAT_R16G16_SNORM:
+        case VK_FORMAT_R16G16_UNORM:
+            return true;
+        default:
+            return false;
+        }
+    };
     std::scoped_lock lock{dlss_candidate_mutex};
 
     for (const auto& candidate : candidates) {
@@ -2046,6 +2058,11 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
                 .slot = candidate.slot,
                 .consecutive_frames = 1,
                 .last_frame = frame_index,
+                .motion_format_compatible = IsMotionCompatibleFormat(candidate.format),
+                .render_resolution_compatible =
+                    depth.IsValid() && candidate.extent.width == depth.extent.width &&
+                    candidate.extent.height == depth.extent.height,
+                .persistent = false,
             });
             continue;
         }
@@ -2053,6 +2070,11 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
         it->consecutive_frames =
             it->last_frame + 1 == frame_index ? it->consecutive_frames + 1 : 1;
         it->last_frame = frame_index;
+        it->motion_format_compatible = IsMotionCompatibleFormat(candidate.format);
+        it->render_resolution_compatible =
+            depth.IsValid() && candidate.extent.width == depth.extent.width &&
+            candidate.extent.height == depth.extent.height;
+        it->persistent = it->consecutive_frames >= 8;
     }
 
     std::erase_if(dlss_motion_history, [frame_index](const DlssMotionCandidateHistory& history) {
