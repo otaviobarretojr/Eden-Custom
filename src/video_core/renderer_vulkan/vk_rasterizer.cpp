@@ -2059,8 +2059,10 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
         if (it == dlss_motion_history.end()) {
             dlss_motion_history.push_back({
                 .image = candidate.image,
+                .view = candidate.view,
                 .format = candidate.format,
                 .extent = candidate.extent,
+                .layout = candidate.layout,
                 .slot = candidate.slot,
                 .consecutive_frames = 1,
                 .last_frame = frame_index,
@@ -2073,6 +2075,8 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
             continue;
         }
 
+        it->view = candidate.view;
+        it->layout = candidate.layout;
         it->consecutive_frames =
             it->last_frame + 1 == frame_index ? it->consecutive_frames + 1 : 1;
         it->last_frame = frame_index;
@@ -2139,7 +2143,9 @@ DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_ind
     if (!motion_candidates.empty()) {
         const auto& candidate = motion_candidates.front();
         snapshot.motion_candidate = candidate.image;
+        snapshot.motion_candidate_view = candidate.view;
         snapshot.motion_candidate_format = candidate.format;
+        snapshot.motion_candidate_layout = candidate.layout;
         snapshot.motion_candidate_slot = candidate.slot;
         snapshot.motion_candidate_persistence = candidate.consecutive_frames;
         snapshot.motion_confidence = DlssMotionConfidence::Candidate;
