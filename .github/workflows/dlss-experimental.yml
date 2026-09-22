@@ -36,6 +36,25 @@ jobs:
           EOF
           c++ -std=c++20 -fsyntax-only /tmp/dlss_header_smoke.cpp -Isrc
 
+  dlss-linux-configure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install configure dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libvulkan-dev
+      - name: Configure Eden with experimental DLSS disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build/dlss-ci -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_NVIDIA_STREAMLINE=OFF
+
   dlss-source-guards:
     runs-on: ubuntu-latest
     steps:
