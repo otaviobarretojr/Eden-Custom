@@ -42,21 +42,11 @@ void StreamlineRuntime::BindVulkanDevice(const vk::Instance& instance, const Dev
         return;
     }
 
-    sl::VulkanInfo info{};
-    info.instance = *instance;
-    info.physicalDevice = *device.GetPhysical();
-    info.device = *device.GetLogical();
-    info.graphicsQueueFamily = device.GetGraphicsFamily();
-    info.graphicsQueueIndex = 0;
+    // Eden creates the Vulkan instance/device through Streamline's Vulkan proxies.
+    // The current Streamline API explicitly says slSetVulkanInfo must only be called
+    // when those creation proxies are NOT used, so no manual device binding is needed.
 
-    const sl::Result result = slSetVulkanInfo(info);
-    if (result != sl::Result::eOk) {
-        LOG_WARNING(Render_Vulkan, "Streamline Vulkan device binding failed: {}",
-                    static_cast<int>(result));
-        return;
-    }
-
-    LOG_INFO(Render_Vulkan, "Streamline bound to Eden Vulkan device");
+    LOG_INFO(Render_Vulkan, "Streamline Vulkan proxies created the Eden device");
     sl::AdapterInfo adapter_info{};
     adapter_info.vkPhysicalDevice = *device.GetPhysical();
     const sl::Result support = slIsFeatureSupported(sl::kFeatureDLSS, adapter_info);
