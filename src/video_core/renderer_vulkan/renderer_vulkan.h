@@ -82,7 +82,10 @@ private:
     Tegra::MaxwellDeviceMemoryManager& device_memory;
     Tegra::GPU& gpu;
 
-    // Must precede all Vulkan objects: constructed before Vulkan and destroyed after them.
+    // Streamline must initialize before the Vulkan loader/instance. Normal shutdown is
+    // explicit in RendererVulkan::~RendererVulkan() while Vulkan is still alive.
+    // If construction fails, C++ unwinds later Vulkan members first and destroys this
+    // runtime last; its destructor remains the constructor-failure fallback.
     StreamlineRuntime streamline_runtime;
     std::shared_ptr<Common::DynamicLibrary> library;
     vk::InstanceDispatch dld;
