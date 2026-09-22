@@ -14,6 +14,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QObject>
 #include <QRegularExpression>
 #include <QSaveFile>
 
@@ -28,7 +29,7 @@ QString IndexPath() {
 
 QString SafeBaseName(QString name) {
     name = QFileInfo{name}.completeBaseName();
-    name.replace(QRegularExpression(QStringLiteral(R"([^A-Za-z0-9._-]+)")),
+    name.replace(QRegularExpression(QStringLiteral("[^A-Za-z0-9._-]+")),
                  QStringLiteral("_"));
     while (name.startsWith(QLatin1Char('_'))) {
         name.remove(0, 1);
