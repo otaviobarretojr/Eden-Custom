@@ -13,6 +13,7 @@
 #include <windows.h>
 #include <softpub.h>
 #include <wintrust.h>
+#include <sl_security.h>
 #endif
 #include "video_core/vulkan_common/vulkan_library.h"
 
@@ -41,50 +42,51 @@ std::shared_ptr<Common::DynamicLibrary> OpenLibrary(
     }
 #else
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
-    // Streamline's Vulkan integration is opt-in. If a signed/packaged interposer is shipped
-    // next to Eden, prefer it as the Vulkan loader. If it is absent or incomplete, fall back
-    // to the system Vulkan loader without preventing the emulator from starting.
+    // Streamline's Vulkan integration is opt-in. Only load the NVIDIA-signed
+    // interposer from the executable directory using its absolute path.
     {
-        wchar_t full_path[MAX_PATH]{};
-        const DWORD path_size = GetFullPathNameW(L"sl.interposer.dll", MAX_PATH, full_path, nullptr);
-        bool signature_valid = false;
-        if (path_size > 0 && path_size < MAX_PATH) {
-            WINTRUST_FILE_INFO file_info{};
-            file_info.cbStruct = sizeof(file_info);
-            file_info.pcwszFilePath = full_path;
+        wchar_t executable_path[MAX_PATH]{};
+        const DWORD executable_size =
+            GetModuleFileNameW(nullptr, executable_path, static_cast<DWORD>(std::size(executable_path)));
+        if (executable_size > 0 && executable_size < std::size(executable_path)) {
+            std::wstring interposer_path{executable_path, executable_size};
+            const auto separator = interposer_path.find_last_of(L"\\/");
+            if (separator != std::wstring::npos) {
+                interposer_path.resize(separator + 1);
+                interposer_path += L"sl.interposer.dll";
 
-            WINTRUST_DATA trust_data{};
-            trust_data.cbStruct = sizeof(trust_data);
-            trust_data.dwUIChoice = WTD_UI_NONE;
-            trust_data.fdwRevocationChecks = WTD_REVOKE_NONE;
-            trust_data.dwUnionChoice = WTD_CHOICE_FILE;
-            trust_data.pFile = &file_info;
-            trust_data.dwStateAction = WTD_STATEACTION_VERIFY;
-            trust_data.dwProvFlags = WTD_CACHE_ONLY_URL_RETRIEVAL;
-
-            GUID policy = WINTRUST_ACTION_GENERIC_VERIFY_V2;
-            signature_valid = WinVerifyTrust(nullptr, &policy, &trust_data) == ERROR_SUCCESS;
-            trust_data.dwStateAction = WTD_STATEACTION_CLOSE;
-            WinVerifyTrust(nullptr, &policy, &trust_data);
-        }
-
-        auto streamline = std::make_shared<Common::DynamicLibrary>();
-        if (signature_valid && streamline->Open("sl.interposer.dll")) {
-            PFN_vkGetInstanceProcAddr sl_get_instance_proc_addr{};
-            PFN_vkGetDeviceProcAddr sl_get_device_proc_addr{};
-            const bool has_instance =
-                streamline->GetSymbol("vkGetInstanceProcAddr", &sl_get_instance_proc_addr);
-            const bool has_device =
-                streamline->GetSymbol("vkGetDeviceProcAddr", &sl_get_device_proc_addr);
-            if (has_instance && has_device) {
-                LOG_INFO(Render_Vulkan, "Using application-local Streamline Vulkan interposer");
-                return streamline;
+                const bool signature_valid =
+                    sl::security::verifyEmbeddedSignature(interposer_path.c_str());
+                if (signature_valid) {
+                    const int utf8_size =
+                        WideCharToMultiByte(CP_UTF8, 0, interposer_path.c_str(), -1, nullptr, 0,
+                                            nullptr, nullptr);
+                    std::string interposer_utf8(static_cast<size_t>(utf8_size), '\0');
+                    if (utf8_size > 0) {
+                        WideCharToMultiByte(CP_UTF8, 0, interposer_path.c_str(), -1,
+                                            interposer_utf8.data(), utf8_size, nullptr, nullptr);
+                        auto streamline = std::make_shared<Common::DynamicLibrary>();
+                        if (streamline->Open(interposer_utf8.c_str())) {
+                            PFN_vkGetInstanceProcAddr sl_get_instance_proc_addr{};
+                            PFN_vkGetDeviceProcAddr sl_get_device_proc_addr{};
+                            const bool has_instance = streamline->GetSymbol(
+                                "vkGetInstanceProcAddr", &sl_get_instance_proc_addr);
+                            const bool has_device = streamline->GetSymbol(
+                                "vkGetDeviceProcAddr", &sl_get_device_proc_addr);
+                            if (has_instance && has_device) {
+                                LOG_INFO(Render_Vulkan,
+                                         "Using verified application-local Streamline Vulkan interposer");
+                                return streamline;
+                            }
+                            LOG_WARNING(Render_Vulkan,
+                                        "Verified Streamline interposer is missing Vulkan exports; falling back");
+                        }
+                    }
+                } else {
+                    LOG_WARNING(Render_Vulkan,
+                                "Streamline interposer is absent or failed NVIDIA signature verification; falling back");
+                }
             }
-            LOG_WARNING(Render_Vulkan,
-                        "Streamline interposer is present but missing Vulkan exports; falling back");
-        } else if (path_size > 0 && path_size < MAX_PATH) {
-            LOG_WARNING(Render_Vulkan,
-                        "Streamline interposer failed Windows signature verification; falling back");
         }
     }
 #endif
