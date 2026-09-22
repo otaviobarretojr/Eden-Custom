@@ -188,10 +188,12 @@ public:
         bool motion_format_compatible{};
         bool render_resolution_compatible{};
         bool persistent{};
+        bool fragment_shader_writes_slot{};
         bool semantic_evidence{};
         DlssMotionConfidence confidence{DlssMotionConfidence::None};
     };
 
+    void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
     void TrackDlssTemporalCandidates(u64 frame_index);
     [[nodiscard]] std::vector<DlssMotionCandidateHistory> GetDlssMotionCandidateHistory() const;
     [[nodiscard]] std::vector<DlssMotionCandidateHistory> GetDlssLikelyMotionCandidates() const;
@@ -285,6 +287,7 @@ private:
 
     mutable std::mutex dlss_candidate_mutex;
     std::vector<DlssMotionCandidateHistory> dlss_motion_history;
+    std::array<bool, 8> dlss_fragment_output_slots{};
     u32 draw_counter = 0;
 };
 
