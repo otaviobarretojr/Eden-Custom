@@ -37,6 +37,7 @@ StreamlineRuntime::StreamlineRuntime() {
 
 void StreamlineRuntime::BindVulkanDevice(const vk::Instance& instance, const Device& device) {
 #ifdef HAS_NVIDIA_STREAMLINE
+    (void)instance;
     if (!initialized) {
         return;
     }
