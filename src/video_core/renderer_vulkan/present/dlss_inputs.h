@@ -77,6 +77,33 @@ struct DlssTemporalInputs {
                motion_vectors.IsValid() && camera_constants_valid && jitter_valid &&
                motion_confidence == DlssMotionConfidence::Verified;
     }
+
+    [[nodiscard]] DlssTagPlan BuildTagPlan() const {
+        DlssTagPlan plan{};
+        if (color_in.image == VK_NULL_HANDLE || color_out.image == VK_NULL_HANDLE ||
+            depth.image == VK_NULL_HANDLE || motion_vectors.image == VK_NULL_HANDLE) {
+            return plan;
+        }
+        if (!color_in.IsValid() || !color_out.IsValid() || !depth.IsValid() ||
+            !motion_vectors.IsValid() || color_in.layout == VK_IMAGE_LAYOUT_UNDEFINED ||
+            color_out.layout == VK_IMAGE_LAYOUT_UNDEFINED ||
+            depth.layout == VK_IMAGE_LAYOUT_UNDEFINED ||
+            motion_vectors.layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+            plan.readiness = DlssTagReadiness::MissingVulkanMetadata;
+            return plan;
+        }
+        if (!camera_constants_valid || !jitter_valid ||
+            motion_confidence != DlssMotionConfidence::Verified) {
+            plan.readiness = DlssTagReadiness::MissingTemporalValidation;
+            return plan;
+        }
+        plan.readiness = DlssTagReadiness::Ready;
+        plan.tag_color_in = true;
+        plan.tag_color_out = true;
+        plan.tag_depth = true;
+        plan.tag_motion_vectors = true;
+        return plan;
+    }
 };
 
 } // namespace Vulkan
