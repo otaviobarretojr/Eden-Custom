@@ -17,6 +17,9 @@ public:
     StreamlineRuntime& operator=(const StreamlineRuntime&) = delete;
 
     void BindVulkanDevice(const vk::Instance& instance, const Device& device);
+    [[nodiscard]] bool IsDlssSupported() const {
+        return dlss_supported;
+    }
 
     [[nodiscard]] bool IsInitialized() const {
         return initialized;
@@ -24,6 +27,7 @@ public:
 
 private:
     bool initialized{};
+    bool dlss_supported{};
 };
 
 } // namespace Vulkan
