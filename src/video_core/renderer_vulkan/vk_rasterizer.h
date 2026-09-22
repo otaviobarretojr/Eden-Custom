@@ -249,6 +249,8 @@ public:
         bool fragment_producer_unambiguous{};
         u32 consecutive_frames{};
         bool stable_binding{};
+        bool plausible_temporal_size{};
+        bool temporal_diagnostic_candidate{};
     };
 
     void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
