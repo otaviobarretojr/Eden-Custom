@@ -28,6 +28,7 @@
 #include <QMimeData>
 #include <QPlainTextEdit>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -605,6 +606,35 @@ void ContentConverterDialog::StartNextFile() {
     arguments << QStringLiteral("-D") << input;
 
     AppendLog(tr("Starting: %1").arg(QFileInfo(input).fileName()));
+
+    // PyInstaller one-file builds unpack their embedded Python runtime into the process
+    // temporary directory. Some Windows security configurations reject loading python311.dll
+    // from the shared %TEMP% path. Keep the NSZ runtime in an Eden-owned, per-process directory
+    // instead so extraction and DLL loading happen from a stable writable location.
+    const auto eden_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::EdenDir);
+    const QString runtime_directory =
+        QDir(QString::fromStdString(eden_dir.string()))
+            .filePath(QStringLiteral("tools/nsz/runtime/%1").arg(QCoreApplication::applicationPid()));
+
+    if (!QDir().mkpath(runtime_directory)) {
+        AppendLog(tr("Failed to create converter runtime directory: %1").arg(runtime_directory));
+        status_label->setText(tr("Converter runtime directory could not be created."));
+        SetBusy(false);
+        return;
+    }
+
+    QProcessEnvironment converter_environment = QProcessEnvironment::systemEnvironment();
+    converter_environment.insert(QStringLiteral("TEMP"), QDir::toNativeSeparators(runtime_directory));
+    converter_environment.insert(QStringLiteral("TMP"), QDir::toNativeSeparators(runtime_directory));
+    process->setProcessEnvironment(converter_environment);
+
+    const QFileInfo program_info{program};
+    if (program_info.isAbsolute()) {
+        process->setWorkingDirectory(program_info.absolutePath());
+    }
+
+    AppendLog(tr("Converter runtime directory: %1")
+                  .arg(QDir::toNativeSeparators(runtime_directory)));
     process->setProcessChannelMode(QProcess::SeparateChannels);
     process->start(program, arguments);
 
@@ -814,12 +844,31 @@ void ContentConverterDialog::ProcessFinished(int exit_code, QProcess::ExitStatus
 
     if (exit_status != QProcess::NormalExit || exit_code != 0) {
         SetBusy(false);
-        status_label->setText(tr("Conversion failed. Check the log for details."));
-        QMessageBox::critical(
-            this, tr("Conversion failed"),
-            tr("The converter returned an error while processing %1. The original NSZ file was "
-               "not modified.")
-                .arg(QFileInfo(queue.value(queue_index)).fileName()));
+
+        const QString converter_log = log_view->toPlainText();
+        const bool python_runtime_failure =
+            converter_log.contains(QStringLiteral("Failed to load Python DLL"),
+                                   Qt::CaseInsensitive) ||
+            (converter_log.contains(QStringLiteral("python311.dll"), Qt::CaseInsensitive) &&
+             converter_log.contains(QStringLiteral("_MEI"), Qt::CaseInsensitive));
+
+        if (python_runtime_failure) {
+            status_label->setText(tr("NSZ embedded Python runtime failed to start."));
+            QMessageBox::critical(
+                this, tr("NSZ runtime failed"),
+                tr("NSZ 5.0.0 could not load its embedded Python runtime while processing %1. "
+                   "Eden already isolated the converter from the shared Windows TEMP folder. "
+                   "The original NSZ file was not modified.\n\n"
+                   "Please keep this log for the compatibility fallback check.")
+                    .arg(QFileInfo(queue.value(queue_index)).fileName()));
+        } else {
+            status_label->setText(tr("Conversion failed. Check the log for details."));
+            QMessageBox::critical(
+                this, tr("Conversion failed"),
+                tr("The converter returned an error while processing %1. The original NSZ file was "
+                   "not modified.")
+                    .arg(QFileInfo(queue.value(queue_index)).fileName()));
+        }
         return;
     }
 
