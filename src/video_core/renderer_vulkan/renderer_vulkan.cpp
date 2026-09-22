@@ -201,6 +201,10 @@ try
         LOG_DEBUG(Render_Vulkan, "DLSS probe: {}", dlss_probe.reason);
     }
 } catch (const vk::Exception& exception) {
+    // A throwing constructor destroys fully constructed Vulkan members before
+    // entering this handler. StreamlineRuntime is then destroyed last and its
+    // idempotent Shutdown() prevents a second shutdown attempt.
+    streamline_runtime.Shutdown();
     LOG_ERROR(Render_Vulkan, "Vulkan initialization failed with error: {}", exception.what());
     throw std::runtime_error{fmt::format("Vulkan initialization error {}", exception.what())};
 }
