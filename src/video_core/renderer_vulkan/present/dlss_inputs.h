@@ -45,6 +45,9 @@ struct DlssTemporalSnapshot {
     bool motion_fragment_shader_writes_slot{};
     bool motion_producer_stable{};
     bool motion_semantic_evidence{};
+    u64 title_id{};
+    DlssTemporalConstants temporal_constants{};
+    bool temporal_profile_valid{};
     u64 frame_index{};
     DlssMotionConfidence motion_confidence{DlssMotionConfidence::None};
 
