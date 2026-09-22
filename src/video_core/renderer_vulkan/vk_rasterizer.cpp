@@ -1996,6 +1996,7 @@ RasterizerVulkan::DlssDepthCandidate RasterizerVulkan::GetDlssDepthCandidate() c
         .extent = framebuffer->RenderArea(),
         .range = *range,
         .layout = VK_IMAGE_LAYOUT_GENERAL,
+        .format = framebuffer->DepthFormat(),
     };
 }
 
@@ -2128,6 +2129,7 @@ DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_ind
     snapshot.depth = {
         .image = depth.image,
         .view = depth.view,
+        .format = depth.format,
         .extent = depth.extent,
         .layout = depth.layout,
     };
