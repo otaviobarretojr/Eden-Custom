@@ -38,6 +38,11 @@ struct DlssTemporalSnapshot {
     VkExtent2D render_extent{};
     u32 motion_candidate_slot{};
     u32 motion_candidate_persistence{};
+    u64 motion_fragment_shader_hash{};
+    u32 motion_producer_persistence{};
+    bool motion_fragment_shader_writes_slot{};
+    bool motion_producer_stable{};
+    bool motion_semantic_evidence{};
     u64 frame_index{};
     DlssMotionConfidence motion_confidence{DlssMotionConfidence::None};
 
