@@ -43,6 +43,26 @@ struct DlssTemporalSnapshot {
     }
 };
 
+enum class DlssTagReadiness {
+    MissingResources,
+    MissingVulkanMetadata,
+    MissingTemporalValidation,
+    Ready,
+};
+
+struct DlssTagPlan {
+    DlssTagReadiness readiness{DlssTagReadiness::MissingResources};
+    bool tag_color_in{};
+    bool tag_color_out{};
+    bool tag_depth{};
+    bool tag_motion_vectors{};
+
+    [[nodiscard]] bool IsReady() const {
+        return readiness == DlssTagReadiness::Ready && tag_color_in && tag_color_out &&
+               tag_depth && tag_motion_vectors;
+    }
+};
+
 struct DlssTemporalInputs {
     DlssImageInput color_in{};
     DlssImageInput color_out{};
