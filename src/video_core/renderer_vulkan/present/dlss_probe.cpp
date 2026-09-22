@@ -24,6 +24,10 @@ DlssProbeResult ProbeDlssSupport(const Device& device) {
                                     LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
     if (module) {
         result.streamline_runtime_present = true;
+        result.bootstrap_state = StreamlineBootstrapState::RuntimePresent;
+        // Do not call slInit here: this probe runs after Vulkan device creation. Streamline
+        // requires slInit before any Vulkan API. Bootstrap initialization belongs in the
+        // early application/Vulkan startup path.
         FreeLibrary(module);
         result.reason = "NVIDIA Vulkan device and Streamline runtime detected; DLSS resource integration is not enabled yet.";
     } else {
