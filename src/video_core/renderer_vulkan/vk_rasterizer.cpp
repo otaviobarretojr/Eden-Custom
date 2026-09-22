@@ -1977,4 +1977,24 @@ void RasterizerVulkan::ReleaseChannel(s32 channel_id) {
     query_cache.EraseChannel(channel_id);
 }
 
+RasterizerVulkan::DlssDepthCandidate RasterizerVulkan::GetDlssDepthCandidate() const {
+    std::scoped_lock lock{texture_cache.mutex};
+    const Framebuffer* const framebuffer = texture_cache.GetFramebuffer();
+    if (!framebuffer || !framebuffer->HasAspectDepthBit()) {
+        return {};
+    }
+
+    const VkImageSubresourceRange* const range = framebuffer->DepthImageRange();
+    if (!range) {
+        return {};
+    }
+
+    return {
+        .image = framebuffer->DepthImage(),
+        .extent = framebuffer->RenderArea(),
+        .range = *range,
+    };
+}
+
+
 } // namespace Vulkan
