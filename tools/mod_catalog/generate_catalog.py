@@ -41,13 +41,15 @@ def infer_category(text: str) -> tuple[str, str | None]:
 
     if "dynamic fps" in value:
         return "dynamic_fps", "framerate"
-    if re.search(r"(^|[^0-9])120\\s*fps", value):
-        return "120_fps", "framerate"
-    if re.search(r"(^|[^0-9])60\\s*fps", value) or "60fps" in value:
-        return "60_fps", "framerate"
-    if re.search(r"(^|[^0-9])30\\s*fps", value) or "30fps" in value:
-        return "30_fps", "framerate"
-    if "fps" in value:
+
+    fps_match = re.search(r"(?<![0-9])(30|40|45|60|90|120|144|165|240|360)\\s*fps(?![0-9])", value)
+    if fps_match:
+        fps = fps_match.group(1)
+        if fps in {"30", "60", "120"}:
+            return f"{fps}_fps", "framerate"
+        return "fps", "framerate"
+
+    if re.search(r"(?<![a-z])fps(?![a-z])", value):
         return "fps", "framerate"
 
     if (
@@ -59,9 +61,11 @@ def infer_category(text: str) -> tuple[str, str | None]:
     ):
         return "aspect_ratio", "aspect_ratio"
 
-    if any(
-        token in value
-        for token in ("4k", "2160p", "2k", "1440p", "1080p", "900p", "720p", "resolution")
+    if (
+        "4k" in value
+        or "2k" in value
+        or "resolution" in value
+        or re.search(r"(?<![0-9])(480|540|720|800|900|1008|1080|1200|1440|1600|1800|2160)p(?![0-9])", value)
     ):
         return "resolution", "resolution"
 
@@ -172,6 +176,7 @@ def scan_member(
     *,
     title_hint: str | None = None,
     title_id_hint: str | None = None,
+    title_lookup: dict[str, str] | None = None,
     container: str | None = None,
 ) -> list[dict]:
     path = normalize_path(path)
@@ -182,7 +187,7 @@ def scan_member(
         return []
 
     title_id = title_id.upper()
-    title = title_hint or title_from_path(path, title_id)
+    title = title_hint or (title_lookup or {}).get(title_id) or title_from_path(path, title_id)
     lower = path.lower()
     basename = PurePosixPath(path).name
     name = mod_name_from_path(path, title_id)
@@ -205,18 +210,19 @@ def scan_member(
     if "/cheats/" in lower and lower.endswith(".txt"):
         build_match = CHEAT_FILE_RE.match(basename)
         build_id = build_match.group(1).upper() if build_match else None
-        return [
-            make_record(
-                title_id,
-                title,
-                name or "Cheats",
-                "cheat",
-                build_id,
-                None,
-                path,
-                container,
-            )
-        ]
+        record = make_record(
+            title_id,
+            title,
+            "Cheat pack",
+            "cheat",
+            build_id,
+            None,
+            path,
+            container,
+        )
+        record["category"] = "cheat"
+        record["conflict_group"] = None
+        return [record]
 
     if lower.endswith(".ips"):
         return [
@@ -275,12 +281,32 @@ def build_catalog(zip_path: str) -> dict:
     nested_zip_packs_scanned = 0
 
     with zipfile.ZipFile(zip_path) as archive:
-        for path in archive.namelist():
+        names = archive.namelist()
+        title_lookup: dict[str, str] = {}
+
+        # Prefer the human-readable metadata filename located beside each Title ID.
+        # This avoids using aggregator folder names such as NX-60FPS-RES-GFX-Cheats as game names.
+        for candidate in names:
+            normalized = normalize_path(candidate)
+            if "/cheats/" in normalized.lower() or not normalized.lower().endswith(".txt"):
+                continue
+            title_match = TITLE_ID_RE.search(normalized)
+            if not title_match:
+                continue
+            title_id = title_match.group(1).upper()
+            parent = PurePosixPath(normalized).parent.name.upper()
+            if parent != title_id:
+                continue
+            title_name = PurePosixPath(normalized).stem.strip()
+            if title_name and title_name.lower() not in {"readme", "info", "credits"}:
+                title_lookup.setdefault(title_id, title_name)
+
+        for path in names:
             if path.endswith("/"):
                 continue
 
             data = archive.read(path)
-            records.extend(scan_member(path, data))
+            records.extend(scan_member(path, data, title_lookup=title_lookup))
 
             if path.lower().endswith(".zip"):
                 archive_match = ARCHIVE_TITLE_RE.match(PurePosixPath(path).name)
