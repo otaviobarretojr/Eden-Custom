@@ -85,6 +85,8 @@ jobs:
           grep -q 'temporal_profile_valid = true' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q 'MakeDlssTemporalInputs' src/video_core/renderer_vulkan/renderer_vulkan.cpp
           grep -q 'BuildTagPlan' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'BuildDlssVulkanResourcePlan' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'struct DlssVulkanResourcePlan' src/video_core/renderer_vulkan/present/dlss_inputs.h
           ! grep -q 'slEvaluateFeature' src/video_core/renderer_vulkan/renderer_vulkan.cpp
           grep -q 'constants.IsReady()' src/video_core/renderer_vulkan/present/dlss_inputs.h
           ! grep -q 'camera_constants_valid' src/video_core/renderer_vulkan/present/dlss_inputs.h
