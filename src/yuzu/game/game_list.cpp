@@ -731,6 +731,7 @@ void GameList::AddGamePopup(QMenu& context_menu, u64 program_id, const std::stri
         context_menu.addAction(tr("Open Transferable Pipeline Cache"));
     QAction* shader_preparation_status =
         context_menu.addAction(tr("Shader Preparation Status"));
+    QAction* compatible_mods = context_menu.addAction(tr("Compatible Mods..."));
     QAction* ryujinx = context_menu.addAction(tr("Link to Ryujinx"));
     context_menu.addSeparator();
     QMenu* remove_menu = context_menu.addMenu(tr("Remove"));
@@ -769,6 +770,7 @@ void GameList::AddGamePopup(QMenu& context_menu, u64 program_id, const std::stri
     open_mod_location->setVisible(program_id != 0);
     open_transferable_shader_cache->setVisible(program_id != 0);
     shader_preparation_status->setVisible(program_id != 0);
+    compatible_mods->setVisible(program_id != 0);
     remove_update->setVisible(program_id != 0);
     remove_dlc->setVisible(program_id != 0);
     remove_gl_shader_cache->setVisible(program_id != 0);
@@ -794,6 +796,8 @@ void GameList::AddGamePopup(QMenu& context_menu, u64 program_id, const std::stri
             [this, program_id]() { emit OpenTransferableShaderCacheRequested(program_id); });
     connect(shader_preparation_status, &QAction::triggered, this,
             [this, program_id]() { emit ShaderPreparationStatusRequested(program_id); });
+    connect(compatible_mods, &QAction::triggered, this,
+            [this, program_id]() { emit ModCatalogRequested(program_id); });
     connect(remove_all_content, &QAction::triggered, this, [this, program_id]() {
         emit RemoveInstalledEntryRequested(program_id, QtCommon::Game::InstalledEntryType::Game);
     });
