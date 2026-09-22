@@ -2089,6 +2089,8 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
                     candidate.slot < dlss_fragment_output_hashes.size()
                         ? dlss_fragment_output_hashes[candidate.slot]
                         : 0,
+                .producer_consecutive_frames = 0,
+                .producer_stable = false,
                 .semantic_evidence = false,
                 .confidence = DlssMotionConfidence::None,
             });
@@ -2108,10 +2110,18 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
         it->fragment_shader_writes_slot =
             candidate.slot < dlss_fragment_output_slots.size() &&
             dlss_fragment_output_slots[candidate.slot];
-        it->fragment_shader_hash =
+        const u64 current_producer_hash =
             candidate.slot < dlss_fragment_output_hashes.size()
                 ? dlss_fragment_output_hashes[candidate.slot]
                 : 0;
+        const bool same_producer = current_producer_hash != 0 &&
+                                   current_producer_hash == it->fragment_shader_hash &&
+                                   it->last_frame == frame_index;
+        it->producer_consecutive_frames =
+            same_producer ? it->producer_consecutive_frames + 1
+                          : (current_producer_hash != 0 ? 1 : 0);
+        it->fragment_shader_hash = current_producer_hash;
+        it->producer_stable = it->producer_consecutive_frames >= 8;
         // Format, extent and persistence are heuristic evidence only. A guest MRT must not
         // become a verified motion-vector input without independent semantic evidence.
         it->confidence = it->semantic_evidence
