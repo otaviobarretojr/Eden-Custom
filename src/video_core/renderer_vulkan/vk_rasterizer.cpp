@@ -670,6 +670,16 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
                                                  u32 size) {
     // Passive DLSS temporal discovery only: retain binding metadata, never interpret guest bytes as
     // camera matrices or jitter until a title-specific semantic profile has been validated.
+    const auto previous = std::find_if(
+        dlss_uniform_observations.begin(), dlss_uniform_observations.end(),
+        [stage, index, title_id = dlss_semantic_title_id](const auto& entry) {
+            return entry.bind_sequence != 0 && entry.stage == stage && entry.index == index &&
+                   entry.title_id == title_id;
+        });
+    const bool consecutive = previous != dlss_uniform_observations.end() &&
+                             previous->frame_index + 1 == dlss_temporal_frame_index &&
+                             previous->gpu_addr == gpu_addr && previous->size == size;
+    const u32 consecutive_frames = consecutive ? previous->consecutive_frames + 1 : 1;
     auto& observation =
         dlss_uniform_observations[dlss_uniform_observation_cursor++ % dlss_uniform_observations.size()];
     observation = {
@@ -680,6 +690,8 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
         .title_id = dlss_semantic_title_id,
         .bind_sequence = ++dlss_uniform_bind_sequence,
         .frame_index = dlss_temporal_frame_index,
+        .consecutive_frames = consecutive_frames,
+        .stable_binding = consecutive_frames >= 8,
     };
     // Shader correlation is filled only when a single fragment producer is known for the frame.
     // Multiple fragment producers deliberately leave the observation unverified.
