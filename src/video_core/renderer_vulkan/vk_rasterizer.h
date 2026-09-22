@@ -176,6 +176,24 @@ public:
 
     [[nodiscard]] std::vector<DlssColorCandidate> GetDlssColorCandidates() const;
 
+    struct DlssMotionEvidence {
+        bool format_compatible{};
+        bool render_resolution_compatible{};
+        bool resource_persistent{};
+        bool fragment_shader_writes_slot{};
+        bool producer_stable{};
+        bool semantic_evidence{};
+
+        [[nodiscard]] bool IsHeuristicCandidate() const noexcept {
+            return format_compatible && render_resolution_compatible && resource_persistent &&
+                   fragment_shader_writes_slot && producer_stable;
+        }
+
+        [[nodiscard]] bool IsVerified() const noexcept {
+            return IsHeuristicCandidate() && semantic_evidence;
+        }
+    };
+
     struct DlssMotionCandidateHistory {
         VkImage image{};
         VkImageView view{};
@@ -193,6 +211,7 @@ public:
         u32 producer_consecutive_frames{};
         bool producer_stable{};
         bool semantic_evidence{};
+        DlssMotionEvidence evidence{};
         DlssMotionConfidence confidence{DlssMotionConfidence::None};
     };
 
