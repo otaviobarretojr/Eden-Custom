@@ -83,6 +83,12 @@ struct DlssTagPlan {
     };
 }
 
+enum class DlssTemporalConstantsSource {
+    None,
+    ValidatedGameProfile,
+    ValidatedGuestMetadata,
+};
+
 struct DlssTemporalConstants {
     float jitter_x{};
     float jitter_y{};
@@ -92,9 +98,11 @@ struct DlssTemporalConstants {
     float camera_aspect_ratio{};
     bool jitter_valid{};
     bool camera_valid{};
+    DlssTemporalConstantsSource source{DlssTemporalConstantsSource::None};
 
     [[nodiscard]] bool IsReady() const noexcept {
-        return jitter_valid && camera_valid && camera_near > 0.0f &&
+        return source != DlssTemporalConstantsSource::None && jitter_valid && camera_valid &&
+               camera_near > 0.0f &&
                camera_far > camera_near && camera_fov_vertical > 0.0f &&
                camera_aspect_ratio > 0.0f;
     }
