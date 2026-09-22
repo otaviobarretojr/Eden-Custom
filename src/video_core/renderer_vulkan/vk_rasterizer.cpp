@@ -1992,6 +1992,7 @@ RasterizerVulkan::DlssDepthCandidate RasterizerVulkan::GetDlssDepthCandidate() c
 
     return {
         .image = framebuffer->DepthImage(),
+        .view = framebuffer->DepthImageView(),
         .extent = framebuffer->RenderArea(),
         .range = *range,
     };
@@ -2016,6 +2017,7 @@ std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColor
         }
         candidates.push_back({
             .image = image,
+            .view = framebuffer->ColorImageView(slot),
             .extent = framebuffer->RenderArea(),
             .range = *range,
             .format = framebuffer->ColorFormat(slot),
