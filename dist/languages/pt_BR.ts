@@ -9256,6 +9256,21 @@ p, li { white-space: pre-wrap; }
         <source>Favorites</source>
         <translation>Favoritos</translation>
     </message>
+
+    <message><source>Unable to read mod package: %1</source><translation>Não foi possível ler o pacote de mods: %1</translation></message>
+    <message><source>Unable to hash mod package: %1</source><translation>Não foi possível calcular o hash do pacote de mods: %1</translation></message>
+    <message><source>Unable to read the mod library index: %1</source><translation>Não foi possível ler o índice da biblioteca de mods: %1</translation></message>
+    <message><source>The mod library index is invalid: %1</source><translation>O índice da biblioteca de mods é inválido: %1</translation></message>
+    <message><source>Unable to write the mod library index: %1</source><translation>Não foi possível gravar o índice da biblioteca de mods: %1</translation></message>
+    <message><source>Unable to commit the mod library index.</source><translation>Não foi possível salvar o índice da biblioteca de mods.</translation></message>
+    <message><source>Mod package does not exist.</source><translation>O pacote de mods não existe.</translation></message>
+    <message><source>Only ZIP mod packages are supported in this version.</source><translation>Nesta versão, apenas pacotes de mods em ZIP são compatíveis.</translation></message>
+    <message><source>The package is indexed, but Eden could not restore the missing ZIP.</source><translation>O pacote está indexado, mas o Eden não conseguiu restaurar o ZIP ausente.</translation></message>
+    <message><source>The ZIP is empty or could not be read.</source><translation>O ZIP está vazio ou não pôde ser lido.</translation></message>
+    <message><source>The ZIP contains unsafe paths and was rejected.</source><translation>O ZIP contém caminhos inseguros e foi rejeitado.</translation></message>
+    <message><source>No files were found inside the ZIP.</source><translation>Nenhum arquivo foi encontrado dentro do ZIP.</translation></message>
+    <message><source>No Nintendo Switch Title IDs were detected in this package.</source><translation>Nenhum Title ID de Nintendo Switch foi detectado neste pacote.</translation></message>
+    <message><source>Unable to copy the mod package into Eden's library.</source><translation>Não foi possível copiar o pacote de mods para a biblioteca do Eden.</translation></message>
 </context>
 <context>
     <name>QtAmiiboSettingsDialog</name>
@@ -11426,5 +11441,57 @@ Commit: %2
         <source>Apply %1</source>
         <translation>Aplicar %1</translation>
     </message>
+</context>
+
+<context>
+    <name>ModCatalogDialog</name>
+    <message><source>Eden Custom — Compatible Mods</source><translation>Eden Custom — Mods compatíveis</translation></message>
+    <message><source>Title ID: %1</source><translation>Title ID: %1</translation></message>
+    <message><source>Build ID has not been observed yet. Launch this game once with Eden Custom, then close it and reopen this screen to verify exact mod compatibility.</source><translation>O Build ID ainda não foi observado. Inicie este jogo uma vez com o Eden Custom, feche-o e reabra esta tela para verificar a compatibilidade exata dos mods.</translation></message>
+    <message><source>Observed Build ID: %1</source><translation>Build ID observado: %1</translation></message>
+    <message><source>All categories</source><translation>Todas as categorias</translation></message>
+    <message><source>Graphics</source><translation>Gráficos</translation></message>
+    <message><source>Resolution</source><translation>Resolução</translation></message>
+    <message><source>Aspect ratio</source><translation>Proporção de tela</translation></message>
+    <message><source>Cheats</source><translation>Cheats</translation></message>
+    <message><source>Show exact Build ID matches only</source><translation>Mostrar somente correspondências exatas de Build ID</translation></message>
+    <message><source>Mod</source><translation>Mod</translation></message>
+    <message><source>Category</source><translation>Categoria</translation></message>
+    <message><source>Version</source><translation>Versão</translation></message>
+    <message><source>Status</source><translation>Status</translation></message>
+    <message><source>Library</source><translation>Biblioteca</translation></message>
+    <message><source>Conflict</source><translation>Conflito</translation></message>
+    <message><source>Import mod package...</source><translation>Importar pacote de mods...</translation></message>
+    <message><source>Open mod library</source><translation>Abrir biblioteca de mods</translation></message>
+    <message><source>Open source</source><translation>Abrir origem</translation></message>
+    <message><source>Mod library could not be read: %1</source><translation>Não foi possível ler a biblioteca de mods: %1</translation></message>
+    <message><source>No imported mod package currently contains this game's Title ID.</source><translation>Nenhum pacote de mods importado contém atualmente o Title ID deste jogo.</translation></message>
+    <message><source>%1 imported package(s) contain this game; %2 catalog mod(s) are available locally.</source><translation>%1 pacote(s) importado(s) contêm este jogo; %2 mod(s) do catálogo estão disponíveis localmente.</translation></message>
+    <message><source>Import mod package</source><translation>Importar pacote de mods</translation></message>
+    <message><source>ZIP archives (*.zip)</source><translation>Arquivos ZIP (*.zip)</translation></message>
+    <message><source>Mod Library</source><translation>Biblioteca de mods</translation></message>
+    <message><source>Unable to import this mod package.</source><translation>Não foi possível importar este pacote de mods.</translation></message>
+    <message><source>%1 is already in Eden's mod library.</source><translation>%1 já está na biblioteca de mods do Eden.</translation></message>
+    <message><source>Imported %1.
+
+Indexed files: %2
+Detected Nintendo Switch Title IDs: %3</source><translation>%1 importado.
+
+Arquivos indexados: %2
+Title IDs de Nintendo Switch detectados: %3</translation></message>
+    <message><source>Unable to open Eden's mod library folder.</source><translation>Não foi possível abrir a pasta da biblioteca de mods do Eden.</translation></message>
+    <message><source>Unverified</source><translation>Não verificado</translation></message>
+    <message><source>Launch once to verify</source><translation>Inicie uma vez para verificar</translation></message>
+    <message><source>Compatible</source><translation>Compatível</translation></message>
+    <message><source>Different Build ID</source><translation>Build ID diferente</translation></message>
+    <message><source>Available</source><translation>Disponível</translation></message>
+    <message><source>Not imported</source><translation>Não importado</translation></message>
+    <message><source>Unknown</source><translation>Desconhecido</translation></message>
+    <message><source>Title ID: %1 — %2 catalog record(s)</source><translation>Title ID: %1 — %2 registro(s) no catálogo</translation></message>
+    <message><source>Title ID: %1 — %2 exact Build ID match(es) of %3 catalog record(s)</source><translation>Title ID: %1 — %2 correspondência(s) exata(s) de Build ID entre %3 registro(s) do catálogo</translation></message>
+    <message><source>Mod Catalog</source><translation>Catálogo de mods</translation></message>
+    <message><source>Unable to open the mod source in the browser.</source><translation>Não foi possível abrir a origem do mod no navegador.</translation></message>
+    <message><source>Dynamic FPS</source><translation>FPS dinâmico</translation></message>
+    <message><source>Other</source><translation>Outros</translation></message>
 </context>
 </TS>
