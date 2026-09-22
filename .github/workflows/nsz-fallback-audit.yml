@@ -1,0 +1,39 @@
+name: NSZ fallback audit
+
+on:
+  push:
+    branches:
+      - mod-manager-v0.8
+    paths:
+      - ".github/workflows/nsz-fallback-audit.yml"
+
+jobs:
+  audit:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - name: Download and inspect NSZ 4.6.1 portable
+        shell: powershell
+        run: |
+          $url = "https://github.com/nicoboss/nsz/releases/download/4.6.1/nsz_v4.6.1_win64_portable.zip"
+          $zip = Join-Path $env:RUNNER_TEMP "nsz_v4.6.1_win64_portable.zip"
+          $out = Join-Path $env:RUNNER_TEMP "nsz461"
+
+          & curl.exe -L --fail --silent --show-error --retry 3 --output $zip $url
+          if ($LASTEXITCODE -ne 0) { throw "download failed" }
+
+          $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+          $size = (Get-Item $zip).Length
+          Write-Host "NSZ461_SHA256=$hash"
+          Write-Host "NSZ461_SIZE=$size"
+
+          Expand-Archive -LiteralPath $zip -DestinationPath $out -Force
+          Get-ChildItem -Path $out -Recurse -File |
+            Sort-Object FullName |
+            Select-Object -First 200 FullName, Length
+
+          $nsz = Get-ChildItem -Path $out -Recurse -Filter nsz.exe -File | Select-Object -First 1
+          if (-not $nsz) { throw "nsz.exe not found" }
+
+          Write-Host "NSZ461_EXE=$($nsz.FullName)"
+          & $nsz.FullName --help | Select-Object -First 80
