@@ -146,6 +146,31 @@ jobs:
         run: |
           cmake --build build --config Release --target yuzu --parallel 4
 
+      - name: Build pinned mod catalog
+        shell: powershell
+        run: |
+          $modDbCommit = "abd55774c369b9c3a4df960e7afdb0391cb52056"
+          $modDbZip = Join-Path $env:RUNNER_TEMP "switch-mod-database.zip"
+          $catalog = Join-Path $env:RUNNER_TEMP "eden_mod_catalog.json"
+          $url = "https://github.com/ADEMOLA200/Switch-Emulator-Mod-Database/archive/$modDbCommit.zip"
+
+          Invoke-WebRequest -Uri $url -OutFile $modDbZip
+          python tools/mod_catalog/generate_catalog.py $modDbZip --output $catalog
+
+          if (-not (Test-Path $catalog)) { throw "mod catalog was not generated" }
+
+          $parsed = Get-Content -Raw $catalog | ConvertFrom-Json
+          if ($parsed.schema_version -ne 1) { throw "unexpected mod catalog schema" }
+          if ($parsed.source.commit -ne $modDbCommit) { throw "mod catalog source commit mismatch" }
+          if ($parsed.stats.titles -lt 1000) { throw "mod catalog title count unexpectedly low" }
+          if ($parsed.stats.exact_build_records -lt 3000) {
+            throw "mod catalog exact Build ID coverage unexpectedly low"
+          }
+
+          Write-Host "Catalog records: $($parsed.stats.records)"
+          Write-Host "Catalog titles: $($parsed.stats.titles)"
+          Write-Host "Exact Build ID records: $($parsed.stats.exact_build_records)"
+
       - name: Stage performance package
         shell: powershell
         run: |
@@ -168,6 +193,11 @@ jobs:
           Copy-Item README.md package/README.md
           Copy-Item CUSTOM_PROJECT.md package/CUSTOM_PROJECT.md
 
+          New-Item -ItemType Directory -Force -Path package/catalog | Out-Null
+          $catalog = Join-Path $env:RUNNER_TEMP "eden_mod_catalog.json"
+          if (-not (Test-Path $catalog)) { throw "eden_mod_catalog.json missing" }
+          Copy-Item $catalog package/catalog/eden_mod_catalog.json
+
           @(
             "Eden Custom performance build"
             "Profile: Zen3-AVX2"
@@ -182,6 +212,9 @@ jobs:
         run: |
           if (-not (Test-Path package/eden.exe)) { throw "eden.exe missing" }
           if (-not (Test-Path package/translations/pt_BR.qm)) { throw "pt_BR.qm missing" }
+          if (-not (Test-Path package/catalog/eden_mod_catalog.json)) {
+            throw "eden_mod_catalog.json missing"
+          }
           Get-ChildItem -Path package -Recurse -File | Select-Object FullName, Length
 
       - name: Upload performance build
