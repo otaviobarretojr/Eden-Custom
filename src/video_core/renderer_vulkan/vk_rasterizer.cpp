@@ -680,6 +680,9 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
                              previous->frame_index + 1 == dlss_temporal_frame_index &&
                              previous->gpu_addr == gpu_addr && previous->size == size;
     const u32 consecutive_frames = consecutive ? previous->consecutive_frames + 1 : 1;
+    // A temporal constant block commonly needs enough room for matrices and camera data. This is
+    // only a diagnostic size filter: it must never be treated as semantic validation.
+    const bool plausible_temporal_size = size >= 64 && size <= 4096 && (size % 16) == 0;
     auto& observation =
         dlss_uniform_observations[dlss_uniform_observation_cursor++ % dlss_uniform_observations.size()];
     observation = {
@@ -692,6 +695,8 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
         .frame_index = dlss_temporal_frame_index,
         .consecutive_frames = consecutive_frames,
         .stable_binding = consecutive_frames >= 8,
+        .plausible_temporal_size = plausible_temporal_size,
+        .temporal_diagnostic_candidate = consecutive_frames >= 8 && plausible_temporal_size,
     };
     // Shader correlation is filled only when a single fragment producer is known for the frame.
     // Multiple fragment producers deliberately leave the observation unverified.
