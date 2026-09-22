@@ -216,6 +216,17 @@ RendererVulkan::~RendererVulkan() {
 
 void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebuffers) {
     rasterizer.TrackDlssTemporalCandidates(++dlss_frame_index);
+    const auto dlss_snapshot = rasterizer.CaptureDlssTemporalSnapshot(dlss_frame_index);
+    if (dlss_snapshot.motion_confidence == DlssMotionConfidence::Candidate &&
+        (dlss_frame_index == 1 || dlss_frame_index % 120 == 0)) {
+        LOG_DEBUG(Render_Vulkan,
+                  "DLSS temporal diagnostic: frame={} extent={}x{} motion_slot={} format={} "
+                  "persistence={} confidence=candidate",
+                  dlss_snapshot.frame_index, dlss_snapshot.render_extent.width,
+                  dlss_snapshot.render_extent.height, dlss_snapshot.motion_candidate_slot,
+                  static_cast<int>(dlss_snapshot.motion_candidate_format),
+                  dlss_snapshot.motion_candidate_persistence);
+    }
     SCOPE_EXIT {
         render_window.OnFrameDisplayed();
     };
