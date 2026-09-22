@@ -211,6 +211,7 @@ RendererVulkan::~RendererVulkan() {
 }
 
 void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebuffers) {
+    rasterizer.TrackDlssTemporalCandidates(++dlss_frame_index);
     SCOPE_EXIT {
         render_window.OnFrameDisplayed();
     };
