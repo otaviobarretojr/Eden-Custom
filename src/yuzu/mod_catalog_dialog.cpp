@@ -3,6 +3,8 @@
 
 #include "yuzu/mod_catalog_dialog.h"
 
+#include <algorithm>
+
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDesktopServices>
