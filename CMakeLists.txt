@@ -87,6 +87,19 @@ cmake_dependent_option(ENABLE_LSFG "Enable Lossless Scaling frame generation" ON
 
 option(ENABLE_RESHADE "Enable ReShade FX post-processing effects" ON)
 
+# NVIDIA Streamline / DLSS integration for the post-v0.8 Windows update.
+# Kept opt-in until the SDK runtime, signature validation and Vulkan resource tagging are complete.
+cmake_dependent_option(ENABLE_NVIDIA_STREAMLINE "Enable experimental NVIDIA Streamline/DLSS integration" OFF "WIN32 AND ARCHITECTURE_x86_64" OFF)
+set(STREAMLINE_SDK_ROOT "" CACHE PATH "Path to an NVIDIA Streamline SDK checkout/package")
+if (ENABLE_NVIDIA_STREAMLINE)
+    if (NOT EXISTS "${STREAMLINE_SDK_ROOT}/include/sl.h")
+        message(FATAL_ERROR "ENABLE_NVIDIA_STREAMLINE requires STREAMLINE_SDK_ROOT with include/sl.h")
+    endif()
+    add_compile_definitions(HAS_NVIDIA_STREAMLINE)
+    include_directories(SYSTEM "${STREAMLINE_SDK_ROOT}/include")
+    message(STATUS "Experimental NVIDIA Streamline integration enabled")
+endif()
+
 # non-linux bundled qt are static
 if (YUZU_USE_BUNDLED_QT AND (APPLE OR NOT UNIX))
     set(YUZU_STATIC_BUILD ON)
