@@ -257,6 +257,13 @@ public:
         return images[rt_map[index]];
     }
 
+    [[nodiscard]] VkImageView ColorImageView(size_t index) const noexcept {
+        if (index >= NUM_RT || !color_present[index] || rt_map[index] >= num_images) {
+            return VK_NULL_HANDLE;
+        }
+        return image_views[rt_map[index]];
+    }
+
     [[nodiscard]] const VkImageSubresourceRange* ColorImageRange(size_t index) const noexcept {
         if (index >= NUM_RT || !color_present[index] || rt_map[index] >= num_images) {
             return nullptr;
@@ -283,6 +290,13 @@ public:
             return VK_NULL_HANDLE;
         }
         return images[num_images - 1];
+    }
+
+    [[nodiscard]] VkImageView DepthImageView() const noexcept {
+        if (!has_depth || num_images == 0) {
+            return VK_NULL_HANDLE;
+        }
+        return image_views[num_images - 1];
     }
 
     [[nodiscard]] const VkImageSubresourceRange* DepthImageRange() const noexcept {
@@ -323,6 +337,7 @@ private:
     u32 num_images = 0;
     std::array<VkImage, 9> images{};
     std::array<VkImageSubresourceRange, 9> image_ranges{};
+    std::array<VkImageView, 9> image_views{};
     std::array<size_t, NUM_RT> rt_map{};
     std::array<bool, NUM_RT> color_present{};
     std::array<VkFormat, NUM_RT> color_formats{};
