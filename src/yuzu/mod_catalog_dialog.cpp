@@ -7,10 +7,15 @@
 #include <QComboBox>
 #include <QDesktopServices>
 #include <QDialogButtonBox>
+#include <QDir>
+#include <QFileDialog>
 #include <QHeaderView>
+#include <QHBoxLayout>
+#include <QItemSelectionModel>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QStandardPaths>
 #include <QTableWidget>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -72,6 +77,7 @@ ModCatalogDialog::ModCatalogDialog(u64 title_id_, const QString& observed_build_
         QMessageBox::warning(this, tr("Mod Catalog"), error);
     }
 
+    ReloadLibrary();
     ReloadTable();
 }
 
@@ -101,6 +107,10 @@ void ModCatalogDialog::BuildUi() {
     }
     layout->addWidget(build_id_label);
 
+    library_label = new QLabel(this);
+    library_label->setWordWrap(true);
+    layout->addWidget(library_label);
+
     auto* filters = new QHBoxLayout();
     category_filter = new QComboBox(this);
     category_filter->addItem(tr("All categories"), QString{});
@@ -120,9 +130,10 @@ void ModCatalogDialog::BuildUi() {
     layout->addLayout(filters);
 
     table = new QTableWidget(this);
-    table->setColumnCount(6);
+    table->setColumnCount(7);
     table->setHorizontalHeaderLabels(
-        {tr("Mod"), tr("Category"), tr("Version"), tr("Build ID"), tr("Status"), tr("Conflict")});
+        {tr("Mod"), tr("Category"), tr("Version"), tr("Build ID"), tr("Status"),
+         tr("Library"), tr("Conflict")});
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::SingleSelection);
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -135,11 +146,16 @@ void ModCatalogDialog::BuildUi() {
     table->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
     table->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
     table->horizontalHeader()->setSectionResizeMode(5, QHeaderView::ResizeToContents);
+    table->horizontalHeader()->setSectionResizeMode(6, QHeaderView::ResizeToContents);
     layout->addWidget(table, 1);
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
+    import_package_button = new QPushButton(tr("Import mod package..."), this);
+    open_library_button = new QPushButton(tr("Open mod library"), this);
     source_button = new QPushButton(tr("Open source"), this);
     source_button->setEnabled(false);
+    buttons->addButton(import_package_button, QDialogButtonBox::ActionRole);
+    buttons->addButton(open_library_button, QDialogButtonBox::ActionRole);
     buttons->addButton(source_button, QDialogButtonBox::ActionRole);
     layout->addWidget(buttons);
 
@@ -151,8 +167,89 @@ void ModCatalogDialog::BuildUi() {
     });
     connect(table, &QTableWidget::cellDoubleClicked, this,
             [this](int, int) { OpenSelectedSource(); });
+    connect(import_package_button, &QPushButton::clicked, this,
+            &ModCatalogDialog::ImportModPackage);
+    connect(open_library_button, &QPushButton::clicked, this,
+            &ModCatalogDialog::OpenLibraryFolder);
     connect(source_button, &QPushButton::clicked, this, &ModCatalogDialog::OpenSelectedSource);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+}
+
+void ModCatalogDialog::ReloadLibrary() {
+    QString error;
+    packages = QtCommon::ModLibrary::PackagesForTitle(title_id, &error);
+
+    if (!error.isEmpty()) {
+        library_label->setText(tr("Mod library could not be read: %1").arg(error));
+        return;
+    }
+
+    if (packages.isEmpty()) {
+        library_label->setText(
+            tr("No imported mod package currently contains this game's Title ID."));
+    } else {
+        int available_entries = 0;
+        for (const auto& entry : entries) {
+            if (IsAvailableInLibrary(entry)) {
+                ++available_entries;
+            }
+        }
+        library_label->setText(
+            tr("%1 imported package(s) contain this game; %2 catalog mod(s) are available locally.")
+                .arg(packages.size())
+                .arg(available_entries));
+    }
+}
+
+void ModCatalogDialog::ImportModPackage() {
+    const QString path = QFileDialog::getOpenFileName(
+        this, tr("Import mod package"),
+        QStandardPaths::writableLocation(QStandardPaths::DownloadLocation),
+        tr("ZIP archives (*.zip)"));
+    if (path.isEmpty()) {
+        return;
+    }
+
+    QtCommon::ModLibrary::PackageInfo package;
+    QString error;
+    if (!QtCommon::ModLibrary::ImportPackage(path, package, &error)) {
+        QMessageBox::critical(this, tr("Mod Library"),
+                              error.isEmpty() ? tr("Unable to import this mod package.") : error);
+        return;
+    }
+
+    ReloadLibrary();
+    ReloadTable();
+
+    if (package.already_imported) {
+        QMessageBox::information(
+            this, tr("Mod Library"),
+            tr("%1 is already in Eden's mod library.").arg(package.name));
+    } else {
+        QMessageBox::information(
+            this, tr("Mod Library"),
+            tr("Imported %1.\n\nIndexed files: %2\nDetected Nintendo Switch Title IDs: %3")
+                .arg(package.name)
+                .arg(package.entry_count)
+                .arg(package.title_ids.size()));
+    }
+}
+
+void ModCatalogDialog::OpenLibraryFolder() {
+    const QString path = QtCommon::ModLibrary::LibraryRootPath();
+    QDir().mkpath(path);
+    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(path))) {
+        QMessageBox::warning(this, tr("Mod Library"),
+                             tr("Unable to open Eden's mod library folder."));
+    }
+}
+
+bool ModCatalogDialog::IsAvailableInLibrary(
+    const EdenCustom::ModCatalogEntry& entry) const {
+    return std::any_of(packages.cbegin(), packages.cend(), [&entry](const auto& package) {
+        return QtCommon::ModLibrary::PackageContainsSource(
+            package, entry.source_path, entry.container);
+    });
 }
 
 bool ModCatalogDialog::IsExactMatch(const EdenCustom::ModCatalogEntry& entry) const {
@@ -202,8 +299,12 @@ void ModCatalogDialog::ReloadTable() {
         table->setItem(row, 2, new QTableWidgetItem(entry.version.isEmpty() ? tr("Unknown") : entry.version));
         table->setItem(row, 3, new QTableWidgetItem(entry.build_id.isEmpty() ? tr("Unknown") : entry.build_id));
         table->setItem(row, 4, new QTableWidgetItem(CompatibilityText(entry)));
+        table->setItem(row, 5,
+                       new QTableWidgetItem(IsAvailableInLibrary(entry)
+                                                ? tr("Available")
+                                                : tr("Not imported")));
         table->setItem(
-            row, 5,
+            row, 6,
             new QTableWidgetItem(entry.conflict_group.isEmpty() ? QStringLiteral("—")
                                                                  : entry.conflict_group));
     }
