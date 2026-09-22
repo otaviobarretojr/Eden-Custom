@@ -439,6 +439,12 @@ if (ENABLE_NVIDIA_STREAMLINE AND WIN32)
         wintrust
         "${STREAMLINE_SDK_ROOT}/lib/x64/sl.interposer.lib"
     )
+    add_custom_command(TARGET video_core POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${STREAMLINE_SDK_ROOT}/bin/x64/sl.interposer.dll"
+            "$<TARGET_FILE_DIR:video_core>/sl.interposer.dll"
+        COMMENT "Staging NVIDIA Streamline Vulkan interposer"
+    )
 endif()
 
 if (ENABLE_NSIGHT_AFTERMATH)
