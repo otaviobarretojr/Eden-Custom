@@ -778,6 +778,10 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
         observation.stable_binding && observation.plausible_temporal_size &&
         observation.temporally_dynamic && observation.title_id != 0 &&
         observation.fragment_producer_unambiguous && observation.fragment_shader_hash != 0;
+    // This gate only selects bindings worth inspecting during a real title run. It deliberately
+    // does not promote guest metadata to validated camera/jitter semantics.
+    observation.semantic_probe_candidate =
+        observation.strong_temporal_candidate && observation.matrix_shape_candidate;
 
     buffer_cache.BindGraphicsUniformBuffer(stage, index, gpu_addr, size);
 }
