@@ -67,6 +67,10 @@ jobs:
           grep -q 'TrackDlssTemporalCandidates' src/video_core/renderer_vulkan/renderer_vulkan.cpp
           grep -q 'consecutive_frames' src/video_core/renderer_vulkan/vk_rasterizer.h
           grep -q 'GetDlssLikelyMotionCandidates' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q '#include <iterator>' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q '#include <mutex>' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q '#include <vector>' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q 'frame_index - history.last_frame > 120' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q 'VK_FORMAT_R16G16_SFLOAT' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q 'persistent = it->consecutive_frames >= 8' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           ! grep -q 'LoadLibraryExW' src/video_core/renderer_vulkan/present/dlss_probe.cpp
