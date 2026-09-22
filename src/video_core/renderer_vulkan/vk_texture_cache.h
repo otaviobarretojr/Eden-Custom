@@ -251,21 +251,22 @@ public:
     }
 
     [[nodiscard]] VkImage ColorImage(size_t index) const noexcept {
-        if (index >= NUM_RT || rt_map[index] >= num_images) {
+        if (index >= NUM_RT || !color_present[index] || rt_map[index] >= num_images) {
             return VK_NULL_HANDLE;
         }
         return images[rt_map[index]];
     }
 
     [[nodiscard]] const VkImageSubresourceRange* ColorImageRange(size_t index) const noexcept {
-        if (index >= NUM_RT || rt_map[index] >= num_images) {
+        if (index >= NUM_RT || !color_present[index] || rt_map[index] >= num_images) {
             return nullptr;
         }
         return &image_ranges[rt_map[index]];
     }
 
     [[nodiscard]] VkFormat ColorFormat(size_t index) const noexcept {
-        return index < NUM_RT ? color_formats[index] : VK_FORMAT_UNDEFINED;
+        return index < NUM_RT && color_present[index] ? color_formats[index]
+                                                       : VK_FORMAT_UNDEFINED;
     }
 
     [[nodiscard]] bool HasAspectColorBit(size_t index) const noexcept {
@@ -322,6 +323,7 @@ private:
     std::array<VkImage, 9> images{};
     std::array<VkImageSubresourceRange, 9> image_ranges{};
     std::array<size_t, NUM_RT> rt_map{};
+    std::array<bool, NUM_RT> color_present{};
     std::array<VkFormat, NUM_RT> color_formats{};
     bool has_depth{};
     bool has_stencil{};
