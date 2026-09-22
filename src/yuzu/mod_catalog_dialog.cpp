@@ -175,8 +175,6 @@ void ModCatalogDialog::ReloadTable() {
     table->setRowCount(0);
 
     const QString filter = category_filter->currentData().toString();
-    int exact_matches = 0;
-
     for (int index = 0; index < entries.size(); ++index) {
         const auto& entry = entries.at(index);
 
