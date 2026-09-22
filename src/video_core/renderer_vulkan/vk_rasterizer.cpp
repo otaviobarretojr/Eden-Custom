@@ -2118,8 +2118,19 @@ DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_ind
 
     // The first populated guest MRT is only a diagnostic color reference at this stage.
     // Resource views/layouts are deliberately not fabricated here.
-    snapshot.color = colors.front().image;
-    snapshot.depth = depth.image;
+    snapshot.color_in = {
+        .image = colors.front().image,
+        .view = colors.front().view,
+        .format = colors.front().format,
+        .extent = colors.front().extent,
+        .layout = colors.front().layout,
+    };
+    snapshot.depth = {
+        .image = depth.image,
+        .view = depth.view,
+        .extent = depth.extent,
+        .layout = depth.layout,
+    };
     snapshot.render_extent = depth.extent;
 
     const auto motion_candidates = GetDlssLikelyMotionCandidates();
