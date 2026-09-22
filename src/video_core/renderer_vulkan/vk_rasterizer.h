@@ -175,6 +175,9 @@ public:
         u32 slot{};
         u32 consecutive_frames{};
         u64 last_frame{};
+        bool motion_format_compatible{};
+        bool render_resolution_compatible{};
+        bool persistent{};
     };
 
     void TrackDlssTemporalCandidates(u64 frame_index);
