@@ -270,7 +270,8 @@ public:
     }
 
     [[nodiscard]] bool HasAspectColorBit(size_t index) const noexcept {
-        return (image_ranges.at(rt_map[index]).aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0;
+        return index < NUM_RT && color_present[index] && rt_map[index] < num_images &&
+               (image_ranges[rt_map[index]].aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0;
     }
 
     [[nodiscard]] bool HasAspectDepthBit() const noexcept {
