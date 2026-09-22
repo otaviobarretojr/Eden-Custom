@@ -24,6 +24,7 @@
 #include "video_core/gpu.h"
 #include "video_core/present.h"
 #include "video_core/renderer_vulkan/present/util.h"
+#include "video_core/renderer_vulkan/present/dlss_probe.h"
 #ifdef HAS_RESHADE
 #include "video_core/post_processing/fx_chain.h"
 #endif
@@ -191,6 +192,12 @@ try
 #endif
 
     Report();
+    const auto dlss_probe = ProbeDlssSupport(device);
+    if (dlss_probe.streamline_runtime_present) {
+        LOG_INFO(Render_Vulkan, "DLSS probe: {}", dlss_probe.reason);
+    } else {
+        LOG_DEBUG(Render_Vulkan, "DLSS probe: {}", dlss_probe.reason);
+    }
 } catch (const vk::Exception& exception) {
     LOG_ERROR(Render_Vulkan, "Vulkan initialization failed with error: {}", exception.what());
     throw std::runtime_error{fmt::format("Vulkan initialization error {}", exception.what())};
