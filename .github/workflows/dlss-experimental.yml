@@ -74,7 +74,7 @@ jobs:
           grep -q 'MakeDlssPresentationOutput' src/video_core/renderer_vulkan/renderer_vulkan.cpp
           grep -q 'frame->layout' src/video_core/renderer_vulkan/renderer_vulkan.cpp
           grep -q 'semantic_evidence' src/video_core/renderer_vulkan/vk_rasterizer.h
-          grep -q 'without independent semantic evidence' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'only independent semantic evidence' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q 'candidate.confidence' src/video_core/renderer_vulkan/vk_rasterizer.cpp
           grep -q 'motion_confidence != DlssMotionConfidence::Verified' src/video_core/renderer_vulkan/present/dlss_inputs.h
           grep -q 'VK_IMAGE_LAYOUT_UNDEFINED' src/video_core/renderer_vulkan/present/dlss_inputs.h
