@@ -188,6 +188,8 @@ public:
         bool motion_format_compatible{};
         bool render_resolution_compatible{};
         bool persistent{};
+        bool semantic_evidence{};
+        DlssMotionConfidence confidence{DlssMotionConfidence::None};
     };
 
     void TrackDlssTemporalCandidates(u64 frame_index);
