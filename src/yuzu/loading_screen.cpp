@@ -145,12 +145,21 @@ void LoadingScreen::OnLoadProgress(VideoCore::LoadCallbackStage stage, std::size
         // reset back to fast shader compiling since the stage changed
         slow_shader_compile_start = false;
     }
-    // update the max of the progress bar if the number of shaders change
-    if (total != previous_total) {
+    // Reset the cached pipeline count only when a new game preparation begins.
+    // The Complete callback may report total=0, so never let it overwrite the number
+    // collected during the Build stage.
+    if (stage == VideoCore::LoadCallbackStage::Prepare) {
+        previous_total = 0;
+    }
+
+    // Track the known pipeline count only while Eden is actually building the cache.
+    if (stage == VideoCore::LoadCallbackStage::Build && total != previous_total) {
         ui->progress_bar->setMaximum(static_cast<int>(total));
         previous_total = total;
     }
-    // Reset the progress bar ranges if compilation is done
+
+    // Reset the progress bar ranges if compilation is done, while preserving
+    // previous_total so the completion message can report the prepared pipelines.
     if (stage == VideoCore::LoadCallbackStage::Complete) {
         ui->progress_bar->setRange(0, 0);
     }
