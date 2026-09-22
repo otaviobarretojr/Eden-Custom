@@ -186,4 +186,24 @@ struct DlssTemporalInputs {
     }
 };
 
+[[nodiscard]] inline DlssTemporalInputs MakeDlssTemporalInputs(
+    const DlssTemporalSnapshot& snapshot, const DlssImageInput& color_out) {
+    DlssTemporalInputs inputs{};
+    inputs.color_in = snapshot.color_in;
+    inputs.color_out = color_out;
+    inputs.depth = snapshot.depth;
+    inputs.motion_vectors = {
+        .image = snapshot.motion_candidate,
+        .view = snapshot.motion_candidate_view,
+        .format = snapshot.motion_candidate_format,
+        .extent = snapshot.render_extent,
+        .layout = snapshot.motion_candidate_layout,
+    };
+    if (snapshot.temporal_profile_valid) {
+        inputs.constants = snapshot.temporal_constants;
+    }
+    inputs.motion_confidence = snapshot.motion_confidence;
+    return inputs;
+}
+
 } // namespace Vulkan
