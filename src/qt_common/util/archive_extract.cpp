@@ -9,7 +9,7 @@ namespace QtCommon::Archive {
 
 QStringList ExtractZip(const QString& archive_path, const QString& destination,
                        ProgressCallback callback) {
-    return QtCommon::Compress::extractDir(archive_path, destination, std::move(callback));
+    return QtCommon::Compress::extractDir(archive_path, destination, callback);
 }
 
 } // namespace QtCommon::Archive
