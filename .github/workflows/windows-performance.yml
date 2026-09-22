@@ -158,6 +158,11 @@ jobs:
           Get-ChildItem -Path $eden.Directory.FullName -Filter *.dll -File -ErrorAction SilentlyContinue |
             ForEach-Object { Copy-Item $_.FullName package/ }
 
+          $ptBr = Get-ChildItem -Path build -Recurse -Filter pt_BR.qm -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $ptBr) { throw "pt_BR.qm was not produced" }
+          New-Item -ItemType Directory -Force -Path package/translations | Out-Null
+          Copy-Item $ptBr.FullName package/translations/pt_BR.qm
+
           Copy-Item LICENSE.txt package/LICENSE.txt
           Copy-Item LICENSES package/LICENSES -Recurse
           Copy-Item README.md package/README.md
@@ -176,6 +181,7 @@ jobs:
         shell: powershell
         run: |
           if (-not (Test-Path package/eden.exe)) { throw "eden.exe missing" }
+          if (-not (Test-Path package/translations/pt_BR.qm)) { throw "pt_BR.qm missing" }
           Get-ChildItem -Path package -Recurse -File | Select-Object FullName, Length
 
       - name: Upload performance build
