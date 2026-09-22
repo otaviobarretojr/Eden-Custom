@@ -430,6 +430,10 @@ target_link_libraries(video_core PRIVATE sirit::sirit)
 # Header-only stuff needed by all dependent targets
 target_link_libraries(video_core PUBLIC Vulkan::Headers Vulkan::UtilityHeaders GPUOpen::VulkanMemoryAllocator)
 
+if (ENABLE_NVIDIA_STREAMLINE AND WIN32)
+    target_link_libraries(video_core PRIVATE wintrust)
+endif()
+
 if (ENABLE_NSIGHT_AFTERMATH)
     if (NOT DEFINED ENV{NSIGHT_AFTERMATH_SDK})
         message(FATAL_ERROR "Environment variable NSIGHT_AFTERMATH_SDK has to be provided")
