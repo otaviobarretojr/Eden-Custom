@@ -194,6 +194,9 @@ public:
         }
     };
 
+    [[nodiscard]] static bool IsVerifiedDlssMotionSignature(
+        const DlssMotionSemanticSignature& signature) noexcept;
+
     struct DlssMotionEvidence {
         bool format_compatible{};
         bool render_resolution_compatible{};
