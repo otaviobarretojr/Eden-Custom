@@ -258,6 +258,20 @@ public:
         return has_depth;
     }
 
+    [[nodiscard]] VkImage DepthImage() const noexcept {
+        if (!has_depth || num_images == 0) {
+            return VK_NULL_HANDLE;
+        }
+        return images[num_images - 1];
+    }
+
+    [[nodiscard]] const VkImageSubresourceRange* DepthImageRange() const noexcept {
+        if (!has_depth || num_images == 0) {
+            return nullptr;
+        }
+        return &image_ranges[num_images - 1];
+    }
+
     [[nodiscard]] bool HasAspectStencilBit() const noexcept {
         return has_stencil;
     }
