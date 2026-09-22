@@ -251,6 +251,9 @@ public:
         bool stable_binding{};
         bool plausible_temporal_size{};
         bool temporal_diagnostic_candidate{};
+        u64 last_sampled_frame{};
+        u64 sample_fingerprint{};
+        bool sampled{};
     };
 
     void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
