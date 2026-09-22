@@ -258,6 +258,7 @@ public:
         u32 sample_count{};
         u32 fingerprint_change_count{};
         bool temporally_dynamic{};
+        bool strong_temporal_candidate{};
     };
 
     void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
