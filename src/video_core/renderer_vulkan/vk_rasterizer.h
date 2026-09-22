@@ -178,8 +178,10 @@ public:
 
     struct DlssMotionCandidateHistory {
         VkImage image{};
+        VkImageView view{};
         VkFormat format{VK_FORMAT_UNDEFINED};
         VkExtent2D extent{};
+        VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
         u32 slot{};
         u32 consecutive_frames{};
         u64 last_frame{};
