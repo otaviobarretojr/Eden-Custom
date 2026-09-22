@@ -183,6 +183,17 @@ public:
 
     [[nodiscard]] DlssFramebufferSnapshot GetDlssFramebufferSnapshot() const;
 
+    struct DlssMotionSemanticSignature {
+        u64 title_id{};
+        u64 fragment_shader_hash{};
+        u32 slot{};
+        VkFormat format{VK_FORMAT_UNDEFINED};
+
+        [[nodiscard]] bool IsComplete() const noexcept {
+            return title_id != 0 && fragment_shader_hash != 0 && format != VK_FORMAT_UNDEFINED;
+        }
+    };
+
     struct DlssMotionEvidence {
         bool format_compatible{};
         bool render_resolution_compatible{};
