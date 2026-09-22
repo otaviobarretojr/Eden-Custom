@@ -40,6 +40,8 @@ jobs:
           grep -q 'slShutdown()' src/video_core/vulkan_common/streamline_runtime.cpp
           grep -q 'void Shutdown();' src/video_core/vulkan_common/streamline_runtime.h
           grep -q 'streamline_runtime.Shutdown()' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q ', streamline_runtime()' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          ! grep -A5 'catch (const vk::Exception& exception)' src/video_core/renderer_vulkan/renderer_vulkan.cpp | grep -q 'streamline_runtime.Shutdown()'
           grep -q 'initialized = false' src/video_core/vulkan_common/streamline_runtime.cpp
           grep -q 'slSetVulkanInfo(info)' src/video_core/vulkan_common/streamline_runtime.cpp
           grep -q 'BindVulkanDevice(instance, device)' src/video_core/renderer_vulkan/renderer_vulkan.cpp
