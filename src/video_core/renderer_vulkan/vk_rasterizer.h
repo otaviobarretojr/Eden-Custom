@@ -176,6 +176,13 @@ public:
 
     [[nodiscard]] std::vector<DlssColorCandidate> GetDlssColorCandidates() const;
 
+    struct DlssFramebufferSnapshot {
+        DlssDepthCandidate depth{};
+        std::vector<DlssColorCandidate> colors{};
+    };
+
+    [[nodiscard]] DlssFramebufferSnapshot GetDlssFramebufferSnapshot() const;
+
     struct DlssMotionEvidence {
         bool format_compatible{};
         bool render_resolution_compatible{};
