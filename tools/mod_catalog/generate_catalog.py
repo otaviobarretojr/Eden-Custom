@@ -23,17 +23,17 @@ SOURCE_BRANCH = "develop"
 SOURCE_COMMIT = "abd55774c369b9c3a4df960e7afdb0391cb52056"
 
 TITLE_ID_RE = re.compile(r"(?i)(?<![0-9a-f])(010[0-9a-f]{13})(?![0-9a-f])")
-BUILD_ID_RE = re.compile(r"(?im)^\\s*@nsobid[-\\s]+([0-9a-f]{16,64})\\s*$")
-VERSION_RE = re.compile(r"(?i)\\bv(?:ersion)?\\.?\\s*([0-9]+(?:\\.[0-9]+){1,4})")
-CHEAT_FILE_RE = re.compile(r"(?i)^([0-9a-f]{16})\\.txt$")
+BUILD_ID_RE = re.compile(r"(?im)^\s*@nsobid[-\s]+([0-9a-f]{16,64})\s*$")
+VERSION_RE = re.compile(r"(?i)\bv(?:ersion)?\.?\s*([0-9]+(?:\.[0-9]+){1,4})")
+CHEAT_FILE_RE = re.compile(r"(?i)^([0-9a-f]{16})\.txt$")
 ARCHIVE_TITLE_RE = re.compile(
-    r"^(.*?)\\s*\\[([0-9A-Fa-f]{16})\\](?:\\[[^]]+\\])*\\s*(?:\\[mods\\])?\\.zip$",
+    r"^(.*?)\s*\[([0-9A-Fa-f]{16})\](?:\[[^]]+\])*\s*(?:\[mods\])?\.zip$",
     re.I,
 )
 
 
 def normalize_path(path: str) -> str:
-    return path.replace("\\\\", "/").strip("/")
+    return path.replace("\\", "/").strip("/")
 
 
 def repository_relative_path(path: str) -> str:
@@ -50,7 +50,7 @@ def infer_category(text: str) -> tuple[str, str | None]:
     if "dynamic fps" in value:
         return "dynamic_fps", "framerate"
 
-    fps_match = re.search(r"(?<![0-9])(30|40|45|60|90|120|144|165|240|360)\\s*fps(?![0-9])", value)
+    fps_match = re.search(r"(?<![0-9])(30|40|45|60|90|120|144|165|240|360)\s*fps(?![0-9])", value)
     if fps_match:
         fps = fps_match.group(1)
         if fps in {"30", "60", "120"}:
@@ -105,7 +105,7 @@ def title_from_path(path: str, title_id: str) -> str:
         if lower.endswith((".pchtxt", ".txt", ".ips", ".zip", ".rar", ".7z")):
             continue
 
-        cleaned = re.sub(r"\\s*\\[[0-9A-Fa-f]{16}\\].*$", "", component).strip()
+        cleaned = re.sub(r"\s*\[[0-9A-Fa-f]{16}\].*$", "", component).strip()
         if cleaned:
             return cleaned
 
