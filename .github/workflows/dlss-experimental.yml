@@ -42,6 +42,8 @@ jobs:
           grep -q 'motion_vectors.IsValid()' src/video_core/renderer_vulkan/present/dlss_inputs.h
           grep -q 'GetDlssDepthCandidate' src/video_core/renderer_vulkan/vk_rasterizer.h
           grep -q 'DepthImageRange' src/video_core/renderer_vulkan/vk_texture_cache.h
+          grep -q 'GetDlssColorCandidates' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q 'ColorImageRange' src/video_core/renderer_vulkan/vk_texture_cache.h
           ! grep -q 'LoadLibraryExW' src/video_core/renderer_vulkan/present/dlss_probe.cpp
           ! grep -R --line-number --include='dlss_probe.*' 'slInit[[:space:]]*(' src/video_core/renderer_vulkan/present
           echo "DLSS bootstrap source guards passed"
