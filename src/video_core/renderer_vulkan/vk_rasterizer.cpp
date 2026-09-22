@@ -2102,5 +2102,32 @@ RasterizerVulkan::GetDlssLikelyMotionCandidates() const {
     return candidates;
 }
 
+DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_index) const {
+    DlssTemporalSnapshot snapshot{};
+    snapshot.frame_index = frame_index;
+
+    const auto colors = GetDlssColorCandidates();
+    const auto depth = GetDlssDepthCandidate();
+    if (colors.empty() || !depth.IsValid()) {
+        return snapshot;
+    }
+
+    // The first populated guest MRT is only a diagnostic color reference at this stage.
+    // Resource views/layouts are deliberately not fabricated here.
+    snapshot.color = colors.front().image;
+    snapshot.depth = depth.image;
+    snapshot.render_extent = depth.extent;
+
+    const auto motion_candidates = GetDlssLikelyMotionCandidates();
+    if (!motion_candidates.empty()) {
+        const auto& candidate = motion_candidates.front();
+        snapshot.motion_candidate = candidate.image;
+        snapshot.motion_candidate_format = candidate.format;
+        snapshot.motion_candidate_slot = candidate.slot;
+        snapshot.motion_candidate_persistence = candidate.consecutive_frames;
+        snapshot.motion_confidence = DlssMotionConfidence::Candidate;
+    }
+    return snapshot;
+}
 
 } // namespace Vulkan
