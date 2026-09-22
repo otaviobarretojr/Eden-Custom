@@ -1997,4 +1997,31 @@ RasterizerVulkan::DlssDepthCandidate RasterizerVulkan::GetDlssDepthCandidate() c
 }
 
 
+std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColorCandidates() const {
+    std::scoped_lock lock{texture_cache.mutex};
+    const Framebuffer* const framebuffer = texture_cache.GetFramebuffer();
+    if (!framebuffer) {
+        return {};
+    }
+
+    std::vector<DlssColorCandidate> candidates;
+    candidates.reserve(NUM_RT);
+    for (u32 slot = 0; slot < NUM_RT; ++slot) {
+        const VkImage image = framebuffer->ColorImage(slot);
+        const VkImageSubresourceRange* const range = framebuffer->ColorImageRange(slot);
+        if (image == VK_NULL_HANDLE || !range ||
+            (range->aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) == 0) {
+            continue;
+        }
+        candidates.push_back({
+            .image = image,
+            .extent = framebuffer->RenderArea(),
+            .range = *range,
+            .slot = slot,
+        });
+    }
+    return candidates;
+}
+
+
 } // namespace Vulkan
