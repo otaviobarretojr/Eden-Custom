@@ -2,9 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "video_core/renderer_vulkan/present/dlss_probe.h"
 #include "video_core/vulkan_common/vulkan_device.h"
-#ifdef _WIN32
-#include <windows.h>
-#endif
 namespace Vulkan {
 DlssProbeResult ProbeDlssSupport(const Device& device) {
     DlssProbeResult result{};
@@ -19,22 +16,15 @@ DlssProbeResult ProbeDlssSupport(const Device& device) {
         result.reason = "DLSS probe disabled: Streamline requires Vulkan 1.2 or newer.";
         return result;
     }
-#ifdef _WIN32
-    HMODULE module = LoadLibraryExW(L"sl.interposer.dll", nullptr,
-                                    LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
-    if (module) {
-        result.streamline_runtime_present = true;
-        result.bootstrap_state = StreamlineBootstrapState::RuntimePresent;
-        // Do not call slInit here: this probe runs after Vulkan device creation. Streamline
-        // requires slInit before any Vulkan API. Bootstrap initialization belongs in the
-        // early application/Vulkan startup path.
-        FreeLibrary(module);
-        result.reason = "NVIDIA Vulkan device and Streamline runtime detected; DLSS resource integration is not enabled yet.";
-    } else {
-        result.reason = "NVIDIA Vulkan device detected; Streamline runtime was not found next to the executable.";
-    }
+#ifdef HAS_NVIDIA_STREAMLINE
+    result.streamline_runtime_present = true;
+    result.bootstrap_state = StreamlineBootstrapState::ApiResolved;
+    result.reason =
+        "NVIDIA Vulkan device detected; Streamline bootstrap is compiled in. "
+        "Runtime capability and temporal inputs are validated separately.";
 #else
-    result.reason = "NVIDIA Vulkan device detected; initial Streamline experiment is Windows-only.";
+    result.reason =
+        "NVIDIA Vulkan device detected; this build does not include experimental Streamline support.";
 #endif
     return result;
 }
