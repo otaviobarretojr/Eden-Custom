@@ -231,6 +231,7 @@ public:
         u64 fragment_shader_hash{};
         u32 producer_consecutive_frames{};
         bool producer_stable{};
+        DlssMotionSemanticSignature semantic_signature{};
         bool semantic_evidence{};
         DlssMotionEvidence evidence{};
         DlssMotionConfidence confidence{DlssMotionConfidence::None};
