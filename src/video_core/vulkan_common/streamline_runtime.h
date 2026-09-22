@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "video_core/vulkan_common/vulkan_wrapper.h"
+
 namespace Vulkan {
+
+class Device;
 
 class StreamlineRuntime final {
 public:
@@ -11,6 +15,8 @@ public:
 
     StreamlineRuntime(const StreamlineRuntime&) = delete;
     StreamlineRuntime& operator=(const StreamlineRuntime&) = delete;
+
+    void BindVulkanDevice(const vk::Instance& instance, const Device& device);
 
     [[nodiscard]] bool IsInitialized() const {
         return initialized;
