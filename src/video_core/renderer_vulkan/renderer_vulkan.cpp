@@ -129,6 +129,7 @@ try
     : RendererBase(emu_window, std::move(context_))
     , device_memory(device_memory_)
     , gpu(gpu_)
+    , streamline_runtime()
     , library(OpenLibrary(context.get()))
     , dld()
     // Create raw Vulkan instance first
