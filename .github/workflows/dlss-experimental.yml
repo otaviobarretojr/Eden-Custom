@@ -191,7 +191,7 @@ jobs:
       - name: Configure Windows probe build
         shell: pwsh
         run: >
-          cmake -S . -B build/dlss-windows -G "Visual Studio 17 2022" -A x64
+          cmake -S . -B build/dlss-windows -G "Visual Studio 17 2022" -A x64 -T v143,version=14.44
           -DCMAKE_BUILD_TYPE=Release
           -DENABLE_NVIDIA_STREAMLINE=OFF
           -DENABLE_QT=ON
@@ -204,18 +204,23 @@ jobs:
         run: |
           cmake --build build/dlss-windows --config Release --target video_core --parallel 2
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Link Eden GUI probe
+        shell: pwsh
+        run: |
+          cmake --build build/dlss-windows --config Release --target yuzu --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Collect probe package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifact | Out-Null
           Get-ChildItem build/dlss-windows -Recurse -File |
-            Where-Object { $_.Name -eq 'video_core.lib' } |
+            Where-Object { $_.Extension -in '.exe','.dll' -or $_.Name -eq 'video_core.lib' } |
             Copy-Item -Destination artifact -Force
-          Set-Content artifact/DLSS-PROBE-README.txt 'Windows/MSVC diagnostic compile proof for the experimental DLSS semantic probe. Streamline execution remains disabled. This artifact validates the instrumented video_core target only and is not a runnable Eden package.'
-          if (-not (Get-ChildItem artifact -Filter video_core.lib)) { throw 'video_core.lib was not produced.' }
+          Set-Content artifact/DLSS-PROBE-README.txt 'Experimental Windows semantic probe build. Streamline execution is disabled. Run eden.exe with a representative game for 5-10 minutes, move the camera, close Eden normally, then return the Eden log containing DLSS semantic probe entries.'
+          if (-not (Get-ChildItem artifact -Filter eden.exe)) { throw 'eden.exe was not produced.' }
       - uses: actions/upload-artifact@v4
         with:
-          name: eden-dlss-semantic-probe-windows-compile-proof
+          name: eden-dlss-semantic-probe-windows
           path: artifact/
           if-no-files-found: error
           retention-days: 14
