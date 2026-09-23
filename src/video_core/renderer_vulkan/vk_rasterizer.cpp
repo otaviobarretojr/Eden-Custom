@@ -2106,7 +2106,7 @@ void RasterizerVulkan::ReleaseChannel(s32 channel_id) {
     query_cache.EraseChannel(channel_id);
 }
 
-RasterizerVulkan::DlssDepthCandidate RasterizerVulkan::GetDlssDepthCandidate() const {
+RasterizerVulkan::DlssDepthCandidate RasterizerVulkan::GetDlssDepthCandidate() {
     std::scoped_lock lock{texture_cache.mutex};
     const Framebuffer* const framebuffer = texture_cache.GetFramebuffer();
     if (!framebuffer || !framebuffer->HasAspectDepthBit()) {
@@ -2129,7 +2129,7 @@ RasterizerVulkan::DlssDepthCandidate RasterizerVulkan::GetDlssDepthCandidate() c
 }
 
 
-std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColorCandidates() const {
+std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColorCandidates() {
     std::scoped_lock lock{texture_cache.mutex};
     const Framebuffer* const framebuffer = texture_cache.GetFramebuffer();
     if (!framebuffer) {
@@ -2159,7 +2159,7 @@ std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColor
 }
 
 
-RasterizerVulkan::DlssFramebufferSnapshot RasterizerVulkan::GetDlssFramebufferSnapshot() const {
+RasterizerVulkan::DlssFramebufferSnapshot RasterizerVulkan::GetDlssFramebufferSnapshot() {
     std::scoped_lock lock{texture_cache.mutex};
     DlssFramebufferSnapshot snapshot{};
     const Framebuffer* const framebuffer = texture_cache.GetFramebuffer();
