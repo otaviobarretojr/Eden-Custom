@@ -177,9 +177,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Install glslang tools
+      - name: Install Vulkan SDK shader tools
         shell: pwsh
-        run: choco install glslang -y --no-progress
+        run: |
+          $version = '1.4.321.1'
+          $installer = Join-Path $env:RUNNER_TEMP 'VulkanSDK.exe'
+          Invoke-WebRequest "https://sdk.lunarg.com/sdk/download/$version/windows/VulkanSDK-$version-Installer.exe" -OutFile $installer
+          Start-Process -FilePath $installer -ArgumentList '--accept-licenses --default-answer --confirm-command install' -Wait -NoNewWindow
+          $sdk = "C:\VulkanSDK\$version"
+          if (-not (Test-Path "$sdk\Bin\glslangValidator.exe")) { throw 'glslangValidator was not installed by Vulkan SDK.' }
+          "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Configure Windows probe build
         shell: pwsh
         run: >
