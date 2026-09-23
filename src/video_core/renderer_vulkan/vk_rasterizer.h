@@ -158,7 +158,7 @@ public:
         }
     };
 
-    [[nodiscard]] DlssDepthCandidate GetDlssDepthCandidate() const;
+    [[nodiscard]] DlssDepthCandidate GetDlssDepthCandidate();
 
     struct DlssColorCandidate {
         VkImage image{};
@@ -174,14 +174,14 @@ public:
         }
     };
 
-    [[nodiscard]] std::vector<DlssColorCandidate> GetDlssColorCandidates() const;
+    [[nodiscard]] std::vector<DlssColorCandidate> GetDlssColorCandidates();
 
     struct DlssFramebufferSnapshot {
         DlssDepthCandidate depth{};
         std::vector<DlssColorCandidate> colors{};
     };
 
-    [[nodiscard]] DlssFramebufferSnapshot GetDlssFramebufferSnapshot() const;
+    [[nodiscard]] DlssFramebufferSnapshot GetDlssFramebufferSnapshot();
 
     struct DlssMotionSemanticSignature {
         u64 title_id{};
