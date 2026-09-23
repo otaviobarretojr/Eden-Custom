@@ -204,6 +204,22 @@ jobs:
         run: |
           cmake --build build/dlss-windows --config Release --target video_core --parallel 2
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Audit runner MSVC libraries
+        shell: pwsh
+        run: |
+          $roots = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC" -Directory | Sort-Object Name -Descending
+          foreach ($root in $roots) {
+            Write-Host "MSVC toolset=$($root.Name)"
+            $dumpbin = Get-ChildItem $root.FullName -Recurse -Filter dumpbin.exe | Where-Object { $_.FullName -match 'Hostx64\\x64' } | Select-Object -First 1
+            $libs = Get-ChildItem "$($root.FullName)\lib\x64" -Filter "*.lib" -ErrorAction SilentlyContinue
+            foreach ($lib in $libs) {
+              $matches = & $dumpbin.FullName /symbols $lib.FullName 2>$null | Select-String "__std_(rotate|unique|minmax_element|replace_copy)"
+              if ($matches) {
+                Write-Host "Provider candidate=$($lib.Name)"
+                $matches | Select-Object -First 12
+              }
+            }
+          }
       - name: Audit bundled Qt toolchain
         shell: pwsh
         run: |
