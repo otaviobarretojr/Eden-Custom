@@ -208,8 +208,9 @@ jobs:
           [System.IO.File]::WriteAllLines($cmdFile, [string[]]$cmdLines, [System.Text.Encoding]::ASCII)
           Write-Host "Generated command file:"
           Get-Content $cmdFile | ForEach-Object { Write-Host "CMD> $_" }
-          Push-Location $env:RUNNER_TEMP
-          & $env:ComSpec /d /c eden-msvc-configure.cmd
+          $workspace = $env:GITHUB_WORKSPACE
+          Push-Location $workspace
+          & $env:ComSpec /d /c $cmdFile
           $code = $LASTEXITCODE
           Pop-Location
           if ($code -ne 0) { exit $code }
