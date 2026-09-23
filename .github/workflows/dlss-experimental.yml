@@ -207,8 +207,7 @@ jobs:
       - name: Link Eden GUI probe
         shell: pwsh
         run: |
-          $msvc = Get-ChildItem "$env:VCToolsInstallDir\bin\Hostx64\x64" -ErrorAction SilentlyContinue
-          Write-Host "VCToolsInstallDir=$env:VCToolsInstallDir"
+          Write-Host "EDEN_MSVC_TOOLSET=$env:EDEN_MSVC_TOOLSET"
           cmake --build build/dlss-windows --config Release --target yuzu --parallel 2
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Collect probe package
