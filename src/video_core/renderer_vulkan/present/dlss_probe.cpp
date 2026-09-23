@@ -28,3 +28,5 @@ DlssProbeResult ProbeDlssSupport(const Device& device) {
 #endif
     return result;
 }
+
+} // namespace Vulkan
