@@ -2394,7 +2394,7 @@ RasterizerVulkan::GetDlssLikelyMotionCandidates() const {
     return candidates;
 }
 
-DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_index) const {
+DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_index) {
     DlssTemporalSnapshot snapshot{};
     snapshot.frame_index = frame_index;
     snapshot.title_id = dlss_semantic_title_id;
