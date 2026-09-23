@@ -96,12 +96,12 @@ public:
     }
 
     [[nodiscard]] bool FragmentStoresColor(u32 index) const noexcept {
-        const auto& info = stage_infos[Tegra::Engines::Maxwell3D::Regs::ShaderStage::Fragment];
+        const auto& info = stage_infos[4];
         return index < info.stores_frag_color.size() && info.stores_frag_color[index];
     }
 
     [[nodiscard]] u64 FragmentShaderHash() const noexcept {
-        return key.unique_hashes[Tegra::Engines::Maxwell3D::Regs::ShaderStage::Fragment];
+        return key.unique_hashes[5];
     }
 
     bool UsesExtendedDynamicState() const noexcept {
