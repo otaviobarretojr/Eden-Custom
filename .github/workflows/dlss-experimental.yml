@@ -201,19 +201,21 @@ jobs:
           -DYUZU_CRASH_DUMPS=OFF
       - name: Build Eden probe
         shell: pwsh
-        run: cmake --build build/dlss-windows --config Release --parallel 2
+        run: |
+          cmake --build build/dlss-windows --config Release --target video_core --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Collect probe package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifact | Out-Null
           Get-ChildItem build/dlss-windows -Recurse -File |
-            Where-Object { $_.Extension -in '.exe','.dll' } |
+            Where-Object { $_.Name -eq 'video_core.lib' } |
             Copy-Item -Destination artifact -Force
-          Set-Content artifact/DLSS-PROBE-README.txt 'Experimental semantic probe build. Streamline execution is disabled. Run a game for 5-10 minutes, move the camera, close Eden normally, then return the Eden log containing DLSS semantic probe entries.'
-          if (-not (Get-ChildItem artifact -Filter *.exe)) { throw 'No Windows executable was produced.' }
+          Set-Content artifact/DLSS-PROBE-README.txt 'Windows/MSVC diagnostic compile proof for the experimental DLSS semantic probe. Streamline execution remains disabled. This artifact validates the instrumented video_core target only and is not a runnable Eden package.'
+          if (-not (Get-ChildItem artifact -Filter video_core.lib)) { throw 'video_core.lib was not produced.' }
       - uses: actions/upload-artifact@v4
         with:
-          name: eden-dlss-semantic-probe-windows
+          name: eden-dlss-semantic-probe-windows-compile-proof
           path: artifact/
           if-no-files-found: error
           retention-days: 14
