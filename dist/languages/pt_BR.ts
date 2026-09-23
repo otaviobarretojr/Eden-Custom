@@ -6329,6 +6329,7 @@ Por favor vá para Configuração -&gt; Sistema -&gt; Rede e selecione.</transla
         <source>Shader Preparation Status</source>
         <translation>Status da preparação de shaders</translation>
     </message>
+    <message><source>Compatible Mods...</source><translation>Mods compatíveis...</translation></message>
 </context>
 <context>
     <name>GameListItemCompat</name>
@@ -8326,6 +8327,7 @@ As configurações serão usadas na próxima execução do jogo. As configuraç�
         <source>Performance &amp;Profiles...</source>
         <translation>&amp;Perfis de desempenho...</translation>
     </message>
+    <message><source>Content &amp;Converter...</source><translation>&amp;Conversor de conteúdo...</translation></message>
 </context>
 <context>
     <name>MigrationWorker</name>
@@ -11493,5 +11495,149 @@ Title IDs de Nintendo Switch detectados: %3</translation></message>
     <message><source>Unable to open the mod source in the browser.</source><translation>Não foi possível abrir a origem do mod no navegador.</translation></message>
     <message><source>Dynamic FPS</source><translation>FPS dinâmico</translation></message>
     <message><source>Other</source><translation>Outros</translation></message>
+    <message><source>Build ID</source><translation>Build ID</translation></message>
+</context>
+<context>
+    <name>ContentConverterDialog</name>
+    <message><source>NSZ converter detected.</source><translation>Conversor NSZ detectado.</translation></message>
+    <message><source>NSZ converter not found. You can install the verified official tool automatically.</source><translation>Conversor NSZ não encontrado. Você pode instalar automaticamente a ferramenta oficial verificada.</translation></message>
+    <message><source>Content Converter — NSZ to NSP</source><translation>Conversor de conteúdo — NSZ para NSP</translation></message>
+    <message><source>Convert compressed NSZ files to standard NSP files before running or installing them. The original NSZ file is always preserved.</source><translation>Converta arquivos NSZ compactados em arquivos NSP padrão antes de executá-los ou instalá-los. O arquivo NSZ original é sempre preservado.</translation></message>
+    <message><source>Files</source><translation>Arquivos</translation></message>
+    <message><source>Add NSZ files</source><translation>Adicionar arquivos NSZ</translation></message>
+    <message><source>Remove selected</source><translation>Remover selecionados</translation></message>
+    <message><source>Clear</source><translation>Limpar</translation></message>
+    <message><source>Conversion settings</source><translation>Configurações de conversão</translation></message>
+    <message><source>Output folder:</source><translation>Pasta de saída:</translation></message>
+    <message><source>Browse...</source><translation>Procurar...</translation></message>
+    <message><source>NSZ converter:</source><translation>Conversor NSZ:</translation></message>
+    <message><source>Install official</source><translation>Instalar oficial</translation></message>
+    <message><source>Verify integrity during conversion</source><translation>Verificar integridade durante a conversão</translation></message>
+    <message><source>Install confirmed updates and DLC automatically after conversion</source><translation>Instalar automaticamente atualizações e DLC confirmados após a conversão</translation></message>
+    <message><source>Base games are never installed to NAND automatically.</source><translation>Jogos base nunca são instalados automaticamente na NAND.</translation></message>
+    <message><source>Add converted base-game folder to the game library</source><translation>Adicionar a pasta do jogo base convertido à biblioteca de jogos</translation></message>
+    <message><source>Progress</source><translation>Progresso</translation></message>
+    <message><source>Waiting</source><translation>Aguardando</translation></message>
+    <message><source>Conversion log</source><translation>Log da conversão</translation></message>
+    <message><source>Convert</source><translation>Converter</translation></message>
+    <message><source>Cancel</source><translation>Cancelar</translation></message>
+    <message><source>Select NSZ files</source><translation>Selecionar arquivos NSZ</translation></message>
+    <message><source>Nintendo Submission Zip (*.nsz)</source><translation>Nintendo Submission Zip (*.nsz)</translation></message>
+    <message><source>Title ID: %1
+Version: %2
+Detected type: %3</source><translation>Title ID: %1
+Versão: %2
+Tipo detectado: %3</translation></message>
+    <message><source>
+Related base Title ID: %1</source><translation>
+Title ID base relacionado: %1</translation></message>
+    <message><source>
+DLC classification will be confirmed from content metadata after conversion.</source><translation>
+A classificação como DLC será confirmada pelos metadados do conteúdo após a conversão.</translation></message>
+    <message><source>Select output folder</source><translation>Selecionar pasta de saída</translation></message>
+    <message><source>Select NSZ converter</source><translation>Selecionar conversor NSZ</translation></message>
+    <message><source>NSZ CLI (nsz-cli-windows-x64.exe nsz.exe);;Executable files (*.exe);;All files (*.*)</source><translation>NSZ CLI (nsz-cli-windows-x64.exe nsz.exe);;Arquivos executáveis (*.exe);;Todos os arquivos (*.*)</translation></message>
+    <message><source>NSZ converter selected.</source><translation>Conversor NSZ selecionado.</translation></message>
+    <message><source>Eden's prod.keys file was not found. The NSZ 4.6.1 compatibility fallback needs the same keys already used by Eden.</source><translation>O arquivo prod.keys do Eden não foi encontrado. O modo alternativo de compatibilidade do NSZ 4.6.1 precisa das mesmas chaves já usadas pelo Eden.</translation></message>
+    <message><source>Eden could not prepare the temporary keys.txt file for the NSZ compatibility fallback.</source><translation>O Eden não conseguiu preparar o arquivo temporário keys.txt para o modo alternativo de compatibilidade do NSZ.</translation></message>
+    <message><source>The NSZ 4.6.1 compatibility package failed SHA-256 validation.</source><translation>O pacote de compatibilidade do NSZ 4.6.1 falhou na validação SHA-256.</translation></message>
+    <message><source>The NSZ compatibility folder could not be created.</source><translation>Não foi possível criar a pasta de compatibilidade do NSZ.</translation></message>
+    <message><source>The verified NSZ compatibility package could not be saved.</source><translation>Não foi possível salvar o pacote de compatibilidade do NSZ já verificado.</translation></message>
+    <message><source>The previous NSZ compatibility folder could not be replaced.</source><translation>Não foi possível substituir a pasta anterior de compatibilidade do NSZ.</translation></message>
+    <message><source>The NSZ 4.6.1 compatibility package could not be extracted correctly.</source><translation>Não foi possível extrair corretamente o pacote de compatibilidade do NSZ 4.6.1.</translation></message>
+    <message><source>Retrying with official NSZ 4.6.1 portable compatibility fallback.</source><translation>Tentando novamente com o modo alternativo oficial e portátil do NSZ 4.6.1.</translation></message>
+    <message><source>Retrying with NSZ 4.6.1 portable compatibility fallback...</source><translation>Tentando novamente com o modo alternativo portátil do NSZ 4.6.1...</translation></message>
+    <message><source>Another converter download is already in progress.</source><translation>Já existe outro download do conversor em andamento.</translation></message>
+    <message><source>Installing NSZ compatibility fallback</source><translation>Instalando modo alternativo de compatibilidade do NSZ</translation></message>
+    <message><source>Downloading verified official NSZ 4.6.1 portable fallback...</source><translation>Baixando o modo alternativo portátil oficial e verificado do NSZ 4.6.1...</translation></message>
+    <message><source>NSZ 5.0.0 embedded runtime failed; downloading official NSZ 4.6.1 portable compatibility fallback.</source><translation>O runtime integrado do NSZ 5.0.0 falhou; baixando o modo alternativo portátil oficial do NSZ 4.6.1.</translation></message>
+    <message><source>Downloading compatibility fallback... %1 / %2 MB</source><translation>Baixando modo alternativo de compatibilidade... %1 / %2 MB</translation></message>
+    <message><source>NSZ converter</source><translation>Conversor NSZ</translation></message>
+    <message><source>The converter folder could not be created.</source><translation>Não foi possível criar a pasta do conversor.</translation></message>
+    <message><source>Downloading NSZ converter</source><translation>Baixando conversor NSZ</translation></message>
+    <message><source>Downloading the pinned official NSZ 5.0.0 Windows x64 tool...</source><translation>Baixando a ferramenta oficial fixada do NSZ 5.0.0 para Windows x64...</translation></message>
+    <message><source>Downloading official NSZ 5.0.0 converter.</source><translation>Baixando o conversor oficial NSZ 5.0.0.</translation></message>
+    <message><source>Downloading converter... %1 / %2 MB</source><translation>Baixando conversor... %1 / %2 MB</translation></message>
+    <message><source>Conversion cancelled. Original files were preserved.</source><translation>Conversão cancelada. Os arquivos originais foram preservados.</translation></message>
+    <message><source>NSZ compatibility fallback download failed.</source><translation>Falha ao baixar o modo alternativo de compatibilidade do NSZ.</translation></message>
+    <message><source>Compatibility fallback download error: %1</source><translation>Erro ao baixar o modo alternativo de compatibilidade: %1</translation></message>
+    <message><source>NSZ compatibility fallback</source><translation>Modo alternativo de compatibilidade do NSZ</translation></message>
+    <message><source>The official NSZ 4.6.1 portable fallback could not be downloaded.
+
+%1</source><translation>Não foi possível baixar o modo alternativo portátil oficial do NSZ 4.6.1.
+
+%1</translation></message>
+    <message><source>Converter download failed.</source><translation>Falha ao baixar o conversor.</translation></message>
+    <message><source>Download error: %1</source><translation>Erro de download: %1</translation></message>
+    <message><source>The official converter could not be downloaded.
+
+%1</source><translation>Não foi possível baixar o conversor oficial.
+
+%1</translation></message>
+    <message><source>NSZ compatibility fallback installation failed.</source><translation>Falha ao instalar o modo alternativo de compatibilidade do NSZ.</translation></message>
+    <message><source>Installed and SHA-256 verified official NSZ 4.6.1 portable fallback.</source><translation>Modo alternativo portátil oficial do NSZ 4.6.1 instalado e verificado por SHA-256.</translation></message>
+    <message><source>NSZ 4.6.1 portable fallback installed. Retrying conversion...</source><translation>Modo alternativo portátil do NSZ 4.6.1 instalado. Tentando a conversão novamente...</translation></message>
+    <message><source>Downloaded converter failed SHA-256 validation.</source><translation>O conversor baixado falhou na validação SHA-256.</translation></message>
+    <message><source>Security validation failed. Expected %1, received %2.</source><translation>Falha na validação de segurança. Esperado: %1; recebido: %2.</translation></message>
+    <message><source>The downloaded converter did not match the pinned SHA-256 checksum and was not saved.</source><translation>O conversor baixado não corresponde ao SHA-256 fixado e não foi salvo.</translation></message>
+    <message><source>Converter could not be saved.</source><translation>Não foi possível salvar o conversor.</translation></message>
+    <message><source>The verified converter could not be saved to:
+%1</source><translation>Não foi possível salvar o conversor verificado em:
+%1</translation></message>
+    <message><source>NSZ converter ready</source><translation>Conversor NSZ pronto</translation></message>
+    <message><source>Official NSZ 5.0.0 converter installed and SHA-256 verified.</source><translation>Conversor oficial NSZ 5.0.0 instalado e verificado por SHA-256.</translation></message>
+    <message><source>Installed verified NSZ converter: %1</source><translation>Conversor NSZ verificado instalado: %1</translation></message>
+    <message><source>Content Converter</source><translation>Conversor de conteúdo</translation></message>
+    <message><source>Add at least one NSZ file.</source><translation>Adicione pelo menos um arquivo NSZ.</translation></message>
+    <message><source>Select an output folder.</source><translation>Selecione uma pasta de saída.</translation></message>
+    <message><source>The output folder could not be created.</source><translation>Não foi possível criar a pasta de saída.</translation></message>
+    <message><source>NSZ converter not found</source><translation>Conversor NSZ não encontrado</translation></message>
+    <message><source>The NSZ converter is not installed yet. Use 'Install official' to download the pinned and checksum-verified NSZ 5.0.0 tool. Eden Custom does not include console keys or game content.</source><translation>O conversor NSZ ainda não está instalado. Use 'Instalar oficial' para baixar a ferramenta NSZ 5.0.0 fixada e verificada por checksum. O Eden Custom não inclui chaves do console nem conteúdo de jogos.</translation></message>
+    <message><source>Conversion cancelled.</source><translation>Conversão cancelada.</translation></message>
+    <message><source>Completed</source><translation>Concluído</translation></message>
+    <message><source>All files were converted successfully.</source><translation>Todos os arquivos foram convertidos com sucesso.</translation></message>
+    <message><source>All conversions completed.</source><translation>Todas as conversões foram concluídas.</translation></message>
+    <message><source>Sending %1 converted update/DLC file(s) to NAND installation.</source><translation>Enviando %1 arquivo(s) convertido(s) de atualização/DLC para instalação na NAND.</translation></message>
+    <message><source>The configured NSZ converter is no longer available.</source><translation>O conversor NSZ configurado não está mais disponível.</translation></message>
+    <message><source>%1 of %2 — %3</source><translation>%1 de %2 — %3</translation></message>
+    <message><source>Converting with compatibility fallback...</source><translation>Convertendo com o modo alternativo de compatibilidade...</translation></message>
+    <message><source>Converting...</source><translation>Convertendo...</translation></message>
+    <message><source>Starting: %1</source><translation>Iniciando: %1</translation></message>
+    <message><source>Converter compatibility mode: official NSZ 4.6.1 portable.</source><translation>Modo de compatibilidade do conversor: NSZ 4.6.1 portátil oficial.</translation></message>
+    <message><source>Failed to create converter runtime directory: %1</source><translation>Falha ao criar o diretório de runtime do conversor: %1</translation></message>
+    <message><source>Converter runtime directory could not be created.</source><translation>Não foi possível criar o diretório de runtime do conversor.</translation></message>
+    <message><source>Converter runtime directory: %1</source><translation>Diretório de runtime do conversor: %1</translation></message>
+    <message><source>Failed to start converter: %1</source><translation>Falha ao iniciar o conversor: %1</translation></message>
+    <message><source>Converter could not be started.</source><translation>Não foi possível iniciar o conversor.</translation></message>
+    <message><source>Cancelling...</source><translation>Cancelando...</translation></message>
+    <message><source>Converted NSP was not found for metadata inspection: %1</source><translation>O NSP convertido não foi encontrado para inspeção de metadados: %1</translation></message>
+    <message><source>Converted NSP could not be opened by Eden for metadata inspection.</source><translation>O Eden não conseguiu abrir o NSP convertido para inspeção de metadados.</translation></message>
+    <message><source>NSP conversion completed, but Eden could not fully parse its metadata.</source><translation>A conversão para NSP foi concluída, mas o Eden não conseguiu interpretar completamente os metadados.</translation></message>
+    <message><source>%1 confirmed — Title ID %2 — version %3</source><translation>%1 confirmado — Title ID %2 — versão %3</translation></message>
+    <message><source> — base %1</source><translation> — base %1</translation></message>
+    <message><source>Converted: %1
+Title ID: %2
+Version: %3
+Confirmed type: %4</source><translation>Convertido: %1
+Title ID: %2
+Versão: %3
+Tipo confirmado: %4</translation></message>
+    <message><source>Conversion succeeded, but no CNMT metadata entry was found.</source><translation>A conversão foi concluída, mas nenhuma entrada de metadados CNMT foi encontrada.</translation></message>
+    <message><source>Cancelled</source><translation>Cancelado</translation></message>
+    <message><source>Detected NSZ 5.0.0 embedded Python runtime incompatibility.</source><translation>Detectada incompatibilidade no runtime Python integrado do NSZ 5.0.0.</translation></message>
+    <message><source>NSZ embedded Python runtime failed to start.</source><translation>Falha ao iniciar o runtime Python integrado do NSZ.</translation></message>
+    <message><source>NSZ runtime failed</source><translation>Falha no runtime do NSZ</translation></message>
+    <message><source>NSZ 5.0.0 could not load its embedded Python runtime while processing %1. The automatic portable fallback was already attempted. The original NSZ file was not modified.
+
+Please keep this log for compatibility analysis.</source><translation>O NSZ 5.0.0 não conseguiu carregar o runtime Python integrado ao processar %1. O modo alternativo portátil automático já foi tentado. O arquivo NSZ original não foi modificado.
+
+Guarde este log para análise de compatibilidade.</translation></message>
+    <message><source>NSZ 4.6.1 compatibility conversion failed. Check the log for details.</source><translation>A conversão de compatibilidade com o NSZ 4.6.1 falhou. Consulte o log para obter detalhes.</translation></message>
+    <message><source>Compatibility conversion failed</source><translation>Falha na conversão de compatibilidade</translation></message>
+    <message><source>The NSZ 4.6.1 portable fallback returned an error while processing %1. The original NSZ file was not modified.</source><translation>O modo alternativo portátil do NSZ 4.6.1 retornou um erro ao processar %1. O arquivo NSZ original não foi modificado.</translation></message>
+    <message><source>Conversion failed. Check the log for details.</source><translation>A conversão falhou. Consulte o log para obter detalhes.</translation></message>
+    <message><source>Conversion failed</source><translation>Falha na conversão</translation></message>
+    <message><source>The converter returned an error while processing %1. The original NSZ file was not modified.</source><translation>O conversor retornou um erro ao processar %1. O arquivo NSZ original não foi modificado.</translation></message>
+    <message><source>Completed: %1</source><translation>Concluído: %1</translation></message>
 </context>
 </TS>
