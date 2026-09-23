@@ -207,7 +207,7 @@ jobs:
       - name: Audit runner MSVC libraries
         shell: pwsh
         run: |
-          $roots = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC" -Directory | Sort-Object Name -Descending
+          $roots = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio" -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Parent.Name -eq "MSVC" } | Sort-Object Name -Descending
           foreach ($root in $roots) {
             Write-Host "MSVC toolset=$($root.Name)"
             $dumpbin = Get-ChildItem $root.FullName -Recurse -Filter dumpbin.exe | Where-Object { $_.FullName -match 'Hostx64\\x64' } | Select-Object -First 1
