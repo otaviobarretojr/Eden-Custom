@@ -430,11 +430,12 @@ target_link_libraries(video_core PRIVATE sirit::sirit)
 # Header-only stuff needed by all dependent targets
 target_link_libraries(video_core PUBLIC Vulkan::Headers Vulkan::UtilityHeaders GPUOpen::VulkanMemoryAllocator)
 
+target_sources(video_core PRIVATE
+    vulkan_common/streamline_runtime.cpp
+    vulkan_common/streamline_runtime.h
+)
+
 if (ENABLE_NVIDIA_STREAMLINE AND WIN32)
-    target_sources(video_core PRIVATE
-        vulkan_common/streamline_runtime.cpp
-        vulkan_common/streamline_runtime.h
-    )
     target_link_libraries(video_core PRIVATE
         wintrust
         "${STREAMLINE_SDK_ROOT}/lib/x64/sl.interposer.lib"
