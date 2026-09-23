@@ -1,8 +1,11 @@
 name: Experimental DLSS Windows probe
-on:
+
+'on':
   push:
-    branches: ['exp/dlss-*']
-  workflow_dispatch:
+    branches:
+      - 'exp/dlss-*'
+  workflow_dispatch: {}
+
 jobs:
   windows-probe-build:
     runs-on: windows-2022
