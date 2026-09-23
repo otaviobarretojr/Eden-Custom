@@ -782,6 +782,18 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
     // does not promote guest metadata to validated camera/jitter semantics.
     observation.semantic_probe_candidate =
         observation.strong_temporal_candidate && observation.matrix_shape_candidate;
+    if (observation.semantic_probe_candidate && observation.sampled &&
+        observation.last_sampled_frame == dlss_temporal_frame_index) {
+        LOG_DEBUG(Render_Vulkan,
+                  "DLSS semantic probe: frame={} title={:016x} stage={} binding={} size={} "
+                  "shader={:016x} samples={} changes={} floats={} finite={} normalized={} "
+                  "matrix_shape=true",
+                  observation.frame_index, observation.title_id, observation.stage,
+                  observation.index, observation.size, observation.fragment_shader_hash,
+                  observation.sample_count, observation.fingerprint_change_count,
+                  observation.sampled_float_count, observation.finite_float_count,
+                  observation.normalized_float_count);
+    }
 
     buffer_cache.BindGraphicsUniformBuffer(stage, index, gpu_addr, size);
 }
