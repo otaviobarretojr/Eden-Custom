@@ -191,7 +191,7 @@ jobs:
       - name: Configure Windows probe build
         shell: pwsh
         run: >
-          cmake -S . -B build/dlss-windows -G "Visual Studio 17 2022" -A x64
+          cmake -S . -B build/dlss-windows -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DENABLE_NVIDIA_STREAMLINE=OFF
           -DENABLE_QT=ON
