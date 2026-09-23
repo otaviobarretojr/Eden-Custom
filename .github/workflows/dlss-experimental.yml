@@ -204,6 +204,20 @@ jobs:
         run: |
           cmake --build build/dlss-windows --config Release --target video_core --parallel 2
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Audit bundled Qt toolchain
+        shell: pwsh
+        run: |
+          Write-Host "EDEN_MSVC_TOOLSET=$env:EDEN_MSVC_TOOLSET"
+          $qt = Get-ChildItem ".cache/cpm/qt6" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $qt) { throw "Bundled Qt package was not found." }
+          Write-Host "Qt package=$($qt.FullName)"
+          $core = Get-ChildItem $qt.FullName -Recurse -Filter Qt6Core.lib | Select-Object -First 1
+          if (-not $core) { throw "Qt6Core.lib was not found." }
+          Write-Host "Qt6Core=$($core.FullName)"
+          $dumpbin = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe |
+            Where-Object { $_.FullName -match 'Hostx64\\x64' } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $dumpbin) { throw "dumpbin.exe was not found." }
+          & $dumpbin.FullName /symbols $core.FullName | Select-String "__std_(rotate|unique|minmax|replace_copy)" | Select-Object -First 20
       - name: Link Eden GUI probe
         shell: pwsh
         run: |
