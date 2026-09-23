@@ -207,8 +207,8 @@ jobs:
             '@cmake -S . -B build/dlss-windows -G Ninja -DCMAKE_C_COMPILER=cl.exe -DCMAKE_CXX_COMPILER=cl.exe -DCMAKE_BUILD_TYPE=Release -DENABLE_NVIDIA_STREAMLINE=OFF -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=ON -DYUZU_USE_BUNDLED_FFMPEG=ON -DENABLE_UPDATE_CHECKER=OFF -DYUZU_CRASH_DUMPS=OFF'
           )
           $cmdLines | Set-Content -Path $cmdFile -Encoding ascii
-          & $cmdFile
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $proc = Start-Process -FilePath "cmd.exe" -ArgumentList @("/d", "/c", "`"$cmdFile`"") -Wait -NoNewWindow -PassThru
+          if ($proc.ExitCode -ne 0) { exit $proc.ExitCode }
       - name: Build Eden probe
         shell: pwsh
         run: |
