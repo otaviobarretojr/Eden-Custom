@@ -683,10 +683,26 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
             previous = &entry;
         }
     }
-    const bool consecutive = previous != nullptr &&
-                             previous->frame_index + 1 == dlss_temporal_frame_index &&
-                             previous->gpu_addr == gpu_addr && previous->size == size;
-    const u32 consecutive_frames = consecutive ? previous->consecutive_frames + 1 : 1;
+    const bool same_address_size =
+        previous != nullptr && previous->gpu_addr == gpu_addr && previous->size == size;
+    const bool same_frame =
+        same_address_size && previous->frame_index == dlss_temporal_frame_index;
+    const bool next_frame =
+        same_address_size && previous->frame_index + 1 == dlss_temporal_frame_index;
+    if (same_address_size) {
+        ++dlss_uniform_same_address_size_count;
+    }
+    if (same_frame) {
+        ++dlss_uniform_same_frame_match_count;
+    }
+    if (next_frame) {
+        ++dlss_uniform_next_frame_match_count;
+    }
+    // A binding can be rebound many times inside one emulated frame. Treat same-frame rebinding as
+    // continuity rather than resetting persistence; only advance the frame streak once per frame.
+    const u32 consecutive_frames =
+        same_frame ? previous->consecutive_frames
+                   : (next_frame ? previous->consecutive_frames + 1 : 1);
     // A temporal constant block commonly needs enough room for matrices and camera data. This is
     // only a diagnostic size filter: it must never be treated as semantic validation.
     const bool plausible_temporal_size = size >= 64 && size <= 4096 && (size % 16) == 0;
@@ -2254,10 +2270,13 @@ void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
     if ((frame_index % 120) == 0) {
         LOG_INFO(Render_Vulkan,
                  "DLSS UBO pipeline heartbeat: frame={} title={:016x} bind_calls={} "
-                 "observations={} mature={} samples={} ring_cursor={}",
+                 "observations={} mature={} samples={} same_addr_size={} same_frame={} "
+                 "next_frame={} ring_cursor={}",
                  frame_index, dlss_semantic_title_id, dlss_uniform_bind_call_count,
                  dlss_uniform_observation_count, dlss_uniform_mature_candidate_count,
-                 dlss_uniform_sample_count, dlss_uniform_observation_cursor);
+                 dlss_uniform_sample_count, dlss_uniform_same_address_size_count,
+                 dlss_uniform_same_frame_match_count, dlss_uniform_next_frame_match_count,
+                 dlss_uniform_observation_cursor);
     }
     const auto framebuffer_snapshot = GetDlssFramebufferSnapshot();
     const auto& candidates = framebuffer_snapshot.colors;
