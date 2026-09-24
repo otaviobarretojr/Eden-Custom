@@ -369,6 +369,10 @@ private:
     u64 dlss_semantic_title_id{};
     u64 dlss_uniform_bind_sequence{};
     u64 dlss_temporal_frame_index{};
+    u64 dlss_uniform_bind_call_count{};
+    u64 dlss_uniform_observation_count{};
+    u64 dlss_uniform_mature_candidate_count{};
+    u64 dlss_uniform_sample_count{};
     std::array<DlssUniformBindingObservation, 64> dlss_uniform_observations{};
     size_t dlss_uniform_observation_cursor{};
     u32 draw_counter = 0;
