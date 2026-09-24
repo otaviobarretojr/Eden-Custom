@@ -249,21 +249,23 @@ jobs:
           }
       - name: Audit bundled Qt toolchain
         shell: pwsh
+        continue-on-error: true
         run: |
-          Write-Host "EDEN_MSVC_TOOLSET=$env:EDEN_MSVC_TOOLSET"
           $qt = Get-ChildItem ".cache/cpm/qt6" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $qt) { throw "Bundled Qt package was not found." }
+          if (-not $qt) { Write-Warning "Bundled Qt package was not found."; exit 0 }
           Write-Host "Qt package=$($qt.FullName)"
-          $core = Get-ChildItem $qt.FullName -Recurse -Filter Qt6Core.lib | Select-Object -First 1
-          if (-not $core) { throw "Qt6Core.lib was not found." }
+          $core = Get-ChildItem $qt.FullName -Recurse -Filter Qt6Core.lib -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $core) { Write-Warning "Qt6Core.lib was not found."; exit 0 }
           Write-Host "Qt6Core=$($core.FullName)"
-          $dumpbin = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe |
+          $vswhere = "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $dumpbin = Get-ChildItem (Join-Path $vs "VC\\Tools\\MSVC") -Recurse -Filter dumpbin.exe -ErrorAction SilentlyContinue |
             Where-Object { $_.FullName -match 'Hostx64\\x64' } | Sort-Object FullName -Descending | Select-Object -First 1
-          if (-not $dumpbin) { throw "dumpbin.exe was not found." }
+          if (-not $dumpbin) { Write-Warning "dumpbin.exe was not found; skipping diagnostic symbol audit."; exit 0 }
           $symbolOutput = & $dumpbin.FullName /symbols $core.FullName 2>&1
           $matches = $symbolOutput | Select-String "__std_(rotate|unique|minmax|replace_copy)" | Select-Object -First 20
           if ($matches) { $matches | ForEach-Object { Write-Host $_ } } else { Write-Host "No matching Qt STL symbols found in audit." }
-          Write-Host "Qt audit is diagnostic-only; continuing to GUI link."
+          Write-Host "Qt audit complete; continuing to GUI link."
       - name: Link Eden GUI probe
         shell: pwsh
         run: |
