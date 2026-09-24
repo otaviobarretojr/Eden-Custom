@@ -782,17 +782,30 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
     // does not promote guest metadata to validated camera/jitter semantics.
     observation.semantic_probe_candidate =
         observation.strong_temporal_candidate && observation.matrix_shape_candidate;
-    if (observation.semantic_probe_candidate && observation.sampled &&
+    if (observation.sampled &&
         observation.last_sampled_frame == dlss_temporal_frame_index) {
+        // Emit every mature sampled binding, not only bindings that pass the final semantic
+        // heuristic. This keeps the probe fail-closed while making each rejected gate visible
+        // during a real title run. Raw guest bytes are still never logged.
         LOG_INFO(Render_Vulkan,
-                 "DLSS semantic probe: frame={} title={:016x} stage={} binding={} size={} "
-                  "shader={:016x} samples={} changes={} floats={} finite={} normalized={} "
-                  "matrix_shape=true",
-                  observation.frame_index, observation.title_id, observation.stage,
-                  observation.index, observation.size, observation.fragment_shader_hash,
-                  observation.sample_count, observation.fingerprint_change_count,
-                  observation.sampled_float_count, observation.finite_float_count,
-                  observation.normalized_float_count);
+                 "DLSS temporal UBO probe: frame={} title={:016x} stage={} binding={} size={} "
+                 "stable={} plausible_size={} dynamic={} producer={} shader={:016x} "
+                 "samples={} changes={} floats={} finite={} normalized={} matrix_shape={} "
+                 "strong={} semantic={} reject_stable={} reject_size={} reject_dynamic={} "
+                 "reject_title={} reject_producer={} reject_matrix={}",
+                 observation.frame_index, observation.title_id, observation.stage,
+                 observation.index, observation.size, observation.stable_binding,
+                 observation.plausible_temporal_size, observation.temporally_dynamic,
+                 observation.fragment_producer_unambiguous, observation.fragment_shader_hash,
+                 observation.sample_count, observation.fingerprint_change_count,
+                 observation.sampled_float_count, observation.finite_float_count,
+                 observation.normalized_float_count, observation.matrix_shape_candidate,
+                 observation.strong_temporal_candidate, observation.semantic_probe_candidate,
+                 !observation.stable_binding, !observation.plausible_temporal_size,
+                 !observation.temporally_dynamic, observation.title_id == 0,
+                 !observation.fragment_producer_unambiguous ||
+                     observation.fragment_shader_hash == 0,
+                 !observation.matrix_shape_candidate);
     }
 
     buffer_cache.BindGraphicsUniformBuffer(stage, index, gpu_addr, size);
