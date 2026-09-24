@@ -784,8 +784,8 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
         observation.strong_temporal_candidate && observation.matrix_shape_candidate;
     if (observation.semantic_probe_candidate && observation.sampled &&
         observation.last_sampled_frame == dlss_temporal_frame_index) {
-        LOG_DEBUG(Render_Vulkan,
-                  "DLSS semantic probe: frame={} title={:016x} stage={} binding={} size={} "
+        LOG_INFO(Render_Vulkan,
+                 "DLSS semantic probe: frame={} title={:016x} stage={} binding={} size={} "
                   "shader={:016x} samples={} changes={} floats={} finite={} normalized={} "
                   "matrix_shape=true",
                   observation.frame_index, observation.title_id, observation.stage,
