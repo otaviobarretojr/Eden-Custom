@@ -373,6 +373,9 @@ private:
     u64 dlss_uniform_observation_count{};
     u64 dlss_uniform_mature_candidate_count{};
     u64 dlss_uniform_sample_count{};
+    u64 dlss_uniform_same_frame_match_count{};
+    u64 dlss_uniform_next_frame_match_count{};
+    u64 dlss_uniform_same_address_size_count{};
     std::array<DlssUniformBindingObservation, 64> dlss_uniform_observations{};
     size_t dlss_uniform_observation_cursor{};
     u32 draw_counter = 0;
