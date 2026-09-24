@@ -260,13 +260,28 @@ jobs:
           $dumpbin = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe |
             Where-Object { $_.FullName -match 'Hostx64\\x64' } | Sort-Object FullName -Descending | Select-Object -First 1
           if (-not $dumpbin) { throw "dumpbin.exe was not found." }
-          & $dumpbin.FullName /symbols $core.FullName | Select-String "__std_(rotate|unique|minmax|replace_copy)" | Select-Object -First 20
+          $symbolOutput = & $dumpbin.FullName /symbols $core.FullName 2>&1
+          $matches = $symbolOutput | Select-String "__std_(rotate|unique|minmax|replace_copy)" | Select-Object -First 20
+          if ($matches) { $matches | ForEach-Object { Write-Host $_ } } else { Write-Host "No matching Qt STL symbols found in audit." }
+          Write-Host "Qt audit is diagnostic-only; continuing to GUI link."
       - name: Link Eden GUI probe
         shell: pwsh
         run: |
           Write-Host "EDEN_MSVC_TOOLSET=$env:EDEN_MSVC_TOOLSET"
-          cmake --build build/dlss-windows --config Release --target yuzu --parallel 2
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $vswhere = "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $devcmd = Join-Path $vs "Common7\\Tools\\VsDevCmd.bat"
+          $cmdFile = Join-Path $env:RUNNER_TEMP "eden-msvc-link.cmd"
+          $cmdLines = [System.Collections.Generic.List[string]]::new()
+          $cmdLines.Add('@call "' + $devcmd + '" -arch=x64 -host_arch=x64')
+          $cmdLines.Add('@if errorlevel 1 exit /b %errorlevel%')
+          $cmdLines.Add('@cmake --build build/dlss-windows --target yuzu --parallel 2')
+          [System.IO.File]::WriteAllLines($cmdFile, [string[]]$cmdLines, [System.Text.Encoding]::ASCII)
+          Push-Location $env:GITHUB_WORKSPACE
+          & $env:ComSpec /d /c $cmdFile
+          $code = $LASTEXITCODE
+          Pop-Location
+          if ($code -ne 0) { exit $code }
       - name: Collect probe package
         shell: pwsh
         run: |
