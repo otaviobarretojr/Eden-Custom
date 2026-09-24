@@ -668,6 +668,7 @@ void RasterizerVulkan::Query(GPUVAddr gpu_addr, VideoCommon::QueryType type,
 
 void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAddr gpu_addr,
                                                  u32 size) {
+    ++dlss_uniform_bind_call_count;
     // Passive DLSS temporal discovery only: retain binding metadata, never interpret guest bytes as
     // camera matrices or jitter until a title-specific semantic profile has been validated.
     // The observation store is a ring. Always select the newest matching binding instead of the
@@ -691,6 +692,7 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
     const bool plausible_temporal_size = size >= 64 && size <= 4096 && (size % 16) == 0;
     auto& observation =
         dlss_uniform_observations[dlss_uniform_observation_cursor++ % dlss_uniform_observations.size()];
+    ++dlss_uniform_observation_count;
     observation = {
         .stage = stage,
         .index = index,
@@ -706,6 +708,9 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
     };
     // Sample only mature diagnostic candidates, at most once every 120 temporal frames. Keep
     // only a compact fingerprint: raw guest constant bytes are never retained by the probe.
+    if (observation.temporal_diagnostic_candidate) {
+        ++dlss_uniform_mature_candidate_count;
+    }
     if (observation.temporal_diagnostic_candidate && gpu_addr != 0 && size != 0 &&
         (dlss_temporal_frame_index % 120) == 0 &&
         (previous == nullptr || previous->last_sampled_frame != dlss_temporal_frame_index)) {
@@ -757,6 +762,7 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
             float_count >= 16 && finite_float_count * 4 >= float_count * 3 &&
             normalized_float_count * 2 >= finite_float_count;
         observation.sampled = true;
+        ++dlss_uniform_sample_count;
     }
 
     // Shader correlation is filled only when a single fragment producer is known for the frame.
@@ -2245,6 +2251,14 @@ void RasterizerVulkan::TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline
 
 void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
     dlss_temporal_frame_index = frame_index;
+    if ((frame_index % 120) == 0) {
+        LOG_INFO(Render_Vulkan,
+                 "DLSS UBO pipeline heartbeat: frame={} title={:016x} bind_calls={} "
+                 "observations={} mature={} samples={} ring_cursor={}",
+                 frame_index, dlss_semantic_title_id, dlss_uniform_bind_call_count,
+                 dlss_uniform_observation_count, dlss_uniform_mature_candidate_count,
+                 dlss_uniform_sample_count, dlss_uniform_observation_cursor);
+    }
     const auto framebuffer_snapshot = GetDlssFramebufferSnapshot();
     const auto& candidates = framebuffer_snapshot.colors;
     const auto& depth = framebuffer_snapshot.depth;
