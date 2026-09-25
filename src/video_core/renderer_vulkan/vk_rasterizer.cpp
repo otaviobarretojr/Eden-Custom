@@ -729,8 +729,13 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
     if (observation.temporal_diagnostic_candidate) {
         ++dlss_uniform_mature_candidate_count;
     }
-    if (observation.temporal_diagnostic_candidate && gpu_addr != 0 && size != 0 &&
-        (dlss_temporal_frame_index % 120) == 0 &&
+    // Crash-isolation guard: keep temporal continuity discovery metadata-only. Rotating guest
+    // addresses can become stale before a diagnostic sample is taken; reading them directly from
+    // this passive probe must never be allowed to destabilize emulation. Re-enable bounded sampling
+    // only after the address can be validated against the active guest mapping.
+    constexpr bool EnableDlssGuestUniformSampling = false;
+    if (EnableDlssGuestUniformSampling && observation.temporal_diagnostic_candidate &&
+        gpu_addr != 0 && size != 0 && (dlss_temporal_frame_index % 120) == 0 &&
         (previous == nullptr || previous->last_sampled_frame != dlss_temporal_frame_index)) {
         constexpr size_t MaxSampleBytes = 512;
         std::array<u8, MaxSampleBytes> sample{};
