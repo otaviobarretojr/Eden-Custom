@@ -683,12 +683,14 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
             previous = &entry;
         }
     }
-    const bool same_address_size =
-        previous != nullptr && previous->gpu_addr == gpu_addr && previous->size == size;
-    const bool same_frame =
-        same_address_size && previous->frame_index == dlss_temporal_frame_index;
-    const bool next_frame =
-        same_address_size && previous->frame_index + 1 == dlss_temporal_frame_index;
+    // Guest uniform buffers commonly rotate backing addresses while preserving the same logical
+    // shader binding. Continuity therefore belongs to (title, stage, binding, size), not to the
+    // transient GPU address. Requiring address equality made every cross-frame match disappear in
+    // Pokémon Violet even though same-frame rebinds were abundant.
+    const bool same_size = previous != nullptr && previous->size == size;
+    const bool same_address_size = same_size && previous->gpu_addr == gpu_addr;
+    const bool same_frame = same_size && previous->frame_index == dlss_temporal_frame_index;
+    const bool next_frame = same_size && previous->frame_index + 1 == dlss_temporal_frame_index;
     if (same_address_size) {
         ++dlss_uniform_same_address_size_count;
     }
@@ -698,8 +700,8 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
     if (next_frame) {
         ++dlss_uniform_next_frame_match_count;
     }
-    // A binding can be rebound many times inside one emulated frame. Treat same-frame rebinding as
-    // continuity rather than resetting persistence; only advance the frame streak once per frame.
+    // Rebinding within one emulated frame keeps the streak unchanged. A matching logical binding
+    // in the next frame advances it even when the guest rotates to a different backing address.
     const u32 consecutive_frames =
         same_frame ? previous->consecutive_frames
                    : (next_frame ? previous->consecutive_frames + 1 : 1);
