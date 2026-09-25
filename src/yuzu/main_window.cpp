@@ -70,6 +70,7 @@
 #include <QActionGroup>
 #include <QCheckBox>
 #include <QClipboard>
+#include <QCoreApplication>
 #include <QDesktopServices>
 #include <QDateTime>
 #include <QDir>
@@ -5141,20 +5142,49 @@ void MainWindow::UpdateUITheme() {
 }
 
 void MainWindow::LoadTranslation() {
-    bool loaded;
+    const std::string configured_language = UISettings::values.language.GetValue();
+    const bool use_system_locale = configured_language.empty();
+    const QString resource_directory = QStringLiteral(":/languages/");
+    const QString packaged_directory =
+        QDir{QCoreApplication::applicationDirPath()}.filePath(QStringLiteral("translations"));
 
-    if (UISettings::values.language.GetValue().empty()) {
-        // If the selected language is empty, use system locale
-        loaded = translator.load(QLocale(), {}, {}, QStringLiteral(":/languages/"));
-    } else {
-        // Otherwise load from the specified file
-        loaded = translator.load(QString::fromStdString(UISettings::values.language.GetValue()),
-                                 QStringLiteral(":/languages/"));
+    const auto load_from_directory = [this, use_system_locale, &configured_language](
+                                         const QString& directory) {
+        if (use_system_locale) {
+            return translator.load(QLocale::system(), {}, {}, directory);
+        }
+        return translator.load(QString::fromStdString(configured_language), directory);
+    };
+
+    bool loaded = load_from_directory(resource_directory);
+    bool loaded_from_packaged_file = false;
+
+    // Performance/portable packages also ship the generated .qm files beside eden.exe.
+    // Use them as a runtime fallback if the compiled Qt resource is unavailable or does not
+    // resolve the selected/system locale. This keeps translations functional in portable builds
+    // without changing the normal embedded-resource path.
+    if (!loaded && QDir{packaged_directory}.exists()) {
+        loaded = load_from_directory(packaged_directory);
+        loaded_from_packaged_file = loaded;
     }
 
     if (loaded) {
         qApp->installTranslator(&translator);
+        const QString requested =
+            use_system_locale ? QLocale::system().name()
+                              : QString::fromStdString(configured_language);
+        LOG_INFO(Frontend, "UI translation loaded for {} from {}",
+                 requested.toStdString(),
+                 loaded_from_packaged_file ? packaged_directory.toStdString()
+                                           : resource_directory.toStdString());
     } else {
+        const QString requested =
+            use_system_locale ? QLocale::system().name()
+                              : QString::fromStdString(configured_language);
+        LOG_WARNING(Frontend,
+                    "UI translation for {} could not be loaded from resources or package; "
+                    "falling back to English",
+                    requested.toStdString());
         UISettings::values.language = std::string("en");
     }
 }
