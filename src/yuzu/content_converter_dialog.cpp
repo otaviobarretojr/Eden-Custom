@@ -811,7 +811,12 @@ void ContentConverterDialog::StartNextFile() {
                               .arg(pending_install_files.size()));
             }
 
-            accept();
+            const QString completion_message =
+                tr("All files were converted successfully.") + QStringLiteral("\n\n") +
+                tr("Output folder:") + QStringLiteral("\n") +
+                QDir::toNativeSeparators(output_directory->text().trimmed());
+
+            QMessageBox::information(this, tr("Content Converter"), completion_message);
 
             if (install_after) {
                 emit InstallConvertedContentRequested(pending_install_files);
@@ -819,6 +824,8 @@ void ContentConverterDialog::StartNextFile() {
             if (add_library_after) {
                 emit AddConvertedDirectoriesRequested(pending_library_dirs);
             }
+
+            accept();
         }
         return;
     }
