@@ -9,6 +9,12 @@
 #include "common/dynamic_library.h"
 #include "common/fs/path_util.h"
 #include "common/logging.h"
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+#include <windows.h>
+#include <softpub.h>
+#include <wintrust.h>
+#include <sl_security.h>
+#endif
 #include "video_core/vulkan_common/vulkan_library.h"
 
 namespace Vulkan {
@@ -35,6 +41,47 @@ std::shared_ptr<Common::DynamicLibrary> OpenLibrary(
         }
     }
 #else
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    // Streamline's Vulkan integration is opt-in. Only load the NVIDIA-signed
+    // interposer from the executable directory using its absolute path.
+    {
+        wchar_t executable_path[MAX_PATH]{};
+        const DWORD executable_size =
+            GetModuleFileNameW(nullptr, executable_path, static_cast<DWORD>(std::size(executable_path)));
+        if (executable_size > 0 && executable_size < std::size(executable_path)) {
+            std::wstring interposer_path{executable_path, executable_size};
+            const auto separator = interposer_path.find_last_of(L"\\/");
+            if (separator != std::wstring::npos) {
+                interposer_path.resize(separator + 1);
+                interposer_path += L"sl.interposer.dll";
+
+                const bool signature_valid =
+                    sl::security::verifyEmbeddedSignature(interposer_path.c_str());
+                if (signature_valid) {
+                    auto streamline = std::make_shared<Common::DynamicLibrary>();
+                    if (streamline->Open(std::wstring_view{interposer_path})) {
+                        PFN_vkGetInstanceProcAddr sl_get_instance_proc_addr{};
+                        PFN_vkGetDeviceProcAddr sl_get_device_proc_addr{};
+                        const bool has_instance = streamline->GetSymbol(
+                            "vkGetInstanceProcAddr", &sl_get_instance_proc_addr);
+                        const bool has_device = streamline->GetSymbol(
+                            "vkGetDeviceProcAddr", &sl_get_device_proc_addr);
+                        if (has_instance && has_device) {
+                            LOG_INFO(Render_Vulkan,
+                                     "Using verified application-local Streamline Vulkan interposer");
+                            return streamline;
+                        }
+                        LOG_WARNING(Render_Vulkan,
+                                    "Verified Streamline interposer is missing Vulkan exports; falling back");
+                    }
+                } else {
+                    LOG_WARNING(Render_Vulkan,
+                                "Streamline interposer is absent or failed NVIDIA signature verification; falling back");
+                }
+            }
+        }
+    }
+#endif
     std::string filename = Common::DynamicLibrary::GetVersionedFilename("vulkan", 1);
     LOG_DEBUG(Render_Vulkan, "Trying Vulkan library: {}", filename);
     if (!library->Open(filename.c_str())) {

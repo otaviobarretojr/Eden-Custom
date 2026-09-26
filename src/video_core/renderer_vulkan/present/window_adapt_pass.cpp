@@ -69,6 +69,11 @@ void WindowAdaptPass::Draw(const Device& device, RasterizerVulkan& rasterizer, S
         layer_it++;
     }
 
+    // CreateWrappedRenderPass() finishes the destination attachment in GENERAL.
+    // Publish that state immediately after queuing this draw so downstream consumers can
+    // describe the presentation resource without guessing its Vulkan layout.
+    dst->layout = VK_IMAGE_LAYOUT_GENERAL;
+
     scheduler.Record([=](vk::CommandBuffer cmdbuf) {
         const f32 bg_red = Settings::values.bg_red.GetValue() / 255.0f;
         const f32 bg_green = Settings::values.bg_green.GetValue() / 255.0f;

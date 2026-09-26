@@ -250,12 +250,64 @@ public:
         return image_ranges;
     }
 
+    [[nodiscard]] VkImage ColorImage(size_t index) const noexcept {
+        if (index >= NUM_RT || !color_present[index] || rt_map[index] >= num_images) {
+            return VK_NULL_HANDLE;
+        }
+        return images[rt_map[index]];
+    }
+
+    [[nodiscard]] VkImageView ColorImageView(size_t index) const noexcept {
+        if (index >= NUM_RT || !color_present[index] || rt_map[index] >= num_images) {
+            return VK_NULL_HANDLE;
+        }
+        return image_views[rt_map[index]];
+    }
+
+    [[nodiscard]] const VkImageSubresourceRange* ColorImageRange(size_t index) const noexcept {
+        if (index >= NUM_RT || !color_present[index] || rt_map[index] >= num_images) {
+            return nullptr;
+        }
+        return &image_ranges[rt_map[index]];
+    }
+
+    [[nodiscard]] VkFormat ColorFormat(size_t index) const noexcept {
+        return index < NUM_RT && color_present[index] ? color_formats[index]
+                                                       : VK_FORMAT_UNDEFINED;
+    }
+
     [[nodiscard]] bool HasAspectColorBit(size_t index) const noexcept {
-        return (image_ranges.at(rt_map[index]).aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0;
+        return index < NUM_RT && color_present[index] && rt_map[index] < num_images &&
+               (image_ranges[rt_map[index]].aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0;
     }
 
     [[nodiscard]] bool HasAspectDepthBit() const noexcept {
         return has_depth;
+    }
+
+    [[nodiscard]] VkImage DepthImage() const noexcept {
+        if (!has_depth || num_images == 0) {
+            return VK_NULL_HANDLE;
+        }
+        return images[num_images - 1];
+    }
+
+    [[nodiscard]] VkImageView DepthImageView() const noexcept {
+        if (!has_depth || num_images == 0) {
+            return VK_NULL_HANDLE;
+        }
+        return image_views[num_images - 1];
+    }
+
+    [[nodiscard]] const VkImageSubresourceRange* DepthImageRange() const noexcept {
+        if (!has_depth || num_images == 0) {
+            return nullptr;
+        }
+        return &image_ranges[num_images - 1];
+    }
+
+    [[nodiscard]] VkFormat DepthFormat() const noexcept {
+        return depth_format;
     }
 
     [[nodiscard]] bool HasAspectStencilBit() const noexcept {
@@ -289,7 +341,11 @@ private:
     u32 num_images = 0;
     std::array<VkImage, 9> images{};
     std::array<VkImageSubresourceRange, 9> image_ranges{};
+    std::array<VkImageView, 9> image_views{};
     std::array<size_t, NUM_RT> rt_map{};
+    std::array<bool, NUM_RT> color_present{};
+    std::array<VkFormat, NUM_RT> color_formats{};
+    VkFormat depth_format{VK_FORMAT_UNDEFINED};
     bool has_depth{};
     bool has_stencil{};
     bool is_rescaled{};

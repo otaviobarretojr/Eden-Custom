@@ -213,6 +213,10 @@ void PresentManager::RecreateFrame(Frame* frame, u32 width, u32 height, VkFormat
 
     frame->width = width;
     frame->height = height;
+    frame->format = swapchain.GetImageFormat();
+    // Recreated presentation images start undefined. The draw pass owns the transition;
+    // do not claim a usable Streamline layout until that transition is explicitly tracked.
+    frame->layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     const bool with_storage = storage && frame->storage_capable;
     VkImageUsageFlags storage_usage = 0;
