@@ -673,16 +673,21 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
     // camera matrices or jitter until a title-specific semantic profile has been validated.
     // The observation store is a ring. Always select the newest matching binding instead of the
     // first physical slot, otherwise persistence and sample history become stale after wraparound.
-    const DlssUniformBindingObservation* previous = nullptr;
+    // Snapshot the newest matching observation instead of retaining a pointer into the ring.
+    // The destination slot selected below can be the same slot as the previous observation after
+    // wraparound; overwriting that slot would otherwise mutate the history while it is still being
+    // consulted by this bind.
+    std::optional<DlssUniformBindingObservation> previous_snapshot;
     for (const auto& entry : dlss_uniform_observations) {
         if (entry.bind_sequence == 0 || entry.stage != stage || entry.index != index ||
             entry.title_id != dlss_semantic_title_id) {
             continue;
         }
-        if (previous == nullptr || entry.bind_sequence > previous->bind_sequence) {
-            previous = &entry;
+        if (!previous_snapshot || entry.bind_sequence > previous_snapshot->bind_sequence) {
+            previous_snapshot = entry;
         }
     }
+    const auto* previous = previous_snapshot ? &*previous_snapshot : nullptr;
     // Guest uniform buffers commonly rotate backing addresses while preserving the same logical
     // shader binding. Continuity therefore belongs to (title, stage, binding, size), not to the
     // transient GPU address. Requiring address equality made every cross-frame match disappear in
