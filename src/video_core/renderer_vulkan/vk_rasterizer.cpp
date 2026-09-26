@@ -738,14 +738,21 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
     // addresses can become stale before a diagnostic sample is taken; reading them directly from
     // this passive probe must never be allowed to destabilize emulation. Re-enable bounded sampling
     // only after the address can be validated against the active guest mapping.
-    constexpr bool EnableDlssGuestUniformSampling = false;
+    constexpr bool EnableDlssGuestUniformSampling = true;
     if (EnableDlssGuestUniformSampling && observation.temporal_diagnostic_candidate &&
         gpu_addr != 0 && size != 0 && (dlss_temporal_frame_index % 120) == 0 &&
         (previous == nullptr || previous->last_sampled_frame != dlss_temporal_frame_index)) {
         constexpr size_t MaxSampleBytes = 512;
         std::array<u8, MaxSampleBytes> sample{};
         const size_t sample_size = std::min<size_t>(size, sample.size());
-        device_memory.ReadBlock(gpu_addr, sample.data(), sample_size);
+        // Never call ReadBlock from this passive diagnostic path. GetSpan validates that the
+        // requested range currently has contiguous guest backing and returns nullptr otherwise,
+        // so a rotating/stale UBO address is skipped instead of being walked or flushed.
+        const u8* const mapped_sample = device_memory.GetSpan(gpu_addr, sample_size);
+        if (mapped_sample == nullptr) {
+            return;
+        }
+        std::memcpy(sample.data(), mapped_sample, sample_size);
         u64 fingerprint = 1469598103934665603ULL;
         for (size_t i = 0; i < sample_size; ++i) {
             fingerprint ^= sample[i];
