@@ -4,6 +4,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 
 namespace Common {
 
@@ -54,6 +55,9 @@ public:
     /// Loads (or replaces) the handle with the specified library file name.
     /// Returns true if the library was loaded and can be used.
     [[nodiscard]] bool Open(const char* filename);
+#ifdef _WIN32
+    [[nodiscard]] bool Open(std::wstring_view filename);
+#endif
 
     /// Unloads the library, any function pointers from this library are no longer valid.
     void Close();
