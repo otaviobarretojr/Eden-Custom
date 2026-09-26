@@ -14,7 +14,6 @@
 #include <array>
 #include <string_view>
 #include <windows.h>
-#include <sl_security.h>
 #endif
 #include "video_core/vulkan_common/vulkan_library.h"
 
@@ -55,22 +54,21 @@ std::shared_ptr<Common::DynamicLibrary> OpenLibrary(
                 interposer_path.resize(separator + 1);
                 interposer_path += L"sl.interposer.dll";
 
-                if (sl::security::verifyEmbeddedSignature(interposer_path.c_str())) {
-                    auto streamline = std::make_shared<Common::DynamicLibrary>();
-                    if (streamline->Open(std::wstring_view{interposer_path})) {
-                        PFN_vkGetInstanceProcAddr get_instance_proc_addr{};
-                        PFN_vkGetDeviceProcAddr get_device_proc_addr{};
-                        const bool has_instance =
-                            streamline->GetSymbol("vkGetInstanceProcAddr",
-                                                  &get_instance_proc_addr);
-                        const bool has_device =
-                            streamline->GetSymbol("vkGetDeviceProcAddr",
-                                                  &get_device_proc_addr);
-                        if (has_instance && has_device) {
-                            LOG_INFO(Render_Vulkan,
-                                     "Using verified application-local Streamline Vulkan interposer");
-                            return streamline;
-                        }
+                auto streamline = std::make_shared<Common::DynamicLibrary>();
+                if (streamline->Open(std::wstring_view{interposer_path})) {
+                    PFN_vkGetInstanceProcAddr get_instance_proc_addr{};
+                    PFN_vkGetDeviceProcAddr get_device_proc_addr{};
+                    const bool has_instance =
+                        streamline->GetSymbol("vkGetInstanceProcAddr",
+                                              &get_instance_proc_addr);
+                    const bool has_device =
+                        streamline->GetSymbol("vkGetDeviceProcAddr",
+                                              &get_device_proc_addr);
+                    if (has_instance && has_device) {
+                        LOG_INFO(Render_Vulkan,
+                                 "Using application-local Streamline Vulkan interposer verified "
+                                 "during bootstrap");
+                        return streamline;
                     }
                 }
             }
