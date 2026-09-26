@@ -73,6 +73,28 @@ option(ENABLE_UPDATE_CHECKER "Enable update checker (for Qt and Android)" OFF)
 cmake_dependent_option(YUZU_USE_QT_MULTIMEDIA "Use QtMultimedia for Camera"  OFF "NOT YUZU_USE_BUNDLED_QT" OFF)
 cmake_dependent_option(YUZU_USE_QT_WEB_ENGINE "Use QtWebEngine for web applet implementation" OFF "NOT YUZU_USE_BUNDLED_QT" OFF)
 set(YUZU_QT_MIRROR "" CACHE STRING "What mirror to use for downloading the bundled Qt libraries")
+
+# NVIDIA Streamline bootstrap for the experimental DLSS 5 compatibility path.
+# Disabled by default: normal Eden builds never load Streamline or NVIDIA runtime DLLs.
+cmake_dependent_option(ENABLE_NVIDIA_STREAMLINE "Enable experimental NVIDIA Streamline bootstrap" OFF "WIN32 AND ARCHITECTURE_x86_64" OFF)
+set(STREAMLINE_SDK_ROOT "" CACHE PATH "Path to an NVIDIA Streamline SDK 2.14.x package")
+if (ENABLE_NVIDIA_STREAMLINE)
+    if (NOT EXISTS "${STREAMLINE_SDK_ROOT}/include/sl.h")
+        message(FATAL_ERROR "ENABLE_NVIDIA_STREAMLINE requires STREAMLINE_SDK_ROOT/include/sl.h")
+    endif()
+    if (NOT EXISTS "${STREAMLINE_SDK_ROOT}/include/sl_security.h")
+        message(FATAL_ERROR "ENABLE_NVIDIA_STREAMLINE requires STREAMLINE_SDK_ROOT/include/sl_security.h")
+    endif()
+    if (NOT EXISTS "${STREAMLINE_SDK_ROOT}/bin/x64/sl.interposer.dll")
+        message(FATAL_ERROR "ENABLE_NVIDIA_STREAMLINE requires bin/x64/sl.interposer.dll")
+    endif()
+    if (NOT EXISTS "${STREAMLINE_SDK_ROOT}/bin/x64/sl.common.dll")
+        message(FATAL_ERROR "ENABLE_NVIDIA_STREAMLINE requires bin/x64/sl.common.dll")
+    endif()
+    add_compile_definitions(HAS_NVIDIA_STREAMLINE)
+    include_directories(SYSTEM "${STREAMLINE_SDK_ROOT}/include")
+    message(STATUS "Experimental NVIDIA Streamline core bootstrap enabled")
+endif()
 cmake_dependent_option(YUZU_USE_BUNDLED_QT "Download bundled Qt binaries" "${MSVC}" "ENABLE_QT" OFF)
 
 # non-linux bundled qt are static
