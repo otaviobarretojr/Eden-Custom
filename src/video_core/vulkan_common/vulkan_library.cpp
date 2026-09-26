@@ -9,6 +9,13 @@
 #include "common/dynamic_library.h"
 #include "common/fs/path_util.h"
 #include "common/logging.h"
+#include "video_core/vulkan_common/streamline_bootstrap.h"
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+#include <array>
+#include <string_view>
+#include <windows.h>
+#include <sl_security.h>
+#endif
 #include "video_core/vulkan_common/vulkan_library.h"
 
 namespace Vulkan {
@@ -35,6 +42,45 @@ std::shared_ptr<Common::DynamicLibrary> OpenLibrary(
         }
     }
 #else
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    if (IsStreamlineBootstrapReady()) {
+        std::array<wchar_t, 32768> executable_path{};
+        const DWORD executable_size =
+            GetModuleFileNameW(nullptr, executable_path.data(),
+                               static_cast<DWORD>(executable_path.size()));
+        if (executable_size > 0 && executable_size < executable_path.size()) {
+            std::wstring interposer_path{executable_path.data(), executable_size};
+            const auto separator = interposer_path.find_last_of(L"\\/");
+            if (separator != std::wstring::npos) {
+                interposer_path.resize(separator + 1);
+                interposer_path += L"sl.interposer.dll";
+
+                if (sl::security::verifyEmbeddedSignature(interposer_path.c_str())) {
+                    auto streamline = std::make_shared<Common::DynamicLibrary>();
+                    if (streamline->Open(std::wstring_view{interposer_path})) {
+                        PFN_vkGetInstanceProcAddr get_instance_proc_addr{};
+                        PFN_vkGetDeviceProcAddr get_device_proc_addr{};
+                        const bool has_instance =
+                            streamline->GetSymbol("vkGetInstanceProcAddr",
+                                                  &get_instance_proc_addr);
+                        const bool has_device =
+                            streamline->GetSymbol("vkGetDeviceProcAddr",
+                                                  &get_device_proc_addr);
+                        if (has_instance && has_device) {
+                            LOG_INFO(Render_Vulkan,
+                                     "Using verified application-local Streamline Vulkan interposer");
+                            return streamline;
+                        }
+                    }
+                }
+            }
+        }
+
+        LOG_WARNING(Render_Vulkan,
+                    "Streamline core initialized but its verified Vulkan interposer could not be "
+                    "used; falling back to the system Vulkan loader");
+    }
+#endif
     std::string filename = Common::DynamicLibrary::GetVersionedFilename("vulkan", 1);
     LOG_DEBUG(Render_Vulkan, "Trying Vulkan library: {}", filename);
     if (!library->Open(filename.c_str())) {
