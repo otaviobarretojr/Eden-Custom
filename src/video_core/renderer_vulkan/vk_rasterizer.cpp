@@ -750,8 +750,9 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
         // so a rotating/stale UBO address is skipped instead of being walked or flushed.
         const u8* const mapped_sample = device_memory.GetSpan(gpu_addr, sample_size);
         if (mapped_sample == nullptr) {
-            return;
-        }
+            // Leave this observation unsampled. The remaining semantic correlation still runs,
+            // and a later bind/frame may provide a currently mapped backing span.
+        } else {
         std::memcpy(sample.data(), mapped_sample, sample_size);
         u64 fingerprint = 1469598103934665603ULL;
         for (size_t i = 0; i < sample_size; ++i) {
@@ -798,6 +799,7 @@ void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAd
             normalized_float_count * 2 >= finite_float_count;
         observation.sampled = true;
         ++dlss_uniform_sample_count;
+        }
     }
 
     // Shader correlation is filled only when a single fragment producer is known for the frame.
