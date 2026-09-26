@@ -1,0 +1,161 @@
+name: DLSS5 Streamline Probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - exp/dlss5-nr-filter
+    paths:
+      - "CMakeLists.txt"
+      - "src/common/**"
+      - "src/video_core/**"
+      - ".github/workflows/dlss5-streamline-probe.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dlss5-streamline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout Eden Custom
+        uses: actions/checkout@v4
+
+      - name: Install Vulkan SDK
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass
+          ./tools/windows/install-vulkan-sdk.ps1
+
+      - name: Cache CPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: .cache/cpm
+          key: eden-cpm-dlss5-windows-${{ hashFiles('cpmfile.json', 'CMakeLists.txt', 'CMakeModules/**/*.cmake') }}
+          restore-keys: |
+            eden-cpm-dlss5-windows-
+            eden-cpm-windows-
+
+      - name: Cache Streamline 2.14.1
+        uses: actions/cache@v4
+        with:
+          path: .cache/streamline-v2.14.1
+          key: streamline-v2.14.1-x64-92c4d954631a1710da86ca3fa8d5034f2b9503838c95fc4ae977ae149319781b
+
+      - name: Fetch and verify Streamline 2.14.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $cache = Join-Path $PWD ".cache/streamline-v2.14.1"
+          $zip = Join-Path $cache "streamline-sdk-v2.14.1.zip"
+          $extract = Join-Path $cache "extracted"
+          $expected = "92c4d954631a1710da86ca3fa8d5034f2b9503838c95fc4ae977ae149319781b"
+          $url = "https://github.com/NVIDIA-RTX/Streamline/releases/download/v2.14.1/streamline-sdk-v2.14.1.zip"
+
+          New-Item -ItemType Directory -Force -Path $cache | Out-Null
+
+          if (-not (Test-Path $zip)) {
+            Write-Host "Downloading pinned Streamline SDK 2.14.1..."
+            & curl.exe -L --fail --show-error --retry 4 --retry-delay 5 --connect-timeout 30 --max-time 1800 -o $zip $url
+            if ($LASTEXITCODE -ne 0) { throw "Streamline SDK download failed" }
+          }
+
+          $actual = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+          Write-Host "Streamline SHA256=$actual"
+          if ($actual -ne $expected) {
+            throw "Streamline SDK SHA256 mismatch"
+          }
+
+          if (-not (Test-Path $extract)) {
+            New-Item -ItemType Directory -Force -Path $extract | Out-Null
+            Expand-Archive -Path $zip -DestinationPath $extract -Force
+          }
+
+          $slHeader = Get-ChildItem -Path $extract -Recurse -Filter sl.h -File |
+            Where-Object { $_.Directory.Name -eq "include" } |
+            Select-Object -First 1
+          if (-not $slHeader) { throw "Streamline include/sl.h not found after extraction" }
+
+          $root = Split-Path $slHeader.Directory.FullName -Parent
+          Write-Host "STREAMLINE_SDK_ROOT=$root"
+
+          foreach ($relative in @(
+            "include/sl.h",
+            "include/sl_security.h",
+            "bin/x64/sl.interposer.dll",
+            "bin/x64/sl.common.dll",
+            "bin/x64/sl.pcl.dll"
+          )) {
+            $candidate = Join-Path $root $relative
+            if (-not (Test-Path $candidate)) {
+              throw "Missing required Streamline file: $relative"
+            }
+          }
+
+          "STREAMLINE_SDK_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Configure MSVC Release with Streamline
+        shell: powershell
+        run: |
+          $cmakeArgs = @(
+            "-S", ".",
+            "-B", "build-dlss5",
+            "-G", "Visual Studio 17 2022",
+            "-A", "x64",
+            "-DYUZU_TESTS=OFF",
+            "-DDYNARMIC_TESTS=OFF",
+            "-DENABLE_QT=ON",
+            "-DENABLE_QT_TRANSLATION=ON",
+            "-DYUZU_USE_BUNDLED_QT=ON",
+            "-DENABLE_NVIDIA_STREAMLINE=ON",
+            "-DSTREAMLINE_SDK_ROOT=$env:STREAMLINE_SDK_ROOT",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CXX_FLAGS=/arch:AVX2"
+          )
+          & cmake @cmakeArgs
+          if ($LASTEXITCODE -ne 0) { throw "Streamline configure failed" }
+
+      - name: Build Eden with Streamline core
+        shell: powershell
+        run: |
+          cmake --build build-dlss5 --config Release --target yuzu --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "Streamline build failed" }
+
+      - name: Validate Streamline runtime package
+        shell: powershell
+        run: |
+          $eden = Get-ChildItem -Path build-dlss5/bin -Recurse -Filter eden.exe -File | Select-Object -First 1
+          if (-not $eden) { throw "eden.exe was not produced" }
+
+          foreach ($name in @("sl.interposer.dll", "sl.common.dll", "sl.pcl.dll")) {
+            $file = Join-Path $eden.Directory.FullName $name
+            if (-not (Test-Path $file)) { throw "$name was not staged beside eden.exe" }
+          }
+
+          New-Item -ItemType Directory -Force -Path dlss5-package | Out-Null
+          Copy-Item $eden.FullName dlss5-package/eden.exe
+          Get-ChildItem -Path $eden.Directory.FullName -Filter *.dll -File |
+            ForEach-Object { Copy-Item $_.FullName dlss5-package/ }
+
+          @(
+            "Eden Custom DLSS 5 compatibility probe"
+            "Commit: $env:GITHUB_SHA"
+            "Streamline SDK: 2.14.1"
+            "Streamline SHA256: 92c4d954631a1710da86ca3fa8d5034f2b9503838c95fc4ae977ae149319781b"
+            "Neural Rendering evaluation: NOT ENABLED YET"
+            "Purpose: validate secure pre-Vulkan Streamline core bootstrap and final-frame tap"
+          ) | Set-Content -Encoding UTF8 dlss5-package/DLSS5_PROBE.txt
+
+      - name: Upload DLSS5 Streamline probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: Eden-Custom-DLSS5-Streamline-Probe
+          path: dlss5-package/**
+          if-no-files-found: error
+          retention-days: 14
