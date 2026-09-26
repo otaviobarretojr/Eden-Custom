@@ -21,6 +21,7 @@
 #include "video_core/renderer_vulkan/vk_state_tracker.h"
 #include "video_core/renderer_vulkan/vk_swapchain.h"
 #include "video_core/renderer_vulkan/vk_turbo_mode.h"
+#include "video_core/vulkan_common/streamline_bootstrap.h"
 #include "video_core/vulkan_common/vulkan_device.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
@@ -76,6 +77,7 @@ private:
     Tegra::MaxwellDeviceMemoryManager& device_memory;
     Tegra::GPU& gpu;
 
+    StreamlineBootstrap streamline_bootstrap;
     std::shared_ptr<Common::DynamicLibrary> library;
     vk::InstanceDispatch dld;
 
