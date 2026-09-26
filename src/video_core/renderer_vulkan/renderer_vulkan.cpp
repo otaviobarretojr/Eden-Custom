@@ -124,6 +124,7 @@ try
     // Create surface
     , surface(CreateSurface(instance, render_window.GetWindowInfo()))
     , device(CreateDevice(instance, dld, *surface))
+    , dlss5_compatibility(device)
     , memory_allocator(device)
     , state_tracker()
     , scheduler(device, state_tracker)
@@ -197,6 +198,7 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
     blit_swapchain.DrawToFrame(rasterizer, frame, framebuffers,
                                render_window.GetFramebufferLayout(), swapchain.GetImageCount(),
                                swapchain.GetImageViewFormat());
+    dlss5_compatibility.ObservePresentFrame(*frame);
     scheduler.Flush(*frame->render_ready);
 
     present_manager.Present(frame);

@@ -13,6 +13,7 @@
 #include "common/dynamic_library.h"
 #include "video_core/host1x/gpu_device_memory_manager.h"
 #include "video_core/renderer_base.h"
+#include "video_core/renderer_vulkan/present/dlss5_compatibility.h"
 #include "video_core/renderer_vulkan/vk_blit_screen.h"
 #include "video_core/renderer_vulkan/vk_present_manager.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
@@ -86,6 +87,7 @@ private:
     vk::SurfaceKHR surface;
 
     Device device;
+    Dlss5CompatibilityFilter dlss5_compatibility;
     MemoryAllocator memory_allocator;
     StateTracker state_tracker;
     Scheduler scheduler;
