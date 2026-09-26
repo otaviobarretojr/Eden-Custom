@@ -120,6 +120,8 @@ add_library(video_core STATIC
 
     # Vulkan
     renderer_vulkan/present/anti_alias_pass.h
+    renderer_vulkan/present/dlss_probe.cpp
+    renderer_vulkan/present/dlss_probe.h
     renderer_vulkan/present/filters.cpp
     renderer_vulkan/present/filters.h
     renderer_vulkan/present/fsr.cpp
@@ -427,6 +429,24 @@ target_link_libraries(video_core PRIVATE sirit::sirit)
 
 # Header-only stuff needed by all dependent targets
 target_link_libraries(video_core PUBLIC Vulkan::Headers Vulkan::UtilityHeaders GPUOpen::VulkanMemoryAllocator)
+
+target_sources(video_core PRIVATE
+    vulkan_common/streamline_runtime.cpp
+    vulkan_common/streamline_runtime.h
+)
+
+if (ENABLE_NVIDIA_STREAMLINE AND WIN32)
+    target_link_libraries(video_core PRIVATE
+        wintrust
+        "${STREAMLINE_SDK_ROOT}/lib/x64/sl.interposer.lib"
+    )
+    add_custom_command(TARGET video_core POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${STREAMLINE_SDK_ROOT}/bin/x64/sl.interposer.dll"
+            "$<TARGET_FILE_DIR:video_core>/sl.interposer.dll"
+        COMMENT "Staging NVIDIA Streamline Vulkan interposer"
+    )
+endif()
 
 if (ENABLE_NSIGHT_AFTERMATH)
     if (NOT DEFINED ENV{NSIGHT_AFTERMATH_SDK})

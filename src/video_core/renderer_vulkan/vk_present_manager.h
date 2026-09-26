@@ -37,6 +37,8 @@ struct Frame {
     vk::Semaphore render_ready;
     vk::Fence present_done;
     bool storage_capable{};
+    VkFormat format{VK_FORMAT_UNDEFINED};
+    VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
 };
 
 class PresentManager {

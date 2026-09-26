@@ -91,6 +91,14 @@ bool DynamicLibrary::Open(const char* filename) {
     return handle != nullptr;
 }
 
+#ifdef _WIN32
+bool DynamicLibrary::Open(std::wstring_view filename) {
+    const std::wstring null_terminated{filename};
+    handle = reinterpret_cast<void*>(LoadLibraryW(null_terminated.c_str()));
+    return handle != nullptr;
+}
+#endif
+
 void DynamicLibrary::Close() {
     if (!IsOpen())
         return;

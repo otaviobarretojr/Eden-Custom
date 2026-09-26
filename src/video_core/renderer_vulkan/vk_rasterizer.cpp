@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <iterator>
 #include <memory>
 #include <mutex>
 
@@ -251,6 +252,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
     if (!pipeline->Configure(is_indexed))
         return;
 
+    TrackDlssFragmentOutputs(*pipeline);
     UpdateDynamicStates();
 
     query_cache.NotifySegment(true);
@@ -666,6 +668,180 @@ void RasterizerVulkan::Query(GPUVAddr gpu_addr, VideoCommon::QueryType type,
 
 void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAddr gpu_addr,
                                                  u32 size) {
+    ++dlss_uniform_bind_call_count;
+    // Passive DLSS temporal discovery only: retain binding metadata, never interpret guest bytes as
+    // camera matrices or jitter until a title-specific semantic profile has been validated.
+    // The observation store is a ring. Always select the newest matching binding instead of the
+    // first physical slot, otherwise persistence and sample history become stale after wraparound.
+    // Snapshot the newest matching observation instead of retaining a pointer into the ring.
+    // The destination slot selected below can be the same slot as the previous observation after
+    // wraparound; overwriting that slot would otherwise mutate the history while it is still being
+    // consulted by this bind.
+    std::optional<DlssUniformBindingObservation> previous_snapshot;
+    for (const auto& entry : dlss_uniform_observations) {
+        if (entry.bind_sequence == 0 || entry.stage != stage || entry.index != index ||
+            entry.title_id != dlss_semantic_title_id) {
+            continue;
+        }
+        if (!previous_snapshot || entry.bind_sequence > previous_snapshot->bind_sequence) {
+            previous_snapshot = entry;
+        }
+    }
+    const auto* previous = previous_snapshot ? &*previous_snapshot : nullptr;
+    // Guest uniform buffers commonly rotate backing addresses while preserving the same logical
+    // shader binding. Continuity therefore belongs to (title, stage, binding, size), not to the
+    // transient GPU address. Requiring address equality made every cross-frame match disappear in
+    // Pokémon Violet even though same-frame rebinds were abundant.
+    const bool same_size = previous != nullptr && previous->size == size;
+    const bool same_address_size = same_size && previous->gpu_addr == gpu_addr;
+    const bool same_frame = same_size && previous->frame_index == dlss_temporal_frame_index;
+    const bool next_frame = same_size && previous->frame_index + 1 == dlss_temporal_frame_index;
+    if (same_address_size) {
+        ++dlss_uniform_same_address_size_count;
+    }
+    if (same_frame) {
+        ++dlss_uniform_same_frame_match_count;
+    }
+    if (next_frame) {
+        ++dlss_uniform_next_frame_match_count;
+    }
+    // Rebinding within one emulated frame keeps the streak unchanged. A matching logical binding
+    // in the next frame advances it even when the guest rotates to a different backing address.
+    const u32 consecutive_frames =
+        same_frame ? previous->consecutive_frames
+                   : (next_frame ? previous->consecutive_frames + 1 : 1);
+    // A temporal constant block commonly needs enough room for matrices and camera data. This is
+    // only a diagnostic size filter: it must never be treated as semantic validation.
+    const bool plausible_temporal_size = size >= 64 && size <= 4096 && (size % 16) == 0;
+    auto& observation =
+        dlss_uniform_observations[dlss_uniform_observation_cursor++ % dlss_uniform_observations.size()];
+    ++dlss_uniform_observation_count;
+    observation = {
+        .stage = stage,
+        .index = index,
+        .gpu_addr = gpu_addr,
+        .size = size,
+        .title_id = dlss_semantic_title_id,
+        .bind_sequence = ++dlss_uniform_bind_sequence,
+        .frame_index = dlss_temporal_frame_index,
+        .consecutive_frames = consecutive_frames,
+        .stable_binding = consecutive_frames >= 8,
+        .plausible_temporal_size = plausible_temporal_size,
+        .temporal_diagnostic_candidate = consecutive_frames >= 8 && plausible_temporal_size,
+    };
+    // Sample only mature diagnostic candidates, at most once every 120 temporal frames. Keep
+    // only a compact fingerprint: raw guest constant bytes are never retained by the probe.
+    if (observation.temporal_diagnostic_candidate) {
+        ++dlss_uniform_mature_candidate_count;
+    }
+    // Crash-isolation guard: keep temporal continuity discovery metadata-only. Rotating guest
+    // addresses can become stale before a diagnostic sample is taken; reading them directly from
+    // this passive probe must never be allowed to destabilize emulation. Re-enable bounded sampling
+    // only after the address can be validated against the active guest mapping.
+    constexpr bool EnableDlssGuestUniformSampling = false;
+    if (EnableDlssGuestUniformSampling && observation.temporal_diagnostic_candidate &&
+        gpu_addr != 0 && size != 0 && (dlss_temporal_frame_index % 120) == 0 &&
+        (previous == nullptr || previous->last_sampled_frame != dlss_temporal_frame_index)) {
+        constexpr size_t MaxSampleBytes = 512;
+        std::array<u8, MaxSampleBytes> sample{};
+        const size_t sample_size = std::min<size_t>(size, sample.size());
+        device_memory.ReadBlock(gpu_addr, sample.data(), sample_size);
+        u64 fingerprint = 1469598103934665603ULL;
+        for (size_t i = 0; i < sample_size; ++i) {
+            fingerprint ^= sample[i];
+            fingerprint *= 1099511628211ULL;
+        }
+        const bool has_previous_sample = previous != nullptr &&
+                                         previous->sampled;
+        const u32 sample_count = has_previous_sample ? previous->sample_count + 1 : 1;
+        const bool fingerprint_changed = has_previous_sample &&
+                                         previous->sample_fingerprint != fingerprint;
+        const u32 fingerprint_change_count =
+            (has_previous_sample ? previous->fingerprint_change_count : 0) +
+            (fingerprint_changed ? 1 : 0);
+        observation.last_sampled_frame = dlss_temporal_frame_index;
+        observation.previous_sample_fingerprint =
+            has_previous_sample ? previous->sample_fingerprint : 0;
+        observation.sample_fingerprint = fingerprint;
+        observation.sample_count = sample_count;
+        observation.fingerprint_change_count = fingerprint_change_count;
+        observation.temporally_dynamic = sample_count >= 3 && fingerprint_change_count >= 2;
+
+        // Retain only coarse structural metrics from the bounded sample. These are diagnostic
+        // heuristics, never semantic proof that the block contains camera or jitter constants.
+        const size_t float_count = sample_size / sizeof(float);
+        u32 finite_float_count = 0;
+        u32 normalized_float_count = 0;
+        for (size_t offset = 0; offset + sizeof(float) <= sample_size; offset += sizeof(float)) {
+            float value{};
+            std::memcpy(&value, sample.data() + offset, sizeof(value));
+            if (!std::isfinite(value)) {
+                continue;
+            }
+            ++finite_float_count;
+            if (std::abs(value) <= 1.0F) {
+                ++normalized_float_count;
+            }
+        }
+        observation.sampled_float_count = static_cast<u32>(float_count);
+        observation.finite_float_count = finite_float_count;
+        observation.normalized_float_count = normalized_float_count;
+        observation.matrix_shape_candidate =
+            float_count >= 16 && finite_float_count * 4 >= float_count * 3 &&
+            normalized_float_count * 2 >= finite_float_count;
+        observation.sampled = true;
+        ++dlss_uniform_sample_count;
+    }
+
+    // Shader correlation is filled only when a single fragment producer is known for the frame.
+    // Multiple fragment producers deliberately leave the observation unverified.
+    for (u32 slot = 0; slot < dlss_fragment_output_slots.size(); ++slot) {
+        if (!dlss_fragment_output_slots[slot] || dlss_fragment_output_ambiguous[slot]) {
+            continue;
+        }
+        const u64 producer_hash = dlss_fragment_output_hashes[slot];
+        if (producer_hash == 0 || observation.fragment_producer_unambiguous) {
+            observation.fragment_shader_hash = 0;
+            observation.fragment_producer_unambiguous = false;
+            break;
+        }
+        observation.fragment_shader_hash = producer_hash;
+        observation.fragment_producer_unambiguous = true;
+    }
+    observation.strong_temporal_candidate =
+        observation.stable_binding && observation.plausible_temporal_size &&
+        observation.temporally_dynamic && observation.title_id != 0 &&
+        observation.fragment_producer_unambiguous && observation.fragment_shader_hash != 0;
+    // This gate only selects bindings worth inspecting during a real title run. It deliberately
+    // does not promote guest metadata to validated camera/jitter semantics.
+    observation.semantic_probe_candidate =
+        observation.strong_temporal_candidate && observation.matrix_shape_candidate;
+    if (observation.sampled &&
+        observation.last_sampled_frame == dlss_temporal_frame_index) {
+        // Emit every mature sampled binding, not only bindings that pass the final semantic
+        // heuristic. This keeps the probe fail-closed while making each rejected gate visible
+        // during a real title run. Raw guest bytes are still never logged.
+        LOG_INFO(Render_Vulkan,
+                 "DLSS temporal UBO probe: frame={} title={:016x} stage={} binding={} size={} "
+                 "stable={} plausible_size={} dynamic={} producer={} shader={:016x} "
+                 "samples={} changes={} floats={} finite={} normalized={} matrix_shape={} "
+                 "strong={} semantic={} reject_stable={} reject_size={} reject_dynamic={} "
+                 "reject_title={} reject_producer={} reject_matrix={}",
+                 observation.frame_index, observation.title_id, observation.stage,
+                 observation.index, observation.size, observation.stable_binding,
+                 observation.plausible_temporal_size, observation.temporally_dynamic,
+                 observation.fragment_producer_unambiguous, observation.fragment_shader_hash,
+                 observation.sample_count, observation.fingerprint_change_count,
+                 observation.sampled_float_count, observation.finite_float_count,
+                 observation.normalized_float_count, observation.matrix_shape_candidate,
+                 observation.strong_temporal_candidate, observation.semantic_probe_candidate,
+                 !observation.stable_binding, !observation.plausible_temporal_size,
+                 !observation.temporally_dynamic, observation.title_id == 0,
+                 !observation.fragment_producer_unambiguous ||
+                     observation.fragment_shader_hash == 0,
+                 !observation.matrix_shape_candidate);
+    }
+
     buffer_cache.BindGraphicsUniformBuffer(stage, index, gpu_addr, size);
 }
 
@@ -1975,6 +2151,360 @@ void RasterizerVulkan::ReleaseChannel(s32 channel_id) {
     }
     pipeline_cache.EraseChannel(channel_id);
     query_cache.EraseChannel(channel_id);
+}
+
+RasterizerVulkan::DlssDepthCandidate RasterizerVulkan::GetDlssDepthCandidate() {
+    std::scoped_lock lock{texture_cache.mutex};
+    const Framebuffer* const framebuffer = texture_cache.GetFramebuffer();
+    if (!framebuffer || !framebuffer->HasAspectDepthBit()) {
+        return {};
+    }
+
+    const VkImageSubresourceRange* const range = framebuffer->DepthImageRange();
+    if (!range) {
+        return {};
+    }
+
+    return {
+        .image = framebuffer->DepthImage(),
+        .view = framebuffer->DepthImageView(),
+        .extent = framebuffer->RenderArea(),
+        .range = *range,
+        .layout = VK_IMAGE_LAYOUT_GENERAL,
+        .format = framebuffer->DepthFormat(),
+    };
+}
+
+
+std::vector<RasterizerVulkan::DlssColorCandidate> RasterizerVulkan::GetDlssColorCandidates() {
+    std::scoped_lock lock{texture_cache.mutex};
+    const Framebuffer* const framebuffer = texture_cache.GetFramebuffer();
+    if (!framebuffer) {
+        return {};
+    }
+
+    std::vector<DlssColorCandidate> candidates;
+    candidates.reserve(NUM_RT);
+    for (u32 slot = 0; slot < NUM_RT; ++slot) {
+        const VkImage image = framebuffer->ColorImage(slot);
+        const VkImageSubresourceRange* const range = framebuffer->ColorImageRange(slot);
+        if (image == VK_NULL_HANDLE || !range ||
+            (range->aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) == 0) {
+            continue;
+        }
+        candidates.push_back({
+            .image = image,
+            .view = framebuffer->ColorImageView(slot),
+            .extent = framebuffer->RenderArea(),
+            .range = *range,
+            .layout = VK_IMAGE_LAYOUT_GENERAL,
+            .format = framebuffer->ColorFormat(slot),
+            .slot = slot,
+        });
+    }
+    return candidates;
+}
+
+
+RasterizerVulkan::DlssFramebufferSnapshot RasterizerVulkan::GetDlssFramebufferSnapshot() {
+    std::scoped_lock lock{texture_cache.mutex};
+    DlssFramebufferSnapshot snapshot{};
+    const Framebuffer* const framebuffer = texture_cache.GetFramebuffer();
+    if (!framebuffer) {
+        return snapshot;
+    }
+
+    if (framebuffer->HasAspectDepthBit()) {
+        if (const VkImageSubresourceRange* const range = framebuffer->DepthImageRange()) {
+            snapshot.depth = {
+                .image = framebuffer->DepthImage(),
+                .view = framebuffer->DepthImageView(),
+                .extent = framebuffer->RenderArea(),
+                .range = *range,
+                .layout = VK_IMAGE_LAYOUT_GENERAL,
+                .format = framebuffer->DepthFormat(),
+            };
+        }
+    }
+
+    snapshot.colors.reserve(NUM_RT);
+    for (u32 slot = 0; slot < NUM_RT; ++slot) {
+        const VkImage image = framebuffer->ColorImage(slot);
+        const VkImageSubresourceRange* const range = framebuffer->ColorImageRange(slot);
+        if (image == VK_NULL_HANDLE || !range ||
+            (range->aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) == 0) {
+            continue;
+        }
+        snapshot.colors.push_back({
+            .image = image,
+            .view = framebuffer->ColorImageView(slot),
+            .extent = framebuffer->RenderArea(),
+            .range = *range,
+            .layout = VK_IMAGE_LAYOUT_GENERAL,
+            .format = framebuffer->ColorFormat(slot),
+            .slot = slot,
+        });
+    }
+    return snapshot;
+}
+
+
+bool RasterizerVulkan::IsVerifiedDlssMotionSignature(
+    const DlssMotionSemanticSignature& signature) noexcept {
+    // Semantic verification is intentionally opt-in. A heuristic candidate must never promote
+    // itself to Verified merely because its resource identity remains stable. Future entries
+    // require an independently validated title/shader/MRT/format signature.
+    if (!signature.IsComplete()) {
+        return false;
+    }
+    return false;
+}
+
+
+void RasterizerVulkan::TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline) {
+    std::scoped_lock lock{dlss_candidate_mutex};
+    for (u32 slot = 0; slot < dlss_fragment_output_slots.size(); ++slot) {
+        if (pipeline.FragmentStoresColor(slot)) {
+            const u64 producer_hash = pipeline.FragmentShaderHash();
+            if (dlss_fragment_output_slots[slot] &&
+                dlss_fragment_output_hashes[slot] != producer_hash) {
+                dlss_fragment_output_ambiguous[slot] = true;
+            } else if (!dlss_fragment_output_slots[slot]) {
+                dlss_fragment_output_hashes[slot] = producer_hash;
+            }
+            dlss_fragment_output_slots[slot] = true;
+        }
+    }
+}
+
+void RasterizerVulkan::TrackDlssTemporalCandidates(u64 frame_index) {
+    dlss_temporal_frame_index = frame_index;
+    if ((frame_index % 120) == 0) {
+        LOG_INFO(Render_Vulkan,
+                 "DLSS UBO pipeline heartbeat: frame={} title={:016x} bind_calls={} "
+                 "observations={} mature={} samples={} same_addr_size={} same_frame={} "
+                 "next_frame={} ring_cursor={}",
+                 frame_index, dlss_semantic_title_id, dlss_uniform_bind_call_count,
+                 dlss_uniform_observation_count, dlss_uniform_mature_candidate_count,
+                 dlss_uniform_sample_count, dlss_uniform_same_address_size_count,
+                 dlss_uniform_same_frame_match_count, dlss_uniform_next_frame_match_count,
+                 dlss_uniform_observation_cursor);
+    }
+    const auto framebuffer_snapshot = GetDlssFramebufferSnapshot();
+    const auto& candidates = framebuffer_snapshot.colors;
+    const auto& depth = framebuffer_snapshot.depth;
+    const auto IsMotionCompatibleFormat = [](VkFormat format) {
+        switch (format) {
+        case VK_FORMAT_R16G16_SFLOAT:
+        case VK_FORMAT_R32G32_SFLOAT:
+        case VK_FORMAT_R16G16_SNORM:
+        case VK_FORMAT_R16G16_UNORM:
+            return true;
+        default:
+            return false;
+        }
+    };
+    std::scoped_lock lock{dlss_candidate_mutex};
+
+    for (const auto& candidate : candidates) {
+        auto it = std::find_if(dlss_motion_history.begin(), dlss_motion_history.end(),
+                               [&candidate](const DlssMotionCandidateHistory& history) {
+                                   return history.image == candidate.image &&
+                                          history.slot == candidate.slot &&
+                                          history.format == candidate.format &&
+                                          history.extent.width == candidate.extent.width &&
+                                          history.extent.height == candidate.extent.height;
+                               });
+        if (it == dlss_motion_history.end()) {
+            dlss_motion_history.push_back({
+                .image = candidate.image,
+                .view = candidate.view,
+                .format = candidate.format,
+                .extent = candidate.extent,
+                .layout = candidate.layout,
+                .slot = candidate.slot,
+                .consecutive_frames = 1,
+                .last_frame = frame_index,
+                .motion_format_compatible = IsMotionCompatibleFormat(candidate.format),
+                .render_resolution_compatible =
+                    depth.IsValid() && candidate.extent.width == depth.extent.width &&
+                    candidate.extent.height == depth.extent.height,
+                .persistent = false,
+                .fragment_shader_writes_slot =
+                    candidate.slot < dlss_fragment_output_slots.size() &&
+                    dlss_fragment_output_slots[candidate.slot],
+                .fragment_shader_hash =
+                    candidate.slot < dlss_fragment_output_hashes.size()
+                        ? dlss_fragment_output_hashes[candidate.slot]
+                        : 0,
+                .producer_consecutive_frames = 0,
+                .producer_stable = false,
+                .semantic_signature = {
+                    .title_id = dlss_semantic_title_id,
+                    .fragment_shader_hash =
+                        candidate.slot < dlss_fragment_output_hashes.size() &&
+                                !dlss_fragment_output_ambiguous[candidate.slot]
+                            ? dlss_fragment_output_hashes[candidate.slot]
+                            : 0,
+                    .slot = candidate.slot,
+                    .format = candidate.format,
+                },
+                .semantic_evidence = false,
+                .confidence = DlssMotionConfidence::None,
+            });
+            auto& inserted = dlss_motion_history.back();
+            inserted.semantic_evidence =
+                IsVerifiedDlssMotionSignature(inserted.semantic_signature);
+            inserted.evidence = {
+                .format_compatible = inserted.motion_format_compatible,
+                .render_resolution_compatible = inserted.render_resolution_compatible,
+                .resource_persistent = inserted.persistent,
+                .fragment_shader_writes_slot = inserted.fragment_shader_writes_slot,
+                .producer_stable = inserted.producer_stable,
+                .semantic_evidence = inserted.semantic_evidence,
+            };
+            inserted.confidence = inserted.evidence.IsVerified()
+                                      ? DlssMotionConfidence::Verified
+                                      : (inserted.evidence.IsHeuristicCandidate()
+                                             ? DlssMotionConfidence::Candidate
+                                             : DlssMotionConfidence::None);
+            continue;
+        }
+
+        it->view = candidate.view;
+        it->layout = candidate.layout;
+        const bool consecutive_frame = it->last_frame + 1 == frame_index;
+        it->consecutive_frames =
+            consecutive_frame ? it->consecutive_frames + 1 : 1;
+        it->motion_format_compatible = IsMotionCompatibleFormat(candidate.format);
+        it->render_resolution_compatible =
+            depth.IsValid() && candidate.extent.width == depth.extent.width &&
+            candidate.extent.height == depth.extent.height;
+        it->persistent = it->consecutive_frames >= 8;
+        it->fragment_shader_writes_slot =
+            candidate.slot < dlss_fragment_output_slots.size() &&
+            dlss_fragment_output_slots[candidate.slot];
+        const bool producer_unambiguous =
+            candidate.slot < dlss_fragment_output_hashes.size() &&
+            dlss_fragment_output_slots[candidate.slot] &&
+            !dlss_fragment_output_ambiguous[candidate.slot] &&
+            dlss_fragment_output_hashes[candidate.slot] != 0;
+        const u64 current_producer_hash =
+            producer_unambiguous ? dlss_fragment_output_hashes[candidate.slot] : 0;
+        const bool same_producer = consecutive_frame && producer_unambiguous &&
+                                   current_producer_hash == it->fragment_shader_hash;
+        it->producer_consecutive_frames =
+            same_producer ? it->producer_consecutive_frames + 1
+                          : (current_producer_hash != 0 ? 1 : 0);
+        it->fragment_shader_hash = current_producer_hash;
+        it->producer_stable = it->producer_consecutive_frames >= 8;
+        it->semantic_signature = {
+            .title_id = dlss_semantic_title_id,
+            .fragment_shader_hash = current_producer_hash,
+            .slot = candidate.slot,
+            .format = candidate.format,
+        };
+        it->semantic_evidence = IsVerifiedDlssMotionSignature(it->semantic_signature);
+        it->last_frame = frame_index;
+        it->evidence = {
+            .format_compatible = it->motion_format_compatible,
+            .render_resolution_compatible = it->render_resolution_compatible,
+            .resource_persistent = it->persistent,
+            .fragment_shader_writes_slot = it->fragment_shader_writes_slot,
+            .producer_stable = it->producer_stable,
+            .semantic_evidence = it->semantic_evidence,
+        };
+        // Heuristic evidence may nominate a candidate, but only independent semantic evidence
+        // can promote that candidate to a verified motion-vector input.
+        it->confidence = it->evidence.IsVerified()
+                             ? DlssMotionConfidence::Verified
+                             : (it->evidence.IsHeuristicCandidate()
+                                    ? DlssMotionConfidence::Candidate
+                                    : DlssMotionConfidence::None);
+    }
+
+    // This evidence is frame-local: only pipelines observed since the previous sample count.
+    dlss_fragment_output_slots.fill(false);
+    dlss_fragment_output_hashes.fill(0);
+    dlss_fragment_output_ambiguous.fill(false);
+
+    std::erase_if(dlss_motion_history, [frame_index](const DlssMotionCandidateHistory& history) {
+        return frame_index > history.last_frame && frame_index - history.last_frame > 120;
+    });
+}
+
+std::vector<RasterizerVulkan::DlssMotionCandidateHistory>
+RasterizerVulkan::GetDlssMotionCandidateHistory() const {
+    std::scoped_lock lock{dlss_candidate_mutex};
+    return dlss_motion_history;
+}
+
+
+std::vector<RasterizerVulkan::DlssMotionCandidateHistory>
+RasterizerVulkan::GetDlssLikelyMotionCandidates() const {
+    const auto history = GetDlssMotionCandidateHistory();
+    std::vector<DlssMotionCandidateHistory> candidates;
+    std::copy_if(history.begin(), history.end(), std::back_inserter(candidates),
+                 [](const DlssMotionCandidateHistory& item) {
+                     return item.confidence == DlssMotionConfidence::Candidate ||
+                            item.confidence == DlssMotionConfidence::Verified;
+                 });
+    return candidates;
+}
+
+DlssTemporalSnapshot RasterizerVulkan::CaptureDlssTemporalSnapshot(u64 frame_index) {
+    DlssTemporalSnapshot snapshot{};
+    snapshot.frame_index = frame_index;
+    snapshot.title_id = dlss_semantic_title_id;
+
+    const auto framebuffer_snapshot = GetDlssFramebufferSnapshot();
+    const auto& colors = framebuffer_snapshot.colors;
+    const auto& depth = framebuffer_snapshot.depth;
+    if (colors.empty() || !depth.IsValid()) {
+        return snapshot;
+    }
+
+    // The first populated guest MRT is only a diagnostic color reference at this stage.
+    // Resource views/layouts are deliberately not fabricated here.
+    snapshot.color_in = {
+        .image = colors.front().image,
+        .view = colors.front().view,
+        .format = colors.front().format,
+        .extent = colors.front().extent,
+        .layout = colors.front().layout,
+    };
+    snapshot.depth = {
+        .image = depth.image,
+        .view = depth.view,
+        .format = depth.format,
+        .extent = depth.extent,
+        .layout = depth.layout,
+    };
+    snapshot.render_extent = depth.extent;
+
+    const auto motion_candidates = GetDlssLikelyMotionCandidates();
+    if (!motion_candidates.empty()) {
+        const auto& candidate = motion_candidates.front();
+        snapshot.motion_candidate = candidate.image;
+        snapshot.motion_candidate_view = candidate.view;
+        snapshot.motion_candidate_format = candidate.format;
+        snapshot.motion_candidate_layout = candidate.layout;
+        snapshot.motion_candidate_slot = candidate.slot;
+        snapshot.motion_candidate_persistence = candidate.consecutive_frames;
+        snapshot.motion_fragment_shader_hash = candidate.fragment_shader_hash;
+        snapshot.motion_producer_persistence = candidate.producer_consecutive_frames;
+        snapshot.motion_fragment_shader_writes_slot = candidate.fragment_shader_writes_slot;
+        snapshot.motion_producer_stable = candidate.producer_stable;
+        snapshot.motion_semantic_evidence = candidate.semantic_evidence;
+        snapshot.motion_confidence = candidate.confidence;
+        if (const auto* profile = FindValidatedDlssTemporalGameProfile(
+                dlss_semantic_title_id, candidate.fragment_shader_hash, candidate.slot,
+                candidate.format)) {
+            snapshot.temporal_constants = profile->constants;
+            snapshot.temporal_profile_valid = true;
+        }
+    }
+    return snapshot;
 }
 
 } // namespace Vulkan

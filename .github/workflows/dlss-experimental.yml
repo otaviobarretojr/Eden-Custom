@@ -1,0 +1,301 @@
+# SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Experimental DLSS guard
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches:
+      - 'exp/dlss-*'
+
+jobs:
+  dlss-header-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Windows probe workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/workflows/dlss-windows-probe.yml
+          grep -q "windows-2022" .github/workflows/dlss-windows-probe.yml
+          grep -q "eden-dlss-semantic-probe-windows" .github/workflows/dlss-windows-probe.yml
+      - name: Install Vulkan headers
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev
+      - name: Compile DLSS metadata header
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/dlss_header_smoke.cpp <<'EOF'
+          #include "video_core/renderer_vulkan/present/dlss_inputs.h"
+          int main() {
+              Vulkan::DlssTemporalSnapshot snapshot{};
+              Vulkan::DlssImageInput output{};
+              const auto inputs = Vulkan::MakeDlssTemporalInputs(snapshot, output);
+              const auto plan = Vulkan::BuildDlssVulkanResourcePlan(inputs);
+              return plan.IsReady() ? 1 : 0;
+          }
+          EOF
+          c++ -std=c++20 -fsyntax-only /tmp/dlss_header_smoke.cpp -Isrc
+
+  dlss-linux-configure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install configure dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libvulkan-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libxtst-dev libudev-dev libdrm-dev glslang-tools
+      - name: Configure Eden with experimental DLSS disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build/dlss-ci -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_NVIDIA_STREAMLINE=OFF \
+            -DENABLE_QT=OFF \
+            -DYUZU_USE_BUNDLED_FFMPEG=ON
+
+  dlss-source-guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify experimental DLSS integration invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/video_core/renderer_vulkan/present/dlss_probe.h
+          test -f src/video_core/renderer_vulkan/present/dlss_probe.cpp
+          grep -q 'StreamlineBootstrapState' src/video_core/renderer_vulkan/present/dlss_probe.h
+          grep -q 'sl.interposer.dll' src/video_core/vulkan_common/vulkan_library.cpp
+          grep -q 'falling back' src/video_core/vulkan_common/vulkan_library.cpp
+          grep -q 'ENABLE_NVIDIA_STREAMLINE' CMakeLists.txt
+          grep -q 'STREAMLINE_SDK_ROOT' CMakeLists.txt
+          grep -q 'NVIDIA_STREAMLINE_APPLICATION_ID "0"' CMakeLists.txt
+          grep -q 'preferences.applicationId = NVIDIA_STREAMLINE_APPLICATION_ID' src/video_core/vulkan_common/streamline_runtime.cpp
+          grep -q 'DLSS capability query skipped' src/video_core/vulkan_common/streamline_runtime.cpp
+          grep -q 'sl.interposer.lib' CMakeLists.txt
+          grep -q 'sl.interposer.lib' src/video_core/CMakeLists.txt
+          grep -q 'copy_if_different' src/video_core/CMakeLists.txt
+          grep -q 'ENABLE_NVIDIA_STREAMLINE.*OFF' CMakeLists.txt
+          grep -q 'verifyEmbeddedSignature' src/video_core/vulkan_common/vulkan_library.cpp
+          grep -q 'GetModuleFileNameW' src/video_core/vulkan_common/vulkan_library.cpp
+          grep -q 'LoadLibraryW' src/common/dynamic_library.cpp
+          grep -q 'Open(std::wstring_view' src/common/dynamic_library.h
+          grep -q 'streamline->Open(std::wstring_view{interposer_path})' src/video_core/vulkan_common/vulkan_library.cpp
+          ! grep -q 'WideCharToMultiByte' src/video_core/vulkan_common/vulkan_library.cpp
+          grep -q 'HAS_NVIDIA_STREAMLINE' src/video_core/vulkan_common/vulkan_library.cpp
+          grep -qi 'wintrust' src/video_core/CMakeLists.txt
+          grep -q 'StreamlineRuntime streamline_runtime' src/video_core/renderer_vulkan/renderer_vulkan.h
+          grep -q 'slInit(preferences)' src/video_core/vulkan_common/streamline_runtime.cpp
+          grep -q 'slShutdown()' src/video_core/vulkan_common/streamline_runtime.cpp
+          grep -q 'void Shutdown();' src/video_core/vulkan_common/streamline_runtime.h
+          grep -q 'streamline_runtime.Shutdown()' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q ', streamline_runtime()' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          ! grep -A5 'catch (const vk::Exception& exception)' src/video_core/renderer_vulkan/renderer_vulkan.cpp | grep -q 'streamline_runtime.Shutdown()'
+          grep -q 'initialized = false' src/video_core/vulkan_common/streamline_runtime.cpp
+          ! grep -q 'slSetVulkanInfo(info)' src/video_core/vulkan_common/streamline_runtime.cpp
+          grep -q 'BindVulkanDevice(instance, device)' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'slIsFeatureSupported(sl::kFeatureDLSS' src/video_core/vulkan_common/streamline_runtime.cpp
+          grep -q 'temporal_inputs_available' src/video_core/renderer_vulkan/present/dlss_probe.h
+          test -f src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'motion_vectors.IsValid()' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'GetDlssDepthCandidate' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q 'DepthImageRange' src/video_core/renderer_vulkan/vk_texture_cache.h
+          grep -q 'GetDlssColorCandidates' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q 'ColorImageRange' src/video_core/renderer_vulkan/vk_texture_cache.h
+          grep -q 'ColorFormat' src/video_core/renderer_vulkan/vk_texture_cache.h
+          grep -q 'color_present' src/video_core/renderer_vulkan/vk_texture_cache.h
+          grep -q 'color_present.fill(false)' src/video_core/renderer_vulkan/vk_texture_cache.cpp
+          grep -q 'color_present\[index\] = true' src/video_core/renderer_vulkan/vk_texture_cache.cpp
+          grep -q 'DlssMotionConfidence::Verified' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'TrackDlssTemporalCandidates' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'consecutive_frames' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q 'GetDlssLikelyMotionCandidates' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'DlssTemporalSnapshot' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'DlssTagReadiness' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'BuildTagPlan' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'dst->layout = VK_IMAGE_LAYOUT_GENERAL' src/video_core/renderer_vulkan/present/window_adapt_pass.cpp
+          grep -q 'GetDlssFramebufferSnapshot' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'IsVerifiedDlssMotionSignature(inserted.semantic_signature)' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'return false;' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'IsVerifiedDlssMotionSignature' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'dlss_semantic_title_id' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'SetDlssSemanticTitleId' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'struct DlssTemporalConstants' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'DlssTemporalConstantsSource' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'source != DlssTemporalConstantsSource::None' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'struct DlssTemporalGameProfile' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'validated_profiles' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'std::array<DlssTemporalGameProfile, 0>' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'FindValidatedDlssTemporalGameProfile' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'temporal_profile_valid = true' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'MakeDlssTemporalInputs' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'BuildTagPlan' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'BuildDlssVulkanResourcePlan' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'struct DlssVulkanResourcePlan' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          ! grep -q 'slEvaluateFeature' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'constants.IsReady()' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          ! grep -q 'camera_constants_valid' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL' src/video_core/renderer_vulkan/vk_texture_cache.cpp
+          grep -q 'newLayout = VK_IMAGE_LAYOUT_GENERAL' src/video_core/renderer_vulkan/vk_texture_cache.cpp
+          grep -q 'MakeDlssPresentationOutput' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'frame->layout' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'semantic_evidence' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q 'only independent semantic evidence' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'candidate.confidence' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'motion_confidence != DlssMotionConfidence::Verified' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'VK_IMAGE_LAYOUT_UNDEFINED' src/video_core/renderer_vulkan/present/dlss_inputs.h
+          grep -q 'CaptureDlssTemporalSnapshot' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'CaptureDlssTemporalSnapshot(dlss_frame_index)' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'dlss_frame_index % 120 == 0' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          ! grep -q 'slEvaluateFeature' src/video_core/renderer_vulkan/renderer_vulkan.cpp
+          grep -q 'candidate.confidence' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'IsHeuristicCandidate' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q 'IsVerified' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q '#include <iterator>' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q '#include <mutex>' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q '#include <vector>' src/video_core/renderer_vulkan/vk_rasterizer.h
+          grep -q 'frame_index - history.last_frame > 120' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'VK_FORMAT_R16G16_SFLOAT' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          grep -q 'persistent = it->consecutive_frames >= 8' src/video_core/renderer_vulkan/vk_rasterizer.cpp
+          ! grep -q 'LoadLibraryExW' src/video_core/renderer_vulkan/present/dlss_probe.cpp
+          ! grep -R --line-number --include='dlss_probe.*' 'slInit[[:space:]]*(' src/video_core/renderer_vulkan/present
+          echo "DLSS bootstrap source guards passed"
+
+  dlss-windows-probe-build:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Vulkan SDK shader tools
+        shell: pwsh
+        run: |
+          $version = (Invoke-RestMethod 'https://vulkan.lunarg.com/sdk/latest/windows.txt').Trim()
+          $installer = Join-Path $env:RUNNER_TEMP 'vulkan_sdk.exe'
+          Invoke-WebRequest 'https://sdk.lunarg.com/sdk/download/latest/windows/vulkan_sdk.exe' -OutFile $installer
+          Start-Process -FilePath $installer -ArgumentList '--accept-licenses --default-answer --confirm-command install' -Wait -NoNewWindow
+          $sdk = "C:\VulkanSDK\$version"
+          if (-not (Test-Path "$sdk\Bin\glslangValidator.exe")) { throw 'glslangValidator was not installed by Vulkan SDK.' }
+          "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Configure Windows probe build
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere not found" }
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw "No Visual C++ toolchain found on runner" }
+          $devcmd = Join-Path $vs "Common7\\Tools\\VsDevCmd.bat"
+          $cmdFile = Join-Path $env:RUNNER_TEMP "eden-msvc-configure.cmd"
+          $cmdLines = [System.Collections.Generic.List[string]]::new()
+          $cmdLines.Add('@call "' + $devcmd + '" -arch=x64 -host_arch=x64')
+          $cmdLines.Add('@if errorlevel 1 exit /b %errorlevel%')
+          $cmdLines.Add('@echo VisualStudio=' + $vs)
+          $cmdLines.Add('@where cl.exe')
+          $cmdLines.Add('@echo INCLUDE=%INCLUDE%')
+          $cmdLines.Add('@echo LIB=%LIB%')
+          $cmdLines.Add('@cmake -S . -B build/dlss-windows -G Ninja -DCMAKE_C_COMPILER=cl.exe -DCMAKE_CXX_COMPILER=cl.exe -DCMAKE_BUILD_TYPE=Release -DENABLE_NVIDIA_STREAMLINE=OFF -DENABLE_QT=ON -DYUZU_USE_BUNDLED_QT=ON -DYUZU_USE_BUNDLED_FFMPEG=ON -DENABLE_UPDATE_CHECKER=OFF -DYUZU_CRASH_DUMPS=OFF')
+          [System.IO.File]::WriteAllLines($cmdFile, [string[]]$cmdLines, [System.Text.Encoding]::ASCII)
+          Write-Host "Generated command file:"
+          Get-Content $cmdFile | ForEach-Object { Write-Host "CMD> $_" }
+          $workspace = $env:GITHUB_WORKSPACE
+          Push-Location $workspace
+          & $env:ComSpec /d /c $cmdFile
+          $code = $LASTEXITCODE
+          Pop-Location
+          if ($code -ne 0) { exit $code }
+      - name: Build Eden probe
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $devcmd = Join-Path $vs "Common7\\Tools\\VsDevCmd.bat"
+          $cmdFile = Join-Path $env:RUNNER_TEMP "eden-msvc-build.cmd"
+          $cmdLines = [System.Collections.Generic.List[string]]::new()
+          $cmdLines.Add('@call "' + $devcmd + '" -arch=x64 -host_arch=x64')
+          $cmdLines.Add('@if errorlevel 1 exit /b %errorlevel%')
+          $cmdLines.Add('@cmake --build build/dlss-windows --target video_core --parallel 2')
+          [System.IO.File]::WriteAllLines($cmdFile, [string[]]$cmdLines, [System.Text.Encoding]::ASCII)
+          Push-Location $env:GITHUB_WORKSPACE
+          & $env:ComSpec /d /c $cmdFile
+          $code = $LASTEXITCODE
+          Pop-Location
+          if ($code -ne 0) { exit $code }
+      - name: Audit runner MSVC libraries
+        shell: pwsh
+        run: |
+          $roots = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio" -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Parent.Name -eq "MSVC" } | Sort-Object Name -Descending
+          foreach ($root in $roots) {
+            Write-Host "MSVC toolset=$($root.Name)"
+            $dumpbin = Get-ChildItem $root.FullName -Recurse -Filter dumpbin.exe | Where-Object { $_.FullName -match 'Hostx64\\x64' } | Select-Object -First 1
+            $libs = Get-ChildItem "$($root.FullName)\lib\x64" -Filter "*.lib" -ErrorAction SilentlyContinue
+            foreach ($lib in $libs) {
+              $matches = & $dumpbin.FullName /symbols $lib.FullName 2>$null | Select-String "__std_(rotate|unique|minmax_element|replace_copy)"
+              if ($matches) {
+                Write-Host "Provider candidate=$($lib.Name)"
+                $matches | Select-Object -First 12
+              }
+            }
+          }
+      - name: Audit bundled Qt toolchain
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $qt = Get-ChildItem ".cache/cpm/qt6" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $qt) { Write-Warning "Bundled Qt package was not found."; exit 0 }
+          Write-Host "Qt package=$($qt.FullName)"
+          $core = Get-ChildItem $qt.FullName -Recurse -Filter Qt6Core.lib -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $core) { Write-Warning "Qt6Core.lib was not found."; exit 0 }
+          Write-Host "Qt6Core=$($core.FullName)"
+          $vswhere = "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $dumpbin = Get-ChildItem (Join-Path $vs "VC\\Tools\\MSVC") -Recurse -Filter dumpbin.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'Hostx64\\x64' } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $dumpbin) { Write-Warning "dumpbin.exe was not found; skipping diagnostic symbol audit."; exit 0 }
+          $symbolOutput = & $dumpbin.FullName /symbols $core.FullName 2>&1
+          $matches = $symbolOutput | Select-String "__std_(rotate|unique|minmax|replace_copy)" | Select-Object -First 20
+          if ($matches) { $matches | ForEach-Object { Write-Host $_ } } else { Write-Host "No matching Qt STL symbols found in audit." }
+          Write-Host "Qt audit complete; continuing to GUI link."
+      - name: Link Eden GUI probe
+        shell: pwsh
+        run: |
+          Write-Host "EDEN_MSVC_TOOLSET=$env:EDEN_MSVC_TOOLSET"
+          $vswhere = "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $devcmd = Join-Path $vs "Common7\\Tools\\VsDevCmd.bat"
+          $cmdFile = Join-Path $env:RUNNER_TEMP "eden-msvc-link.cmd"
+          $cmdLines = [System.Collections.Generic.List[string]]::new()
+          $cmdLines.Add('@call "' + $devcmd + '" -arch=x64 -host_arch=x64')
+          $cmdLines.Add('@if errorlevel 1 exit /b %errorlevel%')
+          $cmdLines.Add('@cmake --build build/dlss-windows --target yuzu --parallel 2')
+          [System.IO.File]::WriteAllLines($cmdFile, [string[]]$cmdLines, [System.Text.Encoding]::ASCII)
+          Push-Location $env:GITHUB_WORKSPACE
+          & $env:ComSpec /d /c $cmdFile
+          $code = $LASTEXITCODE
+          Pop-Location
+          if ($code -ne 0) { exit $code }
+      - name: Collect probe package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Get-ChildItem build/dlss-windows -Recurse -File |
+            Where-Object { $_.Extension -in '.exe','.dll' -or $_.Name -eq 'video_core.lib' } |
+            Copy-Item -Destination artifact -Force
+          Set-Content artifact/DLSS-PROBE-README.txt 'Experimental Windows semantic probe build. Streamline execution is disabled. Run eden.exe with a representative game for 5-10 minutes, move the camera, close Eden normally, then return the Eden log containing DLSS semantic probe entries.'
+          if (-not (Get-ChildItem artifact -Filter eden.exe)) { throw 'eden.exe was not produced.' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eden-dlss-semantic-probe-windows
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 14

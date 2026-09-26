@@ -7,6 +7,8 @@
 #pragma once
 
 #include <array>
+#include <mutex>
+#include <vector>
 
 #include <boost/container/static_vector.hpp>
 
@@ -16,6 +18,7 @@
 #include "video_core/host1x/gpu_device_memory_manager.h"
 #include "video_core/rasterizer_interface.h"
 #include "video_core/renderer_vulkan/blit_image.h"
+#include "video_core/renderer_vulkan/present/dlss_inputs.h"
 #include "video_core/renderer_vulkan/vk_buffer_cache.h"
 #include "video_core/renderer_vulkan/vk_descriptor_buffer.h"
 #include "video_core/renderer_vulkan/vk_descriptor_pool.h"
@@ -142,6 +145,136 @@ public:
                                                             VAddr framebuffer_addr,
                                                             u32 pixel_stride);
 
+    struct DlssDepthCandidate {
+        VkImage image{};
+        VkImageView view{};
+        VkExtent2D extent{};
+        VkImageSubresourceRange range{};
+        VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
+        VkFormat format{VK_FORMAT_UNDEFINED};
+
+        [[nodiscard]] bool IsValid() const {
+            return image != VK_NULL_HANDLE && extent.width != 0 && extent.height != 0;
+        }
+    };
+
+    [[nodiscard]] DlssDepthCandidate GetDlssDepthCandidate();
+
+    struct DlssColorCandidate {
+        VkImage image{};
+        VkImageView view{};
+        VkExtent2D extent{};
+        VkImageSubresourceRange range{};
+        VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
+        VkFormat format{VK_FORMAT_UNDEFINED};
+        u32 slot{};
+
+        [[nodiscard]] bool IsValid() const {
+            return image != VK_NULL_HANDLE && extent.width != 0 && extent.height != 0;
+        }
+    };
+
+    [[nodiscard]] std::vector<DlssColorCandidate> GetDlssColorCandidates();
+
+    struct DlssFramebufferSnapshot {
+        DlssDepthCandidate depth{};
+        std::vector<DlssColorCandidate> colors{};
+    };
+
+    [[nodiscard]] DlssFramebufferSnapshot GetDlssFramebufferSnapshot();
+
+    struct DlssMotionSemanticSignature {
+        u64 title_id{};
+        u64 fragment_shader_hash{};
+        u32 slot{};
+        VkFormat format{VK_FORMAT_UNDEFINED};
+
+        [[nodiscard]] bool IsComplete() const noexcept {
+            return title_id != 0 && fragment_shader_hash != 0 && format != VK_FORMAT_UNDEFINED;
+        }
+    };
+
+    [[nodiscard]] static bool IsVerifiedDlssMotionSignature(
+        const DlssMotionSemanticSignature& signature) noexcept;
+
+    struct DlssMotionEvidence {
+        bool format_compatible{};
+        bool render_resolution_compatible{};
+        bool resource_persistent{};
+        bool fragment_shader_writes_slot{};
+        bool producer_stable{};
+        bool semantic_evidence{};
+
+        [[nodiscard]] bool IsHeuristicCandidate() const noexcept {
+            return format_compatible && render_resolution_compatible && resource_persistent &&
+                   fragment_shader_writes_slot && producer_stable;
+        }
+
+        [[nodiscard]] bool IsVerified() const noexcept {
+            return IsHeuristicCandidate() && semantic_evidence;
+        }
+    };
+
+    struct DlssMotionCandidateHistory {
+        VkImage image{};
+        VkImageView view{};
+        VkFormat format{VK_FORMAT_UNDEFINED};
+        VkExtent2D extent{};
+        VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
+        u32 slot{};
+        u32 consecutive_frames{};
+        u64 last_frame{};
+        bool motion_format_compatible{};
+        bool render_resolution_compatible{};
+        bool persistent{};
+        bool fragment_shader_writes_slot{};
+        u64 fragment_shader_hash{};
+        u32 producer_consecutive_frames{};
+        bool producer_stable{};
+        DlssMotionSemanticSignature semantic_signature{};
+        bool semantic_evidence{};
+        DlssMotionEvidence evidence{};
+        DlssMotionConfidence confidence{DlssMotionConfidence::None};
+    };
+
+    struct DlssUniformBindingObservation {
+        size_t stage{};
+        u32 index{};
+        GPUVAddr gpu_addr{};
+        u32 size{};
+        u64 title_id{};
+        u64 bind_sequence{};
+        u64 frame_index{};
+        u64 fragment_shader_hash{};
+        bool fragment_producer_unambiguous{};
+        u32 consecutive_frames{};
+        bool stable_binding{};
+        bool plausible_temporal_size{};
+        bool temporal_diagnostic_candidate{};
+        u64 last_sampled_frame{};
+        u64 sample_fingerprint{};
+        bool sampled{};
+        u64 previous_sample_fingerprint{};
+        u32 sample_count{};
+        u32 fingerprint_change_count{};
+        bool temporally_dynamic{};
+        bool strong_temporal_candidate{};
+        u32 sampled_float_count{};
+        u32 finite_float_count{};
+        u32 normalized_float_count{};
+        bool matrix_shape_candidate{};
+        bool semantic_probe_candidate{};
+    };
+
+    void TrackDlssFragmentOutputs(const GraphicsPipeline& pipeline);
+    void SetDlssSemanticTitleId(u64 title_id) noexcept {
+        dlss_semantic_title_id = title_id;
+    }
+    void TrackDlssTemporalCandidates(u64 frame_index);
+    [[nodiscard]] std::vector<DlssMotionCandidateHistory> GetDlssMotionCandidateHistory() const;
+    [[nodiscard]] std::vector<DlssMotionCandidateHistory> GetDlssLikelyMotionCandidates() const;
+    [[nodiscard]] DlssTemporalSnapshot CaptureDlssTemporalSnapshot(u64 frame_index);
+
 private:
     static constexpr const u64 NEEDS_D24[] = {
         0x01006A800016E000ULL, // SSBU
@@ -228,6 +361,23 @@ private:
     std::array<VideoCommon::ImageViewId, MAX_IMAGE_VIEWS> image_view_ids;
     boost::container::static_vector<VkSampler, MAX_TEXTURES> sampler_handles;
 
+    mutable std::mutex dlss_candidate_mutex;
+    std::vector<DlssMotionCandidateHistory> dlss_motion_history;
+    std::array<bool, 8> dlss_fragment_output_slots{};
+    std::array<u64, 8> dlss_fragment_output_hashes{};
+    std::array<bool, 8> dlss_fragment_output_ambiguous{};
+    u64 dlss_semantic_title_id{};
+    u64 dlss_uniform_bind_sequence{};
+    u64 dlss_temporal_frame_index{};
+    u64 dlss_uniform_bind_call_count{};
+    u64 dlss_uniform_observation_count{};
+    u64 dlss_uniform_mature_candidate_count{};
+    u64 dlss_uniform_sample_count{};
+    u64 dlss_uniform_same_frame_match_count{};
+    u64 dlss_uniform_next_frame_match_count{};
+    u64 dlss_uniform_same_address_size_count{};
+    std::array<DlssUniformBindingObservation, 64> dlss_uniform_observations{};
+    size_t dlss_uniform_observation_cursor{};
     u32 draw_counter = 0;
 };
 
