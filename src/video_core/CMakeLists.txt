@@ -359,6 +359,9 @@ if (ENABLE_NVIDIA_STREAMLINE AND WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${STREAMLINE_SDK_ROOT}/bin/x64/sl.common.dll"
             "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/sl.common.dll"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${STREAMLINE_SDK_ROOT}/bin/x64/sl.pcl.dll"
+            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/sl.pcl.dll"
         COMMENT "Staging NVIDIA-signed Streamline core runtime"
     )
     add_dependencies(video_core copy_streamline_core)
