@@ -195,6 +195,8 @@ add_library(video_core STATIC
     renderer_vulkan/vk_turbo_mode.h
     renderer_vulkan/vk_update_descriptor.cpp
     renderer_vulkan/vk_update_descriptor.h
+    vulkan_common/streamline_bootstrap.cpp
+    vulkan_common/streamline_bootstrap.h
     vulkan_common/vulkan_debug_callback.cpp
     vulkan_common/vulkan_debug_callback.h
     vulkan_common/vulkan_device.cpp
@@ -346,6 +348,21 @@ target_link_libraries(video_core PRIVATE sirit::sirit)
 
 # Header-only stuff needed by all dependent targets
 target_link_libraries(video_core PUBLIC Vulkan::Headers Vulkan::UtilityHeaders GPUOpen::VulkanMemoryAllocator)
+
+if (ENABLE_NVIDIA_STREAMLINE AND WIN32)
+    target_link_libraries(video_core PRIVATE wintrust)
+    add_custom_target(copy_streamline_core ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${STREAMLINE_SDK_ROOT}/bin/x64/sl.interposer.dll"
+            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/sl.interposer.dll"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${STREAMLINE_SDK_ROOT}/bin/x64/sl.common.dll"
+            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/sl.common.dll"
+        COMMENT "Staging NVIDIA-signed Streamline core runtime"
+    )
+    add_dependencies(video_core copy_streamline_core)
+endif()
 
 if (ENABLE_NSIGHT_AFTERMATH)
     if (NOT DEFINED ENV{NSIGHT_AFTERMATH_SDK})
