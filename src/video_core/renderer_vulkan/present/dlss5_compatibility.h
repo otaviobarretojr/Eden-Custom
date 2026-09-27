@@ -25,6 +25,25 @@ struct Dlss5PresentationSource {
 // Borrowed candidate produced by a future compatibility-processing stage. Ownership and GPU
 // completion remain with that stage; presentation may consume it only after it is explicitly
 // marked ready and passes the structural checks below.
+// Vulkan metadata required by Streamline's public resource-tagging contract. Keeping this
+// separate from feature-specific tags lets Eden describe its final color accurately without
+// claiming unavailable depth, motion-vector or exposure inputs.
+struct Dlss5VulkanResourceDescription {
+    VkImage image{VK_NULL_HANDLE};
+    VkImageView image_view{VK_NULL_HANDLE};
+    VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
+    VkFormat format{VK_FORMAT_UNDEFINED};
+    VkImageUsageFlags usage{};
+    u32 width{};
+    u32 height{};
+
+    [[nodiscard]] bool IsValid() const noexcept {
+        return image != VK_NULL_HANDLE && image_view != VK_NULL_HANDLE &&
+               layout != VK_IMAGE_LAYOUT_UNDEFINED && format != VK_FORMAT_UNDEFINED &&
+               usage != 0 && width != 0 && height != 0;
+    }
+};
+
 struct Dlss5ProcessedOutput {
     u32 width{};
     u32 height{};
@@ -99,9 +118,14 @@ public:
         return inputs;
     }
 
+    [[nodiscard]] const Dlss5VulkanResourceDescription& FinalColorResource() const noexcept {
+        return final_color_resource;
+    }
+
 private:
     Dlss5CompatibilityState state{Dlss5CompatibilityState::UnsupportedGpu};
     Dlss5CompatibilityInputs inputs{};
+    Dlss5VulkanResourceDescription final_color_resource{};
     Dlss5ProcessedOutput processed_output{};
     u64 frames_observed{};
     u32 last_width{};
