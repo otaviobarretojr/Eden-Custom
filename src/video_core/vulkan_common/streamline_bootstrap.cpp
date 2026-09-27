@@ -103,6 +103,8 @@ StreamlineBootstrap::StreamlineBootstrap() {
 
 bool StreamlineBootstrap::BeginFrame(u64 eden_frame_id) noexcept {
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    current_frame_token = nullptr;
+    current_eden_frame_id = 0;
     if (!initialized || !interposer || eden_frame_id == 0) {
         return false;
     }
@@ -128,6 +130,7 @@ bool StreamlineBootstrap::BeginFrame(u64 eden_frame_id) noexcept {
         return false;
     }
 
+    current_frame_token = token;
     current_eden_frame_id = eden_frame_id;
     return true;
 #else
@@ -151,6 +154,8 @@ StreamlineBootstrap::~StreamlineBootstrap() {
         }
     }
 
+    current_frame_token = nullptr;
+    current_eden_frame_id = 0;
     g_streamline_initialized.store(false, std::memory_order_release);
     initialized = false;
 #endif
