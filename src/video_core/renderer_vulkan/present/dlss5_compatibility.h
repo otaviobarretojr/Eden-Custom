@@ -83,7 +83,11 @@ struct Dlss5CompatibilityInputs {
 
 class Dlss5CompatibilityFilter final {
 public:
-    Dlss5CompatibilityFilter(const Device& device, VkFormat final_color_format);
+    explicit Dlss5CompatibilityFilter(const Device& device);
+
+    void SetFinalColorFormat(VkFormat format) noexcept {
+        final_color_format = format;
+    }
 
     void ObservePresentFrame(const Frame& frame);
 
