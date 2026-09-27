@@ -8,6 +8,7 @@
 #include "common/thread.h"
 #include "core/frontend/emu_window.h"
 #include "video_core/renderer_vulkan/vk_present_manager.h"
+#include "video_core/renderer_vulkan/present/dlss5_compatibility.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_swapchain.h"
 #include "video_core/vulkan_common/vulkan_device.h"
@@ -165,16 +166,21 @@ Frame* PresentManager::GetRenderFrame() {
     return frame;
 }
 
-void PresentManager::Present(Frame* frame) {
+void PresentManager::Present(Frame* frame, const Dlss5PresentationSource& source) {
     if (use_present_thread) {
         scheduler.Record([this, frame](vk::CommandBuffer) {
             std::unique_lock lock{queue_mutex};
-            present_queue.push_back(frame);
+            present_queue.push_back({
+                .frame = frame,
+                .source_image = source.image,
+                .source_width = source.width,
+                .source_height = source.height,
+            });
             frame_cv.notify_one();
         });
     } else {
         scheduler.WaitWorker();
-        CopyToSwapchain(frame);
+        CopyToSwapchain(frame, source);
         free_queue.push_back(frame);
     }
 }
@@ -213,7 +219,7 @@ void PresentManager::RecreateFrame(Frame* frame, u32 width, u32 height, VkFormat
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .pNext = nullptr,
         .flags = 0,
-        .image = *frame->image,
+        .image = source.image,
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = image_view_format,
         .components =
@@ -272,15 +278,21 @@ void PresentManager::PresentThread(std::stop_token token) {
         frame_cv.wait(lock, token, [this] { return !present_queue.empty(); });
         if (!token.stop_requested()) {
             // Take the frame and notify anyone waiting
-            Frame* frame = present_queue.front();
+            const PresentRequest request = present_queue.front();
             present_queue.pop_front();
+            Frame* frame = request.frame;
             frame_cv.notify_one();
 
             // By exchanging the lock ownership we take the swapchain lock
             // before the queue lock goes out of scope. This way the swapchain
             // lock in WaitPresent is guaranteed to occur after here.
             std::exchange(lock, std::unique_lock{swapchain_mutex});
-            CopyToSwapchain(frame);
+            CopyToSwapchain(frame, {
+                .width = request.source_width,
+                .height = request.source_height,
+                .image = request.source_image,
+                .processed = false,
+            });
 
             // Free the frame for reuse
             std::scoped_lock fl{free_mutex};
@@ -302,7 +314,7 @@ void PresentManager::SetImageCount() {
     image_count = std::min<size_t>(swapchain.GetImageCount(), 7);
 }
 
-void PresentManager::CopyToSwapchain(Frame* frame) {
+void PresentManager::CopyToSwapchain(Frame* frame, const Dlss5PresentationSource& source) {
     bool requires_recreation = false;
 
     while (true) {
@@ -316,7 +328,7 @@ void PresentManager::CopyToSwapchain(Frame* frame) {
             }
 
             // Draw to swapchain.
-            return CopyToSwapchainImpl(frame);
+            return CopyToSwapchainImpl(frame, source);
         } catch (const vk::Exception& except) {
             if (except.GetResult() != VK_ERROR_SURFACE_LOST_KHR) {
                 throw;
@@ -327,13 +339,13 @@ void PresentManager::CopyToSwapchain(Frame* frame) {
     }
 }
 
-void PresentManager::CopyToSwapchainImpl(Frame* frame) {
+void PresentManager::CopyToSwapchainImpl(Frame* frame, const Dlss5PresentationSource& source) {
 
     // If the size of the incoming frames has changed, recreate the swapchain
     // to account for that.
     const bool is_suboptimal = swapchain.NeedsRecreation();
     const bool size_changed =
-        swapchain.GetWidth() != frame->width || swapchain.GetHeight() != frame->height;
+        swapchain.GetWidth() != source.width || swapchain.GetHeight() != source.height;
     if (is_suboptimal || size_changed) {
         RecreateSwapchain(frame);
     }
@@ -433,14 +445,14 @@ void PresentManager::CopyToSwapchainImpl(Frame* frame) {
                            {}, {}, pre_barriers);
 
     if (blit_supported) {
-        cmdbuf.BlitImage(*frame->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
+        cmdbuf.BlitImage(source.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                         MakeImageBlit(frame->width, frame->height, extent.width, extent.height),
+                         MakeImageBlit(source.width, source.height, extent.width, extent.height),
                          VK_FILTER_LINEAR);
     } else {
-        cmdbuf.CopyImage(*frame->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
+        cmdbuf.CopyImage(source.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                         MakeImageCopy(frame->width, frame->height, extent.width, extent.height));
+                         MakeImageCopy(source.width, source.height, extent.width, extent.height));
     }
 
     cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, {},
