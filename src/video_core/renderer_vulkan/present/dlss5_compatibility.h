@@ -30,9 +30,13 @@ struct Dlss5ProcessedOutput {
     u32 height{};
     VkImage image{VK_NULL_HANDLE};
     bool ready{};
+    // True only after the producer's GPU completion dependency has been folded into the owning
+    // Frame synchronization. A CPU-side ready flag alone must never authorize presentation.
+    bool synchronized_with_frame{};
 
     [[nodiscard]] bool IsValid() const noexcept {
-        return ready && width != 0 && height != 0 && image != VK_NULL_HANDLE;
+        return ready && synchronized_with_frame && width != 0 && height != 0 &&
+               image != VK_NULL_HANDLE;
     }
 };
 
@@ -65,7 +69,8 @@ public:
     void ObservePresentFrame(const Frame& frame);
 
     // Records a borrowed output candidate. This does not make the image presentable by itself;
-    // readiness, dimensions and handle are revalidated when presentation selects its source.
+    // readiness, synchronization, dimensions and handle are revalidated when presentation selects
+    // its source. The producer must keep the image alive through the owning Frame's present_done.
     void SetProcessedOutput(Dlss5ProcessedOutput output) noexcept {
         processed_output = output;
     }
