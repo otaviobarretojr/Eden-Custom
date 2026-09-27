@@ -37,6 +37,14 @@ public:
         return current_eden_frame_id;
     }
 
+    [[nodiscard]] bool IsFrameTaggingReady() const noexcept {
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+        return initialized && current_eden_frame_id != 0 && current_frame_token != nullptr;
+#else
+        return false;
+#endif
+    }
+
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
     [[nodiscard]] sl::FrameToken* CurrentFrameToken() const noexcept {
         return current_frame_token;
