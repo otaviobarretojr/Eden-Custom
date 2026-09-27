@@ -64,8 +64,8 @@ Dlss5PresentationSource Dlss5CompatibilityFilter::SelectPresentationSource(
     const Frame& frame) const noexcept {
     // A processed result is safe to select only when it belongs to the current presentation
     // dimensions. Resolution changes therefore cannot accidentally present a stale output image.
-    if (processed_output.IsValid() && processed_output.width == frame.width &&
-        processed_output.height == frame.height) {
+    if (processed_output.IsValid() && processed_output.frame_id == current_frame_id &&
+        processed_output.width == frame.width && processed_output.height == frame.height) {
         return {
             .width = processed_output.width,
             .height = processed_output.height,
@@ -88,6 +88,10 @@ void Dlss5CompatibilityFilter::ObservePresentFrame(const Frame& frame) {
     }
 
     ++frames_observed;
+    current_frame_id = frames_observed;
+    // A processed result from any previous frame must never become eligible merely because the
+    // next frame has identical dimensions.
+    processed_output = {};
 
     // The presentation frame is the only input Eden can guarantee at this stage. Keep the
     // auxiliary-input contract explicit so future Streamline evaluation never mistakes generated
