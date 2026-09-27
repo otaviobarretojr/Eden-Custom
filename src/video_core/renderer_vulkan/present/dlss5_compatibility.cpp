@@ -73,6 +73,16 @@ void Dlss5CompatibilityFilter::ObservePresentFrame(const Frame& frame) {
         .exposure_available = false,
     };
 
+    final_color_resource = {
+        .image = frame.image ? *frame.image : VK_NULL_HANDLE,
+        .image_view = frame.image_view ? *frame.image_view : VK_NULL_HANDLE,
+        .layout = VK_IMAGE_LAYOUT_GENERAL,
+        .format = final_color_format,
+        .usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .width = frame.width,
+        .height = frame.height,
+    };
+
     if (frame.width == last_width && frame.height == last_height) {
         return;
     }
