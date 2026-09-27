@@ -22,6 +22,7 @@ class EmuWindow;
 namespace Vulkan {
 
 class Device;
+struct Dlss5PresentationSource;
 class Scheduler;
 class Swapchain;
 
@@ -50,8 +51,9 @@ public:
     /// Returns the last used presentation frame
     Frame* GetRenderFrame();
 
-    /// Pushes a frame for presentation
-    void Present(Frame* frame);
+    /// Pushes a frame for presentation. source selects the image copied to the swapchain while
+    /// frame continues to own synchronization and lifetime resources.
+    void Present(Frame* frame, const Dlss5PresentationSource& source);
 
     /// Recreates the present frame to match the provided parameters
     void RecreateFrame(Frame* frame, u32 width, u32 height, VkFormat image_view_format,
@@ -63,9 +65,9 @@ public:
 private:
     void PresentThread(std::stop_token token);
 
-    void CopyToSwapchain(Frame* frame);
+    void CopyToSwapchain(Frame* frame, const Dlss5PresentationSource& source);
 
-    void CopyToSwapchainImpl(Frame* frame);
+    void CopyToSwapchainImpl(Frame* frame, const Dlss5PresentationSource& source);
 
     void RecreateSwapchain(Frame* frame);
 
@@ -81,7 +83,13 @@ private:
     vk::SurfaceKHR& surface;
     vk::CommandPool cmdpool;
     std::vector<Frame> frames;
-    boost::container::deque<Frame*> present_queue;
+    struct PresentRequest {
+        Frame* frame{};
+        VkImage source_image{VK_NULL_HANDLE};
+        u32 source_width{};
+        u32 source_height{};
+    };
+    boost::container::deque<PresentRequest> present_queue;
     boost::container::deque<Frame*> free_queue;
     std::condition_variable_any frame_cv;
     std::condition_variable free_cv;
