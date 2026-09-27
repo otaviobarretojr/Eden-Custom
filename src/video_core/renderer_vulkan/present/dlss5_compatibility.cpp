@@ -32,6 +32,16 @@ Dlss5CompatibilityFilter::Dlss5CompatibilityFilter(const Device& device) {
              "evaluation remains disabled until the runtime stage is wired.");
 }
 
+Dlss5PresentationSource Dlss5CompatibilityFilter::SelectPresentationSource(
+    const Frame& frame) const noexcept {
+    return {
+        .width = frame.width,
+        .height = frame.height,
+        .image = frame.image ? *frame.image : VK_NULL_HANDLE,
+        .processed = false,
+    };
+}
+
 void Dlss5CompatibilityFilter::ObservePresentFrame(const Frame& frame) {
     if (!IsFrameTapReady()) {
         return;
