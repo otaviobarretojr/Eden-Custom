@@ -7,7 +7,35 @@
 #include "video_core/renderer_vulkan/vk_present_manager.h"
 #include "video_core/vulkan_common/vulkan_device.h"
 
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+#include <sl.h>
+#endif
+
 namespace Vulkan {
+namespace {
+
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+[[nodiscard]] sl::Resource MakeStreamlineResource(
+    const Dlss5VulkanResourceDescription& resource) noexcept {
+    sl::Resource result{};
+    if (!resource.IsValid()) {
+        return result;
+    }
+
+    // Streamline's public Vulkan contract carries native image/view handles plus the exact state
+    // metadata. This adapter is intentionally feature-agnostic: it does not tag or evaluate NR.
+    result.type = sl::ResourceType::eTex2d;
+    result.native = resource.image;
+    result.view = resource.image_view;
+    result.state = resource.layout;
+    result.width = resource.width;
+    result.height = resource.height;
+    return result;
+}
+#endif
+
+} // Anonymous namespace
+
 
 Dlss5CompatibilityFilter::Dlss5CompatibilityFilter(const Device& device) {
     if (device.GetDriverID() != VK_DRIVER_ID_NVIDIA_PROPRIETARY) {
