@@ -34,6 +34,18 @@ Dlss5CompatibilityFilter::Dlss5CompatibilityFilter(const Device& device) {
 
 Dlss5PresentationSource Dlss5CompatibilityFilter::SelectPresentationSource(
     const Frame& frame) const noexcept {
+    // A processed result is safe to select only when it belongs to the current presentation
+    // dimensions. Resolution changes therefore cannot accidentally present a stale output image.
+    if (processed_output.IsValid() && processed_output.width == frame.width &&
+        processed_output.height == frame.height) {
+        return {
+            .width = processed_output.width,
+            .height = processed_output.height,
+            .image = processed_output.image,
+            .processed = true,
+        };
+    }
+
     return {
         .width = frame.width,
         .height = frame.height,
