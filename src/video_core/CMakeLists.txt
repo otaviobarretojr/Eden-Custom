@@ -352,16 +352,16 @@ target_link_libraries(video_core PUBLIC Vulkan::Headers Vulkan::UtilityHeaders G
 if (ENABLE_NVIDIA_STREAMLINE AND WIN32)
     target_link_libraries(video_core PRIVATE wintrust)
     add_custom_target(copy_streamline_core ALL
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${STREAMLINE_SDK_ROOT}/bin/x64/sl.interposer.dll"
-            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/sl.interposer.dll"
+            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/sl.interposer.dll"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${STREAMLINE_SDK_ROOT}/bin/x64/sl.common.dll"
-            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/sl.common.dll"
+            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/sl.common.dll"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${STREAMLINE_SDK_ROOT}/bin/x64/sl.pcl.dll"
-            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/sl.pcl.dll"
+            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/sl.pcl.dll"
         COMMENT "Staging NVIDIA-signed Streamline core runtime"
     )
     add_dependencies(video_core copy_streamline_core)
