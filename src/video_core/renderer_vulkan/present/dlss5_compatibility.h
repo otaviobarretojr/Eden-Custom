@@ -16,6 +16,24 @@ struct Dlss5PresentationSource {
     u32 height{};
     VkImage image{VK_NULL_HANDLE};
     bool processed{};
+
+    [[nodiscard]] bool IsValid() const noexcept {
+        return width != 0 && height != 0 && image != VK_NULL_HANDLE;
+    }
+};
+
+// Borrowed candidate produced by a future compatibility-processing stage. Ownership and GPU
+// completion remain with that stage; presentation may consume it only after it is explicitly
+// marked ready and passes the structural checks below.
+struct Dlss5ProcessedOutput {
+    u32 width{};
+    u32 height{};
+    VkImage image{VK_NULL_HANDLE};
+    bool ready{};
+
+    [[nodiscard]] bool IsValid() const noexcept {
+        return ready && width != 0 && height != 0 && image != VK_NULL_HANDLE;
+    }
 };
 
 enum class Dlss5CompatibilityState {
@@ -46,8 +64,18 @@ public:
 
     void ObservePresentFrame(const Frame& frame);
 
-    // Returns the image that should be presented. Until a validated processing stage supplies an
-    // output, this deliberately selects Eden's untouched final frame.
+    // Records a borrowed output candidate. This does not make the image presentable by itself;
+    // readiness, dimensions and handle are revalidated when presentation selects its source.
+    void SetProcessedOutput(Dlss5ProcessedOutput output) noexcept {
+        processed_output = output;
+    }
+
+    void ClearProcessedOutput() noexcept {
+        processed_output = {};
+    }
+
+    // Returns the safest image to present. Any missing, incomplete or stale processing result
+    // falls back to Eden's untouched final frame.
     [[nodiscard]] Dlss5PresentationSource SelectPresentationSource(const Frame& frame) const noexcept;
 
     [[nodiscard]] Dlss5CompatibilityState State() const noexcept {
@@ -69,6 +97,7 @@ public:
 private:
     Dlss5CompatibilityState state{Dlss5CompatibilityState::UnsupportedGpu};
     Dlss5CompatibilityInputs inputs{};
+    Dlss5ProcessedOutput processed_output{};
     u64 frames_observed{};
     u32 last_width{};
     u32 last_height{};
