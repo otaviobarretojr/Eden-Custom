@@ -12,7 +12,7 @@ class DynamicLibrary;
 }
 
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
-namespace sl { struct FrameToken; }
+#include <sl.h>
 #endif
 
 namespace Vulkan {
