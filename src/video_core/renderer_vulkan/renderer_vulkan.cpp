@@ -202,6 +202,9 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
                                render_window.GetFramebufferLayout(), swapchain.GetImageCount(),
                                swapchain.GetImageViewFormat());
     dlss5_compatibility.ObservePresentFrame(*frame);
+    // Correlate Eden's presentation frame with Streamline before any future resource tagging or
+    // feature evaluation. Failure is non-fatal: the untouched Vulkan frame remains authoritative.
+    streamline_bootstrap.BeginFrame(dlss5_compatibility.CurrentFrameId());
     const auto presentation_source = dlss5_compatibility.SelectPresentationSource(*frame);
     scheduler.Flush(*frame->render_ready);
 
