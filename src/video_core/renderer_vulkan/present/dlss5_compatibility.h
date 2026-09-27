@@ -48,13 +48,15 @@ struct Dlss5ProcessedOutput {
     u32 width{};
     u32 height{};
     VkImage image{VK_NULL_HANDLE};
+    // Monotonic token of the exact presentation frame this output was produced from.
+    u64 frame_id{};
     bool ready{};
     // True only after the producer's GPU completion dependency has been folded into the owning
     // Frame synchronization. A CPU-side ready flag alone must never authorize presentation.
     bool synchronized_with_frame{};
 
     [[nodiscard]] bool IsValid() const noexcept {
-        return ready && synchronized_with_frame && width != 0 && height != 0 &&
+        return ready && synchronized_with_frame && frame_id != 0 && width != 0 && height != 0 &&
                image != VK_NULL_HANDLE;
     }
 };
@@ -118,6 +120,10 @@ public:
         return frames_observed;
     }
 
+    [[nodiscard]] u64 CurrentFrameId() const noexcept {
+        return current_frame_id;
+    }
+
     [[nodiscard]] const Dlss5CompatibilityInputs& Inputs() const noexcept {
         return inputs;
     }
@@ -132,6 +138,7 @@ private:
     Dlss5VulkanResourceDescription final_color_resource{};
     Dlss5ProcessedOutput processed_output{};
     u64 frames_observed{};
+    u64 current_frame_id{};
     VkFormat final_color_format{VK_FORMAT_UNDEFINED};
     u32 last_width{};
     u32 last_height{};
