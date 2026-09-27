@@ -225,6 +225,16 @@ private:
     std::array<VideoCommon::ImageViewId, MAX_IMAGE_VIEWS> image_view_ids;
     boost::container::static_vector<VkSampler, MAX_TEXTURES> sampler_handles;
 
+    struct Dlss5DepthCandidateTrace {
+        u32 width{};
+        u32 height{};
+        u32 color_buffers{};
+        u32 observations{};
+        VkSampleCountFlagBits samples{VK_SAMPLE_COUNT_1_BIT};
+        bool rescaled{};
+    };
+
+    Dlss5DepthCandidateTrace dlss5_depth_candidate_trace{};
     u32 draw_counter = 0;
 };
 
