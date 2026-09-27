@@ -10,6 +10,13 @@ namespace Vulkan {
 class Device;
 struct Frame;
 
+struct Dlss5PresentationSource {
+    u32 width{};
+    u32 height{};
+    VkImage image{VK_NULL_HANDLE};
+    bool processed{};
+};
+
 enum class Dlss5CompatibilityState {
     UnsupportedGpu,
     UnsupportedVulkan,
@@ -37,6 +44,10 @@ public:
     explicit Dlss5CompatibilityFilter(const Device& device);
 
     void ObservePresentFrame(const Frame& frame);
+
+    // Returns the image that should be presented. Until a validated processing stage supplies an
+    // output, this deliberately selects Eden's untouched final frame.
+    [[nodiscard]] Dlss5PresentationSource SelectPresentationSource(const Frame& frame) const noexcept;
 
     [[nodiscard]] Dlss5CompatibilityState State() const noexcept {
         return state;
