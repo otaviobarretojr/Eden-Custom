@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <string>
+#include <vulkan/vulkan_core.h>
 
 #include "common/dynamic_library.h"
 #include "common/fs/path_util.h"
