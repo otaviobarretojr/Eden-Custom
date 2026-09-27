@@ -167,13 +167,19 @@ Frame* PresentManager::GetRenderFrame() {
 }
 
 void PresentManager::Present(Frame* frame, const Dlss5PresentationSource& source) {
+    // Presentation must remain viable even if a future compatibility producer hands us an
+    // incomplete source. Resolve the final fallback here as a second safety boundary, independent
+    // from the filter's own selection checks.
+    const VkImage fallback_image = frame->image ? *frame->image : VK_NULL_HANDLE;
+    const bool source_valid = source.IsValid();
+    const PresentRequest request{
+        .frame = frame,
+        .source_image = source_valid ? source.image : fallback_image,
+        .source_width = source_valid ? source.width : frame->width,
+        .source_height = source_valid ? source.height : frame->height,
+    };
+
     if (use_present_thread) {
-        const PresentRequest request{
-            .frame = frame,
-            .source_image = source.image,
-            .source_width = source.width,
-            .source_height = source.height,
-        };
         scheduler.Record([this, request](vk::CommandBuffer) {
             std::unique_lock lock{queue_mutex};
             present_queue.push_back(request);
