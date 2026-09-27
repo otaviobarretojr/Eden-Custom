@@ -244,6 +244,22 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
     if (!pipeline->Configure(is_indexed))
         return;
 
+    const Framebuffer* const dlss5_framebuffer = texture_cache.GetFramebuffer();
+    if (dlss5_framebuffer != nullptr && dlss5_framebuffer->HasAspectDepthBit()) {
+        const VkExtent2D area = dlss5_framebuffer->RenderArea();
+        ++dlss5_depth_candidate_trace.observations;
+        const u64 candidate_pixels = static_cast<u64>(area.width) * area.height;
+        const u64 current_pixels =
+            static_cast<u64>(dlss5_depth_candidate_trace.width) * dlss5_depth_candidate_trace.height;
+        if (candidate_pixels > current_pixels) {
+            dlss5_depth_candidate_trace.width = area.width;
+            dlss5_depth_candidate_trace.height = area.height;
+            dlss5_depth_candidate_trace.color_buffers = dlss5_framebuffer->NumColorBuffers();
+            dlss5_depth_candidate_trace.samples = dlss5_framebuffer->Samples();
+            dlss5_depth_candidate_trace.rescaled = dlss5_framebuffer->IsRescaled();
+        }
+    }
+
     UpdateDynamicStates();
 
     query_cache.NotifySegment(true);
@@ -839,6 +855,16 @@ void RasterizerVulkan::FlushCommands() {
 }
 
 void RasterizerVulkan::TickFrame() {
+    if (dlss5_depth_candidate_trace.observations != 0) {
+        LOG_DEBUG(Render_Vulkan,
+                  "DLSS5 depth trace: observations={}, largest={}x{}, colors={}, samples={}, "
+                  "rescaled={}",
+                  dlss5_depth_candidate_trace.observations, dlss5_depth_candidate_trace.width,
+                  dlss5_depth_candidate_trace.height, dlss5_depth_candidate_trace.color_buffers,
+                  static_cast<u32>(dlss5_depth_candidate_trace.samples),
+                  dlss5_depth_candidate_trace.rescaled);
+    }
+    dlss5_depth_candidate_trace = {};
     draw_counter = 0;
     guest_descriptor_queue.TickFrame();
     compute_pass_descriptor_queue.TickFrame();
