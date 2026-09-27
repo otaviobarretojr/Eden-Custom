@@ -101,6 +101,41 @@ StreamlineBootstrap::StreamlineBootstrap() {
 #endif
 }
 
+bool StreamlineBootstrap::BeginFrame(u64 eden_frame_id) noexcept {
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    if (!initialized || !interposer || eden_frame_id == 0) {
+        return false;
+    }
+
+    PFun_slGetNewFrameToken* sl_get_new_frame_token{};
+    if (!interposer->GetSymbol("slGetNewFrameToken", &sl_get_new_frame_token) ||
+        sl_get_new_frame_token == nullptr) {
+        LOG_WARNING(Render_Vulkan,
+                    "Streamline frame lifecycle: slGetNewFrameToken export was not found");
+        return false;
+    }
+
+    // Eden already owns a monotonic frame id. Streamline accepts a host-provided uint32 frame
+    // index, which keeps its token correlated with Eden without relying on SL's internal counter.
+    const u32 frame_index = static_cast<u32>(eden_frame_id);
+    sl::FrameToken* token{};
+    const sl::Result result = sl_get_new_frame_token(token, &frame_index);
+    if (result != sl::Result::eOk || token == nullptr) {
+        LOG_WARNING(Render_Vulkan,
+                    "Streamline frame lifecycle: slGetNewFrameToken failed for Eden frame {} "
+                    "with result {}",
+                    eden_frame_id, static_cast<int>(result));
+        return false;
+    }
+
+    current_eden_frame_id = eden_frame_id;
+    return true;
+#else
+    (void)eden_frame_id;
+    return false;
+#endif
+}
+
 StreamlineBootstrap::~StreamlineBootstrap() {
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
     if (!initialized || !interposer) {
