@@ -4,6 +4,7 @@
 #pragma once
 
 #include "common/common_types.h"
+#include <vulkan/vulkan_core.h>
 
 namespace Vulkan {
 
