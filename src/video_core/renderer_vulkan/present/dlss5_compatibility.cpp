@@ -111,6 +111,13 @@ void Dlss5CompatibilityFilter::ObservePresentFrame(const Frame& frame) {
         .height = frame.height,
     };
 
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    // Build the public Streamline representation now so SDK/header drift is caught by the probe.
+    // Deliberately do not tag it yet; Neural Rendering remains disabled.
+    const auto streamline_final_color = MakeStreamlineResource(final_color_resource);
+    (void)streamline_final_color;
+#endif
+
     if (frame.width == last_width && frame.height == last_height) {
         return;
     }
