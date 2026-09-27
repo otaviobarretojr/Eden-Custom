@@ -11,6 +11,10 @@ namespace Common {
 class DynamicLibrary;
 }
 
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+namespace sl { struct FrameToken; }
+#endif
+
 namespace Vulkan {
 
 class StreamlineBootstrap final {
@@ -33,10 +37,19 @@ public:
         return current_eden_frame_id;
     }
 
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    [[nodiscard]] sl::FrameToken* CurrentFrameToken() const noexcept {
+        return current_frame_token;
+    }
+#endif
+
 private:
     std::unique_ptr<Common::DynamicLibrary> interposer;
     bool initialized{};
     u64 current_eden_frame_id{};
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    sl::FrameToken* current_frame_token{};
+#endif
 };
 
 [[nodiscard]] bool IsStreamlineBootstrapReady() noexcept;
