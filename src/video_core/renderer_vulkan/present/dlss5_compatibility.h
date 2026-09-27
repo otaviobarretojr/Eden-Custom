@@ -16,6 +16,15 @@ enum class Dlss5CompatibilityState {
     FrameTapReady,
 };
 
+struct Dlss5CompatibilityInputs {
+    u32 width{};
+    u32 height{};
+    bool final_color_available{};
+    bool depth_available{};
+    bool motion_vectors_available{};
+    bool exposure_available{};
+};
+
 class Dlss5CompatibilityFilter final {
 public:
     explicit Dlss5CompatibilityFilter(const Device& device);
@@ -34,8 +43,13 @@ public:
         return frames_observed;
     }
 
+    [[nodiscard]] const Dlss5CompatibilityInputs& Inputs() const noexcept {
+        return inputs;
+    }
+
 private:
     Dlss5CompatibilityState state{Dlss5CompatibilityState::UnsupportedGpu};
+    Dlss5CompatibilityInputs inputs{};
     u64 frames_observed{};
     u32 last_width{};
     u32 last_height{};
