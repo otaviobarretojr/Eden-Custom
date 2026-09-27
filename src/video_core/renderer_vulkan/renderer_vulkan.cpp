@@ -200,9 +200,10 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
                                render_window.GetFramebufferLayout(), swapchain.GetImageCount(),
                                swapchain.GetImageViewFormat());
     dlss5_compatibility.ObservePresentFrame(*frame);
+    const auto presentation_source = dlss5_compatibility.SelectPresentationSource(*frame);
     scheduler.Flush(*frame->render_ready);
 
-    present_manager.Present(frame);
+    present_manager.Present(frame, presentation_source);
 
     gpu.RendererFrameEndNotify();
     rasterizer.TickFrame();
