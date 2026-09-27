@@ -16,6 +16,9 @@ enum class Dlss5CompatibilityState {
     FrameTapReady,
 };
 
+// Inputs associated with the final presentation frame only. Auxiliary resources must remain
+// unavailable unless they can be proven to describe the same presented frame. In particular,
+// rasterizer depth attachments are transient per-pass resources and must not be forwarded here.
 struct Dlss5CompatibilityInputs {
     u32 width{};
     u32 height{};
@@ -23,6 +26,10 @@ struct Dlss5CompatibilityInputs {
     bool depth_available{};
     bool motion_vectors_available{};
     bool exposure_available{};
+
+    [[nodiscard]] bool HasNativeAuxiliaryInputs() const noexcept {
+        return depth_available || motion_vectors_available || exposure_available;
+    }
 };
 
 class Dlss5CompatibilityFilter final {
