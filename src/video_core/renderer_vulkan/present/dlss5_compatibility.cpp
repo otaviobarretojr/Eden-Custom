@@ -39,6 +39,18 @@ void Dlss5CompatibilityFilter::ObservePresentFrame(const Frame& frame) {
 
     ++frames_observed;
 
+    // The presentation frame is the only input Eden can guarantee at this stage. Keep the
+    // auxiliary-input contract explicit so future Streamline evaluation never mistakes generated
+    // or unavailable data for native game-engine buffers.
+    inputs = {
+        .width = frame.width,
+        .height = frame.height,
+        .final_color_available = static_cast<bool>(frame.image),
+        .depth_available = false,
+        .motion_vectors_available = false,
+        .exposure_available = false,
+    };
+
     if (frame.width == last_width && frame.height == last_height) {
         return;
     }
