@@ -172,11 +172,17 @@ void PresentManager::Present(Frame* frame, const Dlss5PresentationSource& source
     // from the filter's own selection checks.
     const VkImage fallback_image = frame->image ? *frame->image : VK_NULL_HANDLE;
     const bool source_valid = source.IsValid();
+    const Dlss5PresentationSource resolved_source{
+        .width = source_valid ? source.width : frame->width,
+        .height = source_valid ? source.height : frame->height,
+        .image = source_valid ? source.image : fallback_image,
+        .processed = source_valid && source.processed,
+    };
     const PresentRequest request{
         .frame = frame,
-        .source_image = source_valid ? source.image : fallback_image,
-        .source_width = source_valid ? source.width : frame->width,
-        .source_height = source_valid ? source.height : frame->height,
+        .source_image = resolved_source.image,
+        .source_width = resolved_source.width,
+        .source_height = resolved_source.height,
     };
 
     if (use_present_thread) {
@@ -187,7 +193,7 @@ void PresentManager::Present(Frame* frame, const Dlss5PresentationSource& source
         });
     } else {
         scheduler.WaitWorker();
-        CopyToSwapchain(frame, source);
+        CopyToSwapchain(frame, resolved_source);
         free_queue.push_back(frame);
     }
 }
