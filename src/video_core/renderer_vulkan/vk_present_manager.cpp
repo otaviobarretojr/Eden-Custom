@@ -168,14 +168,15 @@ Frame* PresentManager::GetRenderFrame() {
 
 void PresentManager::Present(Frame* frame, const Dlss5PresentationSource& source) {
     if (use_present_thread) {
-        scheduler.Record([this, frame](vk::CommandBuffer) {
+        const PresentRequest request{
+            .frame = frame,
+            .source_image = source.image,
+            .source_width = source.width,
+            .source_height = source.height,
+        };
+        scheduler.Record([this, request](vk::CommandBuffer) {
             std::unique_lock lock{queue_mutex};
-            present_queue.push_back({
-                .frame = frame,
-                .source_image = source.image,
-                .source_width = source.width,
-                .source_height = source.height,
-            });
+            present_queue.push_back(request);
             frame_cv.notify_one();
         });
     } else {
@@ -219,7 +220,7 @@ void PresentManager::RecreateFrame(Frame* frame, u32 width, u32 height, VkFormat
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .pNext = nullptr,
         .flags = 0,
-        .image = source.image,
+        .image = *frame->image,
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = image_view_format,
         .components =
