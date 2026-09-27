@@ -30,6 +30,8 @@ namespace {
     result.state = resource.layout;
     result.width = resource.width;
     result.height = resource.height;
+    result.nativeFormat = resource.format;
+    result.usage = resource.usage;
     return result;
 }
 #endif
