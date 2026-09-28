@@ -869,19 +869,23 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
     if (dlss5_depth_candidate_trace.observations == 0) {
         return;
     }
-    LOG_INFO(Render_Vulkan,
-             "DLSS5 depth trace: frame_id={}, observations={}, largest={}x{}, colors={}, "
-              "samples={}, image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, rescaled={}",
-              frame_id, dlss5_depth_candidate_trace.observations, dlss5_depth_candidate_trace.width,
-              dlss5_depth_candidate_trace.height, dlss5_depth_candidate_trace.color_buffers,
-              static_cast<u32>(dlss5_depth_candidate_trace.samples),
-              reinterpret_cast<uintptr_t>(dlss5_depth_candidate_trace.image),
-              static_cast<u32>(dlss5_depth_candidate_trace.range.aspectMask),
-              dlss5_depth_candidate_trace.range.baseMipLevel,
-              dlss5_depth_candidate_trace.range.levelCount,
-              dlss5_depth_candidate_trace.range.baseArrayLayer,
-              dlss5_depth_candidate_trace.range.layerCount,
-              dlss5_depth_candidate_trace.rescaled);
+    const auto log_candidate = [frame_id](const char* kind, const Dlss5DepthCandidate& candidate) {
+        if (candidate.observations == 0) {
+            return;
+        }
+        LOG_INFO(Render_Vulkan,
+                 "DLSS5 depth candidate: frame_id={}, kind={}, observations={}, largest={}x{}, "
+                 "colors={}, samples={}, image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, "
+                 "rescaled={}",
+                 frame_id, kind, candidate.observations, candidate.width, candidate.height,
+                 candidate.color_buffers, static_cast<u32>(candidate.samples),
+                 reinterpret_cast<uintptr_t>(candidate.image),
+                 static_cast<u32>(candidate.range.aspectMask), candidate.range.baseMipLevel,
+                 candidate.range.levelCount, candidate.range.baseArrayLayer,
+                 candidate.range.layerCount, candidate.rescaled);
+    };
+    log_candidate("color-linked", dlss5_depth_candidate_trace.color_linked);
+    log_candidate("depth-only", dlss5_depth_candidate_trace.depth_only);
 }
 
 #endif
