@@ -867,8 +867,8 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
     if (dlss5_depth_candidate_trace.observations == 0) {
         return;
     }
-    LOG_DEBUG(Render_Vulkan,
-              "DLSS5 depth trace: frame_id={}, observations={}, largest={}x{}, colors={}, "
+    LOG_INFO(Render_Vulkan,
+             "DLSS5 depth trace: frame_id={}, observations={}, largest={}x{}, colors={}, "
               "samples={}, image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, rescaled={}",
               frame_id, dlss5_depth_candidate_trace.observations, dlss5_depth_candidate_trace.width,
               dlss5_depth_candidate_trace.height, dlss5_depth_candidate_trace.color_buffers,
