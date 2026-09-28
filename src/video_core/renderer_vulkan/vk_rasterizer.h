@@ -236,6 +236,7 @@ private:
         u32 observations{};
         u32 image_switches{};
         VkSampleCountFlagBits samples{VK_SAMPLE_COUNT_1_BIT};
+        VkFormat format{VK_FORMAT_UNDEFINED};
         VkImage image{VK_NULL_HANDLE};
         VkImage last_image{VK_NULL_HANDLE};
         VkImageSubresourceRange range{};
