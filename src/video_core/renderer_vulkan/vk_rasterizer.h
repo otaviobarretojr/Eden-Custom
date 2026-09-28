@@ -121,7 +121,9 @@ public:
     void TiledCacheBarrier() override;
     void FlushCommands() override;
     void TickFrame() override;
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
     void TracePresentationFrame(u64 frame_id) const;
+#endif
     bool AccelerateConditionalRendering() override;
     bool HasDrawTransformFeedback() override;
     bool AccelerateSurfaceCopy(const Tegra::Engines::Fermi2D::Surface& src,
@@ -226,6 +228,7 @@ private:
     std::array<VideoCommon::ImageViewId, MAX_IMAGE_VIEWS> image_view_ids;
     boost::container::static_vector<VkSampler, MAX_TEXTURES> sampler_handles;
 
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
     struct Dlss5DepthCandidateTrace {
         u32 width{};
         u32 height{};
@@ -236,6 +239,7 @@ private:
     };
 
     Dlss5DepthCandidateTrace dlss5_depth_candidate_trace{};
+#endif
     u32 draw_counter = 0;
 };
 
