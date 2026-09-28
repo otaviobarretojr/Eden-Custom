@@ -253,6 +253,14 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
                               ? dlss5_depth_candidate_trace.color_linked
                               : dlss5_depth_candidate_trace.depth_only;
         ++candidate.observations;
+        const u32 depth_index = dlss5_framebuffer->NumColorBuffers();
+        if (dlss5_framebuffer->NumImages() > depth_index) {
+            const VkImage observed_image = dlss5_framebuffer->Images()[depth_index];
+            if (candidate.last_image != VK_NULL_HANDLE && candidate.last_image != observed_image) {
+                ++candidate.image_switches;
+            }
+            candidate.last_image = observed_image;
+        }
         const u64 candidate_pixels = static_cast<u64>(area.width) * area.height;
         const u64 current_pixels = static_cast<u64>(candidate.width) * candidate.height;
         if (candidate_pixels > current_pixels) {
@@ -260,7 +268,6 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
             candidate.height = area.height;
             candidate.color_buffers = dlss5_framebuffer->NumColorBuffers();
             candidate.samples = dlss5_framebuffer->Samples();
-            const u32 depth_index = dlss5_framebuffer->NumColorBuffers();
             if (dlss5_framebuffer->NumImages() > depth_index) {
                 candidate.image = dlss5_framebuffer->Images()[depth_index];
                 candidate.range = dlss5_framebuffer->ImageRanges()[depth_index];
@@ -874,12 +881,13 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
             return;
         }
         LOG_INFO(Render_Vulkan,
-                 "DLSS5 depth candidate: frame_id={}, kind={}, observations={}, largest={}x{}, "
-                 "colors={}, samples={}, image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, "
-                 "rescaled={}",
-                 frame_id, kind, candidate.observations, candidate.width, candidate.height,
-                 candidate.color_buffers, static_cast<u32>(candidate.samples),
+                 "DLSS5 depth candidate: frame_id={}, kind={}, observations={}, switches={}, "
+                 "largest={}x{}, colors={}, samples={}, image=0x{:x}, last_image=0x{:x}, "
+                 "aspect=0x{:x}, mip={}+{}, layer={}+{}, rescaled={}",
+                 frame_id, kind, candidate.observations, candidate.image_switches, candidate.width,
+                 candidate.height, candidate.color_buffers, static_cast<u32>(candidate.samples),
                  reinterpret_cast<uintptr_t>(candidate.image),
+                 reinterpret_cast<uintptr_t>(candidate.last_image),
                  static_cast<u32>(candidate.range.aspectMask), candidate.range.baseMipLevel,
                  candidate.range.levelCount, candidate.range.baseArrayLayer,
                  candidate.range.layerCount, candidate.rescaled);
