@@ -249,21 +249,23 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
     if (dlss5_framebuffer != nullptr && dlss5_framebuffer->HasAspectDepthBit()) {
         const VkExtent2D area = dlss5_framebuffer->RenderArea();
         ++dlss5_depth_candidate_trace.observations;
+        auto& candidate = dlss5_framebuffer->NumColorBuffers() > 0
+                              ? dlss5_depth_candidate_trace.color_linked
+                              : dlss5_depth_candidate_trace.depth_only;
+        ++candidate.observations;
         const u64 candidate_pixels = static_cast<u64>(area.width) * area.height;
-        const u64 current_pixels =
-            static_cast<u64>(dlss5_depth_candidate_trace.width) * dlss5_depth_candidate_trace.height;
+        const u64 current_pixels = static_cast<u64>(candidate.width) * candidate.height;
         if (candidate_pixels > current_pixels) {
-            dlss5_depth_candidate_trace.width = area.width;
-            dlss5_depth_candidate_trace.height = area.height;
-            dlss5_depth_candidate_trace.color_buffers = dlss5_framebuffer->NumColorBuffers();
-            dlss5_depth_candidate_trace.samples = dlss5_framebuffer->Samples();
+            candidate.width = area.width;
+            candidate.height = area.height;
+            candidate.color_buffers = dlss5_framebuffer->NumColorBuffers();
+            candidate.samples = dlss5_framebuffer->Samples();
             const u32 depth_index = dlss5_framebuffer->NumColorBuffers();
             if (dlss5_framebuffer->NumImages() > depth_index) {
-                dlss5_depth_candidate_trace.image = dlss5_framebuffer->Images()[depth_index];
-                dlss5_depth_candidate_trace.range =
-                    dlss5_framebuffer->ImageRanges()[depth_index];
+                candidate.image = dlss5_framebuffer->Images()[depth_index];
+                candidate.range = dlss5_framebuffer->ImageRanges()[depth_index];
             }
-            dlss5_depth_candidate_trace.rescaled = dlss5_framebuffer->IsRescaled();
+            candidate.rescaled = dlss5_framebuffer->IsRescaled();
         }
     }
 #endif
