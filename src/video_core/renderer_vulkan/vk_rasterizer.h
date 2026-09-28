@@ -229,7 +229,7 @@ private:
     boost::container::static_vector<VkSampler, MAX_TEXTURES> sampler_handles;
 
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
-    struct Dlss5DepthCandidateTrace {
+    struct Dlss5DepthCandidate {
         u32 width{};
         u32 height{};
         u32 color_buffers{};
@@ -238,6 +238,12 @@ private:
         VkImage image{VK_NULL_HANDLE};
         VkImageSubresourceRange range{};
         bool rescaled{};
+    };
+
+    struct Dlss5DepthCandidateTrace {
+        u32 observations{};
+        Dlss5DepthCandidate color_linked{};
+        Dlss5DepthCandidate depth_only{};
     };
 
     Dlss5DepthCandidateTrace dlss5_depth_candidate_trace{};
