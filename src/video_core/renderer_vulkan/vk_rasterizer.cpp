@@ -244,6 +244,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
     if (!pipeline->Configure(is_indexed))
         return;
 
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
     const Framebuffer* const dlss5_framebuffer = texture_cache.GetFramebuffer();
     if (dlss5_framebuffer != nullptr && dlss5_framebuffer->HasAspectDepthBit()) {
         const VkExtent2D area = dlss5_framebuffer->RenderArea();
@@ -259,6 +260,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
             dlss5_depth_candidate_trace.rescaled = dlss5_framebuffer->IsRescaled();
         }
     }
+#endif
 
     UpdateDynamicStates();
 
@@ -854,6 +856,7 @@ void RasterizerVulkan::FlushCommands() {
     scheduler.Flush();
 }
 
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
 void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
     if (dlss5_depth_candidate_trace.observations == 0) {
         return;
@@ -867,8 +870,12 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
               dlss5_depth_candidate_trace.rescaled);
 }
 
+#endif
+
 void RasterizerVulkan::TickFrame() {
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
     dlss5_depth_candidate_trace = {};
+#endif
     draw_counter = 0;
     guest_descriptor_queue.TickFrame();
     compute_pass_descriptor_queue.TickFrame();
