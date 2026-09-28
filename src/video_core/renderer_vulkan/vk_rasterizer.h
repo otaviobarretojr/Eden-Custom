@@ -234,8 +234,10 @@ private:
         u32 height{};
         u32 color_buffers{};
         u32 observations{};
+        u32 image_switches{};
         VkSampleCountFlagBits samples{VK_SAMPLE_COUNT_1_BIT};
         VkImage image{VK_NULL_HANDLE};
+        VkImage last_image{VK_NULL_HANDLE};
         VkImageSubresourceRange range{};
         bool rescaled{};
     };
