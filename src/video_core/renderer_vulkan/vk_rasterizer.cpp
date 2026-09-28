@@ -257,6 +257,12 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
             dlss5_depth_candidate_trace.height = area.height;
             dlss5_depth_candidate_trace.color_buffers = dlss5_framebuffer->NumColorBuffers();
             dlss5_depth_candidate_trace.samples = dlss5_framebuffer->Samples();
+            const u32 depth_index = dlss5_framebuffer->NumColorBuffers();
+            if (dlss5_framebuffer->NumImages() > depth_index) {
+                dlss5_depth_candidate_trace.image = dlss5_framebuffer->Images()[depth_index];
+                dlss5_depth_candidate_trace.range =
+                    dlss5_framebuffer->ImageRanges()[depth_index];
+            }
             dlss5_depth_candidate_trace.rescaled = dlss5_framebuffer->IsRescaled();
         }
     }
@@ -863,10 +869,16 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
     }
     LOG_DEBUG(Render_Vulkan,
               "DLSS5 depth trace: frame_id={}, observations={}, largest={}x{}, colors={}, "
-              "samples={}, rescaled={}",
+              "samples={}, image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, rescaled={}",
               frame_id, dlss5_depth_candidate_trace.observations, dlss5_depth_candidate_trace.width,
               dlss5_depth_candidate_trace.height, dlss5_depth_candidate_trace.color_buffers,
               static_cast<u32>(dlss5_depth_candidate_trace.samples),
+              reinterpret_cast<uintptr_t>(dlss5_depth_candidate_trace.image),
+              static_cast<u32>(dlss5_depth_candidate_trace.range.aspectMask),
+              dlss5_depth_candidate_trace.range.baseMipLevel,
+              dlss5_depth_candidate_trace.range.levelCount,
+              dlss5_depth_candidate_trace.range.baseArrayLayer,
+              dlss5_depth_candidate_trace.range.layerCount,
               dlss5_depth_candidate_trace.rescaled);
 }
 
