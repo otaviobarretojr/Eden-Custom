@@ -149,7 +149,17 @@ jobs:
             "Streamline SDK: 2.14.1"
             "Streamline SHA256: 92c4d954631a1710da86ca3fa8d5034f2b9503838c95fc4ae977ae149319781b"
             "Neural Rendering evaluation: NOT ENABLED YET"
-            "Purpose: validate secure pre-Vulkan Streamline core bootstrap and final-frame tap"
+            "Purpose: validate secure pre-Vulkan Streamline core bootstrap, final-frame tap, and depth-candidate diagnostics"
+            ""
+            "Pokemon Violet runtime diagnostic:"
+            "1. Start this eden.exe and launch Pokemon Violet."
+            "2. Play through a normal 3D scene for about 30 seconds."
+            "3. Close Eden normally so the log is flushed."
+            "4. In the Eden log, search for: DLSS5 depth trace"
+            "5. Preserve a contiguous sample of those lines for analysis."
+            ""
+            "Expected fields: frame_id, observations, largest, colors, samples, image, aspect, mip, layer, rescaled."
+            "These lines are diagnostics only. A reported VkImage is NOT yet approved or tagged as a Streamline input."
           ) | Set-Content -Encoding UTF8 dlss5-package/DLSS5_PROBE.txt
 
       - name: Upload DLSS5 Streamline probe
