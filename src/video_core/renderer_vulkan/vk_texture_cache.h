@@ -201,6 +201,10 @@ public:
         return has_depth;
     }
 
+    [[nodiscard]] VkFormat DepthFormat() const noexcept {
+        return depth_format;
+    }
+
     [[nodiscard]] bool HasAspectStencilBit() const noexcept {
         return has_stencil;
     }
@@ -219,6 +223,7 @@ private:
     std::array<VkImage, 9> images{};
     std::array<VkImageSubresourceRange, 9> image_ranges{};
     std::array<size_t, NUM_RT> rt_map{};
+    VkFormat depth_format{VK_FORMAT_UNDEFINED};
     bool has_depth{};
     bool has_stencil{};
     bool is_rescaled{};
