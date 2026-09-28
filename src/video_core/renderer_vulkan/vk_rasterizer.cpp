@@ -854,16 +854,20 @@ void RasterizerVulkan::FlushCommands() {
     scheduler.Flush();
 }
 
-void RasterizerVulkan::TickFrame() {
-    if (dlss5_depth_candidate_trace.observations != 0) {
-        LOG_DEBUG(Render_Vulkan,
-                  "DLSS5 depth trace: observations={}, largest={}x{}, colors={}, samples={}, "
-                  "rescaled={}",
-                  dlss5_depth_candidate_trace.observations, dlss5_depth_candidate_trace.width,
-                  dlss5_depth_candidate_trace.height, dlss5_depth_candidate_trace.color_buffers,
-                  static_cast<u32>(dlss5_depth_candidate_trace.samples),
-                  dlss5_depth_candidate_trace.rescaled);
+void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
+    if (dlss5_depth_candidate_trace.observations == 0) {
+        return;
     }
+    LOG_DEBUG(Render_Vulkan,
+              "DLSS5 depth trace: frame_id={}, observations={}, largest={}x{}, colors={}, "
+              "samples={}, rescaled={}",
+              frame_id, dlss5_depth_candidate_trace.observations, dlss5_depth_candidate_trace.width,
+              dlss5_depth_candidate_trace.height, dlss5_depth_candidate_trace.color_buffers,
+              static_cast<u32>(dlss5_depth_candidate_trace.samples),
+              dlss5_depth_candidate_trace.rescaled);
+}
+
+void RasterizerVulkan::TickFrame() {
     dlss5_depth_candidate_trace = {};
     draw_counter = 0;
     guest_descriptor_queue.TickFrame();
