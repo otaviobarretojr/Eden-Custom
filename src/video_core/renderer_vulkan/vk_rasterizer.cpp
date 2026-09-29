@@ -910,6 +910,9 @@ RasterizerVulkan::Dlss5DepthSnapshot RasterizerVulkan::GetDlss5DepthSnapshot() c
     const u64 color_pixels = static_cast<u64>(color_linked.width) * color_linked.height;
     const u64 depth_pixels = static_cast<u64>(depth_only.width) * depth_only.height;
     const auto& candidate = color_pixels >= depth_pixels ? color_linked : depth_only;
+    const bool owner_alive = texture_cache.IsImageAlive(candidate.image_id);
+    const bool owner_matches_image =
+        owner_alive && texture_cache.GetImage(candidate.image_id).Handle() == candidate.image;
     return {
         .width = candidate.width,
         .height = candidate.height,
@@ -920,6 +923,8 @@ RasterizerVulkan::Dlss5DepthSnapshot RasterizerVulkan::GetDlss5DepthSnapshot() c
         .layout = candidate.layout,
         .range = candidate.range,
         .rescaled = candidate.rescaled,
+        .owner_alive = owner_alive,
+        .owner_matches_image = owner_matches_image,
     };
 }
 

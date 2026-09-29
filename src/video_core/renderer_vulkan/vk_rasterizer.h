@@ -132,6 +132,8 @@ public:
         VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
         VkImageSubresourceRange range{};
         bool rescaled{};
+        bool owner_alive{};
+        bool owner_matches_image{};
 
         [[nodiscard]] bool IsValid() const noexcept {
             return width != 0 && height != 0 && format != VK_FORMAT_UNDEFINED &&

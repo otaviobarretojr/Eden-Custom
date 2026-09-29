@@ -208,15 +208,18 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
     if (dlss5_depth_snapshot.IsValid()) {
         LOG_INFO(Render_Vulkan,
                  "DLSS5 presentation depth snapshot: frame_id={}, {}x{}, format={}, image=0x{:x}, "
-                 "aspect=0x{:x}, mip={}+{}, layer={}+{}, rescaled={}",
+                 "usage=0x{:x}, layout={}, aspect=0x{:x}, mip={}+{}, layer={}+{}, "
+                 "rescaled={}, owner_alive={}, owner_matches_image={}",
                  dlss5_compatibility.CurrentFrameId(), dlss5_depth_snapshot.width,
                  dlss5_depth_snapshot.height, static_cast<u32>(dlss5_depth_snapshot.format),
                  reinterpret_cast<uintptr_t>(dlss5_depth_snapshot.image),
+                 static_cast<u32>(dlss5_depth_snapshot.usage),
+                 static_cast<u32>(dlss5_depth_snapshot.layout),
                  static_cast<u32>(dlss5_depth_snapshot.range.aspectMask),
                  dlss5_depth_snapshot.range.baseMipLevel, dlss5_depth_snapshot.range.levelCount,
                  dlss5_depth_snapshot.range.baseArrayLayer, dlss5_depth_snapshot.range.layerCount,
-                 dlss5_depth_snapshot.rescaled);
-    }
+                 dlss5_depth_snapshot.rescaled, dlss5_depth_snapshot.owner_alive,
+                 dlss5_depth_snapshot.owner_matches_image);
 #endif
     // Correlate Eden's presentation frame with Streamline before any future resource tagging or
     // feature evaluation. Failure is non-fatal: the untouched Vulkan frame remains authoritative.
