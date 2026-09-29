@@ -2122,7 +2122,7 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
                      ImageId image_id_, Image& image)
     : VideoCommon::ImageViewBase{info, image.info, image_id_, image.gpu_addr},
       device{&runtime.device}, image_handle{image.Handle()},
-      samples(ConvertSampleCount(image.info.num_samples)) {
+      samples(ConvertSampleCount(image.info.num_samples)), image_usage{image.UsageFlags()} {
     using Shader::TextureType;
 
     const VkImageAspectFlags aspect_mask = ImageViewAspectMask(info);
@@ -2446,6 +2446,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
             MaxwellToVK::SurfaceFormat(runtime.device, FormatType::Optimal, false,
                                        depth_buffer->format)
                 .format;
+        depth_usage = depth_buffer->UsageFlags();
         num_layers = (std::max)(num_layers, depth_buffer->range.extent.layers);
         images[num_images] = depth_buffer->ImageHandle();
         const VkImageSubresourceRange subresource_range = MakeSubresourceRange(depth_buffer);

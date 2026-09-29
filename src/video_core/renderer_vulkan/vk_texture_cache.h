@@ -205,6 +205,10 @@ public:
         return depth_format;
     }
 
+    [[nodiscard]] VkImageUsageFlags DepthUsageFlags() const noexcept {
+        return depth_usage;
+    }
+
     [[nodiscard]] bool HasAspectStencilBit() const noexcept {
         return has_stencil;
     }
@@ -224,6 +228,7 @@ private:
     std::array<VkImageSubresourceRange, 9> image_ranges{};
     std::array<size_t, NUM_RT> rt_map{};
     VkFormat depth_format{VK_FORMAT_UNDEFINED};
+    VkImageUsageFlags depth_usage{};
     bool has_depth{};
     bool has_stencil{};
     bool is_rescaled{};
@@ -364,6 +369,10 @@ public:
         return samples;
     }
 
+    [[nodiscard]] VkImageUsageFlags UsageFlags() const noexcept {
+        return image_usage;
+    }
+
     [[nodiscard]] GPUVAddr GpuAddr() const noexcept {
         return gpu_addr;
     }
@@ -392,6 +401,7 @@ private:
     VkImage image_handle = VK_NULL_HANDLE;
     VkImageView render_target = VK_NULL_HANDLE;
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+    VkImageUsageFlags image_usage{};
     u32 buffer_size = 0;
 };
 

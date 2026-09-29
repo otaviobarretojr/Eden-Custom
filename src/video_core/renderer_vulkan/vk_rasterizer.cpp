@@ -269,6 +269,10 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
             candidate.color_buffers = dlss5_framebuffer->NumColorBuffers();
             candidate.samples = dlss5_framebuffer->Samples();
             candidate.format = dlss5_framebuffer->DepthFormat();
+            candidate.usage = dlss5_framebuffer->DepthUsageFlags();
+            // Texture-cache images are initialized into GENERAL and render passes preserve
+            // GENERAL as both the attachment and final layout.
+            candidate.layout = VK_IMAGE_LAYOUT_GENERAL;
             if (dlss5_framebuffer->NumImages() > depth_index) {
                 candidate.image = dlss5_framebuffer->Images()[depth_index];
                 candidate.range = dlss5_framebuffer->ImageRanges()[depth_index];
@@ -883,11 +887,13 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
         }
         LOG_INFO(Render_Vulkan,
                  "DLSS5 depth candidate: frame_id={}, kind={}, observations={}, switches={}, "
-                 "largest={}x{}, colors={}, samples={}, format={}, image=0x{:x}, "
-                 "last_image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, rescaled={}",
+                 "largest={}x{}, colors={}, samples={}, format={}, usage=0x{:x}, layout={}, "
+                 "image=0x{:x}, last_image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, "
+                 "rescaled={}",
                  frame_id, kind, candidate.observations, candidate.image_switches, candidate.width,
                  candidate.height, candidate.color_buffers, static_cast<u32>(candidate.samples),
-                 static_cast<u32>(candidate.format), reinterpret_cast<uintptr_t>(candidate.image),
+                 static_cast<u32>(candidate.format), static_cast<u32>(candidate.usage),
+                 static_cast<u32>(candidate.layout), reinterpret_cast<uintptr_t>(candidate.image),
                  reinterpret_cast<uintptr_t>(candidate.last_image),
                  static_cast<u32>(candidate.range.aspectMask), candidate.range.baseMipLevel,
                  candidate.range.levelCount, candidate.range.baseArrayLayer,
@@ -908,6 +914,8 @@ RasterizerVulkan::Dlss5DepthSnapshot RasterizerVulkan::GetDlss5DepthSnapshot() c
         .height = candidate.height,
         .format = candidate.format,
         .image = candidate.image,
+        .usage = candidate.usage,
+        .layout = candidate.layout,
         .range = candidate.range,
         .rescaled = candidate.rescaled,
     };
