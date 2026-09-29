@@ -122,7 +122,23 @@ public:
     void FlushCommands() override;
     void TickFrame() override;
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    struct Dlss5DepthSnapshot {
+        u32 width{};
+        u32 height{};
+        VkFormat format{VK_FORMAT_UNDEFINED};
+        VkImage image{VK_NULL_HANDLE};
+        VkImageSubresourceRange range{};
+        bool rescaled{};
+
+        [[nodiscard]] bool IsValid() const noexcept {
+            return width != 0 && height != 0 && format != VK_FORMAT_UNDEFINED &&
+                   image != VK_NULL_HANDLE &&
+                   (range.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
+        }
+    };
+
     void TracePresentationFrame(u64 frame_id) const;
+    [[nodiscard]] Dlss5DepthSnapshot GetDlss5DepthSnapshot() const noexcept;
 #endif
     bool AccelerateConditionalRendering() override;
     bool HasDrawTransformFeedback() override;
