@@ -897,6 +897,22 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
     log_candidate("depth-only", dlss5_depth_candidate_trace.depth_only);
 }
 
+RasterizerVulkan::Dlss5DepthSnapshot RasterizerVulkan::GetDlss5DepthSnapshot() const noexcept {
+    const auto& color_linked = dlss5_depth_candidate_trace.color_linked;
+    const auto& depth_only = dlss5_depth_candidate_trace.depth_only;
+    const u64 color_pixels = static_cast<u64>(color_linked.width) * color_linked.height;
+    const u64 depth_pixels = static_cast<u64>(depth_only.width) * depth_only.height;
+    const auto& candidate = color_pixels >= depth_pixels ? color_linked : depth_only;
+    return {
+        .width = candidate.width,
+        .height = candidate.height,
+        .format = candidate.format,
+        .image = candidate.image,
+        .range = candidate.range,
+        .rescaled = candidate.rescaled,
+    };
+
+
 #endif
 
 void RasterizerVulkan::TickFrame() {
