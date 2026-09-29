@@ -148,6 +148,13 @@ public:
         return values_capacity - free_list.size();
     }
 
+    [[nodiscard]] bool contains(SlotId id) const noexcept {
+        if (!id || id.index / 64 >= stored_bitset.size()) {
+            return false;
+        }
+        return ((stored_bitset[id.index / 64] >> (id.index % 64)) & 1) != 0;
+    }
+
 private:
     struct NonTrivialDummy {
         NonTrivialDummy() noexcept {}
