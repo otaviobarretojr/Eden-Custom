@@ -911,7 +911,7 @@ RasterizerVulkan::Dlss5DepthSnapshot RasterizerVulkan::GetDlss5DepthSnapshot() c
         .range = candidate.range,
         .rescaled = candidate.rescaled,
     };
-
+}
 
 #endif
 
