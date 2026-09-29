@@ -167,6 +167,14 @@ public:
     /// Mark an image as modified from the GPU
     void MarkModification(ImageId id) noexcept;
 
+    [[nodiscard]] bool IsImageAlive(ImageId id) const noexcept {
+        return slot_images.contains(id);
+    }
+
+    [[nodiscard]] const Image& GetImage(ImageId id) const noexcept {
+        return slot_images[id];
+    }
+
     /// Fill image_view_ids with the graphics images in indices
     template <bool has_blacklists>
     void FillGraphicsImageViews(std::span<ImageViewInOut> views);
