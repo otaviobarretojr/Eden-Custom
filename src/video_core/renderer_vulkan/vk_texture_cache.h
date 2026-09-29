@@ -209,6 +209,10 @@ public:
         return depth_usage;
     }
 
+    [[nodiscard]] ImageId DepthImageId() const noexcept {
+        return depth_image_id;
+    }
+
     [[nodiscard]] bool HasAspectStencilBit() const noexcept {
         return has_stencil;
     }
@@ -229,6 +233,7 @@ private:
     std::array<size_t, NUM_RT> rt_map{};
     VkFormat depth_format{VK_FORMAT_UNDEFINED};
     VkImageUsageFlags depth_usage{};
+    ImageId depth_image_id{};
     bool has_depth{};
     bool has_stencil{};
     bool is_rescaled{};

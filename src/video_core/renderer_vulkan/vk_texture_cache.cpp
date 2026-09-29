@@ -2447,6 +2447,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                                        depth_buffer->format)
                 .format;
         depth_usage = depth_buffer->UsageFlags();
+        depth_image_id = depth_buffer->image_id;
         num_layers = (std::max)(num_layers, depth_buffer->range.extent.layers);
         images[num_images] = depth_buffer->ImageHandle();
         const VkImageSubresourceRange subresource_range = MakeSubresourceRange(depth_buffer);

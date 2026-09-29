@@ -127,6 +127,7 @@ public:
         u32 height{};
         VkFormat format{VK_FORMAT_UNDEFINED};
         VkImage image{VK_NULL_HANDLE};
+        VideoCommon::ImageId image_id{};
         VkImageUsageFlags usage{};
         VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
         VkImageSubresourceRange range{};
@@ -257,6 +258,7 @@ private:
         VkFormat format{VK_FORMAT_UNDEFINED};
         VkImage image{VK_NULL_HANDLE};
         VkImage last_image{VK_NULL_HANDLE};
+        VideoCommon::ImageId image_id{};
         VkImageUsageFlags usage{};
         VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
         VkImageSubresourceRange range{};

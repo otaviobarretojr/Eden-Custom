@@ -270,6 +270,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
             candidate.samples = dlss5_framebuffer->Samples();
             candidate.format = dlss5_framebuffer->DepthFormat();
             candidate.usage = dlss5_framebuffer->DepthUsageFlags();
+            candidate.image_id = dlss5_framebuffer->DepthImageId();
             // Texture-cache images are initialized into GENERAL and render passes preserve
             // GENERAL as both the attachment and final layout.
             candidate.layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -914,6 +915,7 @@ RasterizerVulkan::Dlss5DepthSnapshot RasterizerVulkan::GetDlss5DepthSnapshot() c
         .height = candidate.height,
         .format = candidate.format,
         .image = candidate.image,
+        .image_id = candidate.image_id,
         .usage = candidate.usage,
         .layout = candidate.layout,
         .range = candidate.range,
