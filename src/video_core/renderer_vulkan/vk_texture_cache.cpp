@@ -2144,8 +2144,8 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
     }
     const auto format_info = MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, format);
     const VkImageUsageFlags requested_view_usage = ImageUsageFlags(format_info, format);
-    const VkImageUsageFlags image_usage = image.UsageFlags();
-    const VkImageUsageFlags clamped_view_usage = requested_view_usage & image_usage;
+    const VkImageUsageFlags backing_image_usage = image.UsageFlags();
+    const VkImageUsageFlags clamped_view_usage = requested_view_usage & backing_image_usage;
     const VkImageViewUsageCreateInfo image_view_usage{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO,
         .pNext = nullptr,
