@@ -228,12 +228,14 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
         streamline_bootstrap.BeginFrame(dlss5_compatibility.CurrentFrameId());
     (void)streamline_frame_ready;
     const auto presentation_source = dlss5_compatibility.SelectPresentationSource(*frame);
-    const u64 presentation_submit_tick = scheduler.Flush(*frame->render_ready);
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    const u64 presentation_submit_tick = scheduler.Flush(*frame->render_ready);
     LOG_INFO(Render_Vulkan,
              "DLSS5 presentation submission: frame_id={}, submit_tick={}, gpu_complete={}",
              dlss5_compatibility.CurrentFrameId(), presentation_submit_tick,
              scheduler.IsFree(presentation_submit_tick));
+#else
+    scheduler.Flush(*frame->render_ready);
 #endif
 
     present_manager.Present(frame, presentation_source);
