@@ -870,6 +870,19 @@ void BlitScale(Scheduler& scheduler, VkImage src_image, VkImage dst_image, const
 }
 } // Anonymous namespace
 
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+struct TextureCacheRuntime::ExternalImageLeaseState {
+    struct RetainedImage {
+        Image image;
+        u64 gpu_tick{};
+        u32 frames_remaining{};
+    };
+
+    std::unordered_map<VkImage, u64> leases;
+    std::vector<RetainedImage> retained_images;
+};
+#endif
+
 TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& scheduler_,
                                          MemoryAllocator& memory_allocator_,
                                          StagingBufferPool& staging_buffer_pool_,
@@ -880,6 +893,9 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
     : device{device_}, scheduler{scheduler_}, memory_allocator{memory_allocator_},
       staging_buffer_pool{staging_buffer_pool_}, blit_image_helper{blit_image_helper_},
       render_pass_cache{render_pass_cache_}, resolution{Settings::values.resolution_info} {
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    external_image_leases = std::make_unique<ExternalImageLeaseState>();
+#endif
     if (Settings::values.accelerate_astc.GetValue() == Settings::AstcDecodeMode::Gpu) {
         astc_decoder_pass.emplace(device, scheduler, descriptor_pool, staging_buffer_pool,
                                   compute_pass_descriptor_queue, memory_allocator);
@@ -1584,7 +1600,50 @@ std::optional<size_t> TextureCacheRuntime::GetSamplerHeapBudget() const {
     return device.GetSamplerHeapBudget();
 }
 
-void TextureCacheRuntime::TickFrame() {}
+TextureCacheRuntime::~TextureCacheRuntime() = default;
+
+void TextureCacheRuntime::TickFrame() {
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    auto& state = *external_image_leases;
+    for (auto& retained : state.retained_images) {
+        if (retained.frames_remaining > 0) {
+            --retained.frames_remaining;
+        }
+    }
+    std::erase_if(state.retained_images, [this](const auto& retained) {
+        return retained.frames_remaining == 0 && scheduler.IsFree(retained.gpu_tick);
+    });
+    std::erase_if(state.leases, [this](const auto& entry) {
+        return scheduler.IsFree(entry.second);
+    });
+#endif
+}
+
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+void TextureCacheRuntime::RegisterExternalImageLease(VkImage image, u64 gpu_tick) {
+    if (image == VK_NULL_HANDLE || gpu_tick == 0) {
+        return;
+    }
+    auto& lease_tick = external_image_leases->leases[image];
+    lease_tick = (std::max)(lease_tick, gpu_tick);
+}
+
+bool TextureCacheRuntime::RetainExternalImageIfLeased(Image&& image, bool preserve_frame_delay) {
+    auto& state = *external_image_leases;
+    const VkImage handle = image.Handle();
+    const auto it = state.leases.find(handle);
+    if (it == state.leases.end() || scheduler.IsFree(it->second)) {
+        return false;
+    }
+    state.retained_images.push_back({
+        .image = std::move(image),
+        .gpu_tick = it->second,
+        .frames_remaining = preserve_frame_delay ? 8U : 0U,
+    });
+    state.leases.erase(it);
+    return true;
+}
+#endif
 
 Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu_addr_,
              VAddr cpu_addr_)

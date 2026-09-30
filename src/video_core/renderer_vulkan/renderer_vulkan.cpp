@@ -229,10 +229,15 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
     (void)streamline_frame_ready;
     const auto presentation_source = dlss5_compatibility.SelectPresentationSource(*frame);
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    const u64 expected_submit_tick = scheduler.CurrentTick();
+    const bool depth_lease_registered =
+        rasterizer.LeaseDlss5Depth(dlss5_depth_snapshot, expected_submit_tick);
     const u64 presentation_submit_tick = scheduler.Flush(*frame->render_ready);
     LOG_INFO(Render_Vulkan,
-             "DLSS5 presentation submission: frame_id={}, submit_tick={}, gpu_complete={}",
-             dlss5_compatibility.CurrentFrameId(), presentation_submit_tick,
+             "DLSS5 presentation submission: frame_id={}, submit_tick={}, expected_tick={}, "
+             "tick_matches={}, depth_lease_registered={}, gpu_complete={}",
+             dlss5_compatibility.CurrentFrameId(), presentation_submit_tick, expected_submit_tick,
+             presentation_submit_tick == expected_submit_tick, depth_lease_registered,
              scheduler.IsFree(presentation_submit_tick));
 #else
     scheduler.Flush(*frame->render_ready);

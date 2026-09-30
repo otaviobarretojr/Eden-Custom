@@ -2493,7 +2493,15 @@ void TextureCache<P>::DeleteImage(ImageId image_id, bool immediate_delete) {
         }
         slot_image_views.erase(image_view_id);
     }
-    if (!immediate_delete) {
+    bool retained_by_external_lease = false;
+    if constexpr (requires(Runtime& candidate_runtime, Image&& candidate_image) {
+                      candidate_runtime.RetainExternalImageIfLeased(
+                          std::move(candidate_image), true);
+                  }) {
+        retained_by_external_lease = runtime.RetainExternalImageIfLeased(
+            std::move(slot_images[image_id]), !immediate_delete);
+    }
+    if (!retained_by_external_lease && !immediate_delete) {
         sentenced_images.Push(std::move(slot_images[image_id]));
     }
     slot_images.erase(image_id);

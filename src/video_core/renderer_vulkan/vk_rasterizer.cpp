@@ -929,6 +929,19 @@ RasterizerVulkan::Dlss5DepthSnapshot RasterizerVulkan::GetDlss5DepthSnapshot() n
     };
 }
 
+bool RasterizerVulkan::LeaseDlss5Depth(const Dlss5DepthSnapshot& snapshot, u64 gpu_tick) noexcept {
+    if (!snapshot.IsValid() || !snapshot.owner_matches_image || gpu_tick == 0) {
+        return false;
+    }
+    std::scoped_lock lock{texture_cache.mutex};
+    if (!texture_cache.IsImageAlive(snapshot.image_id) ||
+        texture_cache.GetImage(snapshot.image_id).Handle() != snapshot.image) {
+        return false;
+    }
+    texture_cache_runtime.RegisterExternalImageLease(snapshot.image, gpu_tick);
+    return true;
+}
+
 #endif
 
 void RasterizerVulkan::TickFrame() {

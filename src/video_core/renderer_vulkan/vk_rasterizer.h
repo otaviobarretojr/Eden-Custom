@@ -144,6 +144,7 @@ public:
 
     void TracePresentationFrame(u64 frame_id) const;
     [[nodiscard]] Dlss5DepthSnapshot GetDlss5DepthSnapshot() noexcept;
+    [[nodiscard]] bool LeaseDlss5Depth(const Dlss5DepthSnapshot& snapshot, u64 gpu_tick) noexcept;
 #endif
     bool AccelerateConditionalRendering() override;
     bool HasDrawTransformFeedback() override;

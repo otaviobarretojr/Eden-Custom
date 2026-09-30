@@ -59,6 +59,11 @@ public:
 
     void TickFrame();
 
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    void RegisterExternalImageLease(VkImage image, u64 gpu_tick);
+    bool RetainExternalImageIfLeased(Image&& image, bool preserve_frame_delay);
+#endif
+
     u64 GetDeviceLocalMemory() const;
 
     u64 GetDeviceMemoryUsage() const;
@@ -139,6 +144,10 @@ public:
 
     static constexpr size_t indexing_slots = 8 * sizeof(size_t);
     std::array<vk::Buffer, indexing_slots> buffers{};
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    struct ExternalImageLeaseState;
+    std::unique_ptr<ExternalImageLeaseState> external_image_leases;
+#endif
 };
 
 class Framebuffer {
