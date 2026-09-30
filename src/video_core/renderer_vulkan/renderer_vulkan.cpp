@@ -220,6 +220,7 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
                  dlss5_depth_snapshot.range.baseArrayLayer, dlss5_depth_snapshot.range.layerCount,
                  dlss5_depth_snapshot.rescaled, dlss5_depth_snapshot.owner_alive,
                  dlss5_depth_snapshot.owner_matches_image);
+    }
 #endif
     // Correlate Eden's presentation frame with Streamline before any future resource tagging or
     // feature evaluation. Failure is non-fatal: the untouched Vulkan frame remains authoritative.
