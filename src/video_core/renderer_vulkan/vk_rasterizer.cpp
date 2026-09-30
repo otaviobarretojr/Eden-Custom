@@ -904,7 +904,8 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
     log_candidate("depth-only", dlss5_depth_candidate_trace.depth_only);
 }
 
-RasterizerVulkan::Dlss5DepthSnapshot RasterizerVulkan::GetDlss5DepthSnapshot() const noexcept {
+RasterizerVulkan::Dlss5DepthSnapshot RasterizerVulkan::GetDlss5DepthSnapshot() noexcept {
+    std::scoped_lock lock{texture_cache.mutex};
     const auto& color_linked = dlss5_depth_candidate_trace.color_linked;
     const auto& depth_only = dlss5_depth_candidate_trace.depth_only;
     const u64 color_pixels = static_cast<u64>(color_linked.width) * color_linked.height;

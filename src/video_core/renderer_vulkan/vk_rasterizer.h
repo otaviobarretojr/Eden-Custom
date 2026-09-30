@@ -143,7 +143,7 @@ public:
     };
 
     void TracePresentationFrame(u64 frame_id) const;
-    [[nodiscard]] Dlss5DepthSnapshot GetDlss5DepthSnapshot() const noexcept;
+    [[nodiscard]] Dlss5DepthSnapshot GetDlss5DepthSnapshot() noexcept;
 #endif
     bool AccelerateConditionalRendering() override;
     bool HasDrawTransformFeedback() override;
