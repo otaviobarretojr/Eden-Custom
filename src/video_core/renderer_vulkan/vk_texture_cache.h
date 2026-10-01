@@ -48,6 +48,7 @@ public:
                                  RenderPassCache& render_pass_cache_,
                                  DescriptorPool& descriptor_pool,
                                  ComputePassDescriptorQueue& compute_pass_descriptor_queue);
+    ~TextureCacheRuntime();
 
     void Finish();
 
