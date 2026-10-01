@@ -100,6 +100,26 @@ jobs:
 
           "STREAMLINE_SDK_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Inspect public Streamline tagging contract
+        shell: powershell
+        run: |
+          $include = Join-Path $env:STREAMLINE_SDK_ROOT "include"
+          foreach ($pattern in @(
+            "slSetTagForFrame",
+            "struct ResourceTag",
+            "enum class BufferType",
+            "eDepth",
+            "eMotionVectors",
+            "eHUDLessColor"
+          )) {
+            Write-Host "=== $pattern ==="
+            Get-ChildItem -Path $include -Filter "*.h" -File -Recurse |
+              Select-String -Pattern $pattern -SimpleMatch |
+              ForEach-Object {
+                Write-Host ("{0}:{1}: {2}" -f $_.Path, $_.LineNumber, $_.Line.Trim())
+              }
+          }
+
       - name: Configure MSVC Release with Streamline
         shell: powershell
         run: |
