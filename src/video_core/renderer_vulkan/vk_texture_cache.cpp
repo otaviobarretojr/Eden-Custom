@@ -872,14 +872,24 @@ void BlitScale(Scheduler& scheduler, VkImage src_image, VkImage dst_image, const
 
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
 struct TextureCacheRuntime::ExternalImageLeaseState {
+    struct Lease {
+        VkImageView depth_view{VK_NULL_HANDLE};
+        u64 gpu_tick{};
+    };
     struct RetainedImage {
         Image image;
         u64 gpu_tick{};
         u32 frames_remaining{};
     };
+    struct RetainedImageView {
+        ImageView image_view;
+        u64 gpu_tick{};
+        u32 frames_remaining{};
+    };
 
-    std::unordered_map<VkImage, u64> leases;
+    std::unordered_map<VkImage, Lease> leases;
     std::vector<RetainedImage> retained_images;
+    std::vector<RetainedImageView> retained_image_views;
 };
 #endif
 
@@ -1610,6 +1620,9 @@ void TextureCacheRuntime::TickFrame() {
             --retained.frames_remaining;
         }
     }
+    std::erase_if(state.retained_image_views, [this](const auto& retained) {
+        return retained.frames_remaining == 0 && scheduler.IsFree(retained.gpu_tick);
+    });
     std::erase_if(state.retained_images, [this](const auto& retained) {
         const bool releasable =
             retained.frames_remaining == 0 && scheduler.IsFree(retained.gpu_tick);
@@ -1621,28 +1634,49 @@ void TextureCacheRuntime::TickFrame() {
         return releasable;
     });
     std::erase_if(state.leases, [this](const auto& entry) {
-        return scheduler.IsFree(entry.second);
+        return scheduler.IsFree(entry.second.gpu_tick);
     });
 #endif
 }
 
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
-void TextureCacheRuntime::RegisterExternalImageLease(VkImage image, u64 gpu_tick) {
-    if (image == VK_NULL_HANDLE || gpu_tick == 0) {
+void TextureCacheRuntime::RegisterExternalImageLease(VkImage image, VkImageView depth_view,
+                                                     u64 gpu_tick) {
+    if (image == VK_NULL_HANDLE || depth_view == VK_NULL_HANDLE || gpu_tick == 0) {
         return;
     }
-    auto& lease_tick = external_image_leases->leases[image];
-    lease_tick = (std::max)(lease_tick, gpu_tick);
+    auto& lease = external_image_leases->leases[image];
+    if (gpu_tick >= lease.gpu_tick) {
+        lease.depth_view = depth_view;
+        lease.gpu_tick = gpu_tick;
+    }
+}
+
+bool TextureCacheRuntime::RetainExternalImageViewIfLeased(ImageView&& image_view,
+                                                          bool preserve_frame_delay) {
+    auto& state = *external_image_leases;
+    const VkImage image = image_view.ImageHandle();
+    const auto it = state.leases.find(image);
+    if (it == state.leases.end() || scheduler.IsFree(it->second.gpu_tick) ||
+        image_view.ExistingDepthView() != it->second.depth_view) {
+        return false;
+    }
+    state.retained_image_views.push_back({
+        .image_view = std::move(image_view),
+        .gpu_tick = it->second.gpu_tick,
+        .frames_remaining = preserve_frame_delay ? 8U : 0U,
+    });
+    return true;
 }
 
 bool TextureCacheRuntime::RetainExternalImageIfLeased(Image&& image, bool preserve_frame_delay) {
     auto& state = *external_image_leases;
     const VkImage handle = image.Handle();
     const auto it = state.leases.find(handle);
-    if (it == state.leases.end() || scheduler.IsFree(it->second)) {
+    if (it == state.leases.end() || scheduler.IsFree(it->second.gpu_tick)) {
         return false;
     }
-    const u64 lease_tick = it->second;
+    const u64 lease_tick = it->second.gpu_tick;
     const u32 frame_delay = preserve_frame_delay ? 8U : 0U;
     LOG_INFO(Render_Vulkan,
              "DLSS5 depth lease retained: image=0x{:x}, gpu_tick={}, frame_delay={}",
@@ -2519,6 +2553,9 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                 .format;
         depth_usage = depth_buffer->UsageFlags();
         depth_image_id = depth_buffer->image_id;
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+        streamline_depth_view = depth_buffer->DepthView();
+#endif
         num_layers = (std::max)(num_layers, depth_buffer->range.extent.layers);
         images[num_images] = depth_buffer->ImageHandle();
         const VkImageSubresourceRange subresource_range = MakeSubresourceRange(depth_buffer);

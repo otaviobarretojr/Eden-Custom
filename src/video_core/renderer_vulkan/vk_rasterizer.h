@@ -127,6 +127,7 @@ public:
         u32 height{};
         VkFormat format{VK_FORMAT_UNDEFINED};
         VkImage image{VK_NULL_HANDLE};
+        VkImageView depth_view{VK_NULL_HANDLE};
         VideoCommon::ImageId image_id{};
         VkImageUsageFlags usage{};
         VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
@@ -260,6 +261,7 @@ private:
         VkSampleCountFlagBits samples{VK_SAMPLE_COUNT_1_BIT};
         VkFormat format{VK_FORMAT_UNDEFINED};
         VkImage image{VK_NULL_HANDLE};
+        VkImageView depth_view{VK_NULL_HANDLE};
         VkImage last_image{VK_NULL_HANDLE};
         VideoCommon::ImageId image_id{};
         VkImageUsageFlags usage{};

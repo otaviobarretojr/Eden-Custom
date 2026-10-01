@@ -61,7 +61,8 @@ public:
     void TickFrame();
 
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
-    void RegisterExternalImageLease(VkImage image, u64 gpu_tick);
+    void RegisterExternalImageLease(VkImage image, VkImageView depth_view, u64 gpu_tick);
+    bool RetainExternalImageViewIfLeased(ImageView&& image_view, bool preserve_frame_delay);
     bool RetainExternalImageIfLeased(Image&& image, bool preserve_frame_delay);
 #endif
 
@@ -223,6 +224,12 @@ public:
         return depth_image_id;
     }
 
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    [[nodiscard]] VkImageView StreamlineDepthView() const noexcept {
+        return streamline_depth_view;
+    }
+#endif
+
     [[nodiscard]] bool HasAspectStencilBit() const noexcept {
         return has_stencil;
     }
@@ -244,6 +251,9 @@ private:
     VkFormat depth_format{VK_FORMAT_UNDEFINED};
     VkImageUsageFlags depth_usage{};
     ImageId depth_image_id{};
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    VkImageView streamline_depth_view{VK_NULL_HANDLE};
+#endif
     bool has_depth{};
     bool has_stencil{};
     bool is_rescaled{};
@@ -358,6 +368,10 @@ public:
     ImageView& operator=(ImageView&&) = default;
 
     [[nodiscard]] VkImageView DepthView();
+
+    [[nodiscard]] VkImageView ExistingDepthView() const noexcept {
+        return depth_view ? *depth_view : VK_NULL_HANDLE;
+    }
 
     [[nodiscard]] VkImageView StencilView();
 

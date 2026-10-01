@@ -2488,7 +2488,15 @@ void TextureCache<P>::DeleteImage(ImageId image_id, bool immediate_delete) {
                    num_removed_overlaps);
     }
     for (const ImageViewId image_view_id : image_view_ids) {
-        if (!immediate_delete) {
+        bool retained_by_external_lease = false;
+        if constexpr (requires(Runtime& candidate_runtime, ImageView&& candidate_view) {
+                          candidate_runtime.RetainExternalImageViewIfLeased(
+                              std::move(candidate_view), true);
+                      }) {
+            retained_by_external_lease = runtime.RetainExternalImageViewIfLeased(
+                std::move(slot_image_views[image_view_id]), !immediate_delete);
+        }
+        if (!retained_by_external_lease && !immediate_delete) {
             sentenced_image_view.Push(std::move(slot_image_views[image_view_id]));
         }
         slot_image_views.erase(image_view_id);

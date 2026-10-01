@@ -271,6 +271,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
             candidate.format = dlss5_framebuffer->DepthFormat();
             candidate.usage = dlss5_framebuffer->DepthUsageFlags();
             candidate.image_id = dlss5_framebuffer->DepthImageId();
+            candidate.depth_view = dlss5_framebuffer->StreamlineDepthView();
             // Texture-cache images are initialized into GENERAL and render passes preserve
             // GENERAL as both the attachment and final layout.
             candidate.layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -919,6 +920,7 @@ RasterizerVulkan::Dlss5DepthSnapshot RasterizerVulkan::GetDlss5DepthSnapshot() n
         .height = candidate.height,
         .format = candidate.format,
         .image = candidate.image,
+        .depth_view = candidate.depth_view,
         .image_id = candidate.image_id,
         .usage = candidate.usage,
         .layout = candidate.layout,
@@ -938,7 +940,7 @@ bool RasterizerVulkan::LeaseDlss5Depth(const Dlss5DepthSnapshot& snapshot, u64 g
         texture_cache.GetImage(snapshot.image_id).Handle() != snapshot.image) {
         return false;
     }
-    texture_cache_runtime.RegisterExternalImageLease(snapshot.image, gpu_tick);
+    texture_cache_runtime.RegisterExternalImageLease(snapshot.image, snapshot.depth_view, gpu_tick);
     return true;
 }
 
