@@ -1611,7 +1611,14 @@ void TextureCacheRuntime::TickFrame() {
         }
     }
     std::erase_if(state.retained_images, [this](const auto& retained) {
-        return retained.frames_remaining == 0 && scheduler.IsFree(retained.gpu_tick);
+        const bool releasable =
+            retained.frames_remaining == 0 && scheduler.IsFree(retained.gpu_tick);
+        if (releasable) {
+            LOG_INFO(Render_Vulkan,
+                     "DLSS5 depth lease released: image=0x{:x}, gpu_tick={}",
+                     reinterpret_cast<uintptr_t>(retained.image.Handle()), retained.gpu_tick);
+        }
+        return releasable;
     });
     std::erase_if(state.leases, [this](const auto& entry) {
         return scheduler.IsFree(entry.second);
@@ -1635,10 +1642,15 @@ bool TextureCacheRuntime::RetainExternalImageIfLeased(Image&& image, bool preser
     if (it == state.leases.end() || scheduler.IsFree(it->second)) {
         return false;
     }
+    const u64 lease_tick = it->second;
+    const u32 frame_delay = preserve_frame_delay ? 8U : 0U;
+    LOG_INFO(Render_Vulkan,
+             "DLSS5 depth lease retained: image=0x{:x}, gpu_tick={}, frame_delay={}",
+             reinterpret_cast<uintptr_t>(handle), lease_tick, frame_delay);
     state.retained_images.push_back({
         .image = std::move(image),
-        .gpu_tick = it->second,
-        .frames_remaining = preserve_frame_delay ? 8U : 0U,
+        .gpu_tick = lease_tick,
+        .frames_remaining = frame_delay,
     });
     state.leases.erase(it);
     return true;
