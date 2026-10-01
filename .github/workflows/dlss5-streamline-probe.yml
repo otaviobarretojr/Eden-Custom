@@ -106,6 +106,7 @@ jobs:
           $include = Join-Path $env:STREAMLINE_SDK_ROOT "include"
           foreach ($pattern in @(
             "slSetTagForFrame",
+            "kBufferTypeDepth",
             "struct Resource",
             "struct ResourceTag",
             "enum class BufferType",
