@@ -220,7 +220,7 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
         LOG_INFO(Render_Vulkan,
                  "DLSS5 presentation depth snapshot: frame_id={}, {}x{}, format={}, image=0x{:x}, "
                  "usage=0x{:x}, layout={}, aspect=0x{:x}, mip={}+{}, layer={}+{}, "
-                 "rescaled={}, owner_alive={}, owner_matches_image={}",
+                 "rescaled={}, owner_alive={}, owner_matches_image={}, streamline_resource_valid={}",
                  dlss5_compatibility.CurrentFrameId(), dlss5_depth_snapshot.width,
                  dlss5_depth_snapshot.height, static_cast<u32>(dlss5_depth_snapshot.format),
                  reinterpret_cast<uintptr_t>(dlss5_depth_snapshot.image),
@@ -230,7 +230,7 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
                  dlss5_depth_snapshot.range.baseMipLevel, dlss5_depth_snapshot.range.levelCount,
                  dlss5_depth_snapshot.range.baseArrayLayer, dlss5_depth_snapshot.range.layerCount,
                  dlss5_depth_snapshot.rescaled, dlss5_depth_snapshot.owner_alive,
-                 dlss5_depth_snapshot.owner_matches_image);
+                 dlss5_depth_snapshot.owner_matches_image, streamline_depth_resource_valid);
     }
 #endif
     // Correlate Eden's presentation frame with Streamline before any future resource tagging or
