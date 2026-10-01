@@ -206,6 +206,17 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
     rasterizer.TracePresentationFrame(dlss5_compatibility.CurrentFrameId());
     const auto dlss5_depth_snapshot = rasterizer.GetDlss5DepthSnapshot();
     if (dlss5_depth_snapshot.IsValid()) {
+        const Dlss5VulkanResourceDescription dlss5_depth_resource{
+            .image = dlss5_depth_snapshot.image,
+            .image_view = dlss5_depth_snapshot.depth_view,
+            .layout = dlss5_depth_snapshot.layout,
+            .format = dlss5_depth_snapshot.format,
+            .usage = dlss5_depth_snapshot.usage,
+            .width = dlss5_depth_snapshot.width,
+            .height = dlss5_depth_snapshot.height,
+        };
+        const bool streamline_depth_resource_valid =
+            ValidateStreamlineVulkanResource(dlss5_depth_resource);
         LOG_INFO(Render_Vulkan,
                  "DLSS5 presentation depth snapshot: frame_id={}, {}x{}, format={}, image=0x{:x}, "
                  "usage=0x{:x}, layout={}, aspect=0x{:x}, mip={}+{}, layer={}+{}, "

@@ -38,6 +38,15 @@ namespace {
 
 } // Anonymous namespace
 
+bool ValidateStreamlineVulkanResource(const Dlss5VulkanResourceDescription& resource) noexcept {
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    const auto streamline_resource = MakeStreamlineResource(resource);
+    return resource.IsValid() && streamline_resource.native != nullptr &&
+           streamline_resource.view != nullptr;
+#else
+    return resource.IsValid();
+#endif
+}
 
 Dlss5CompatibilityFilter::Dlss5CompatibilityFilter(const Device& device) {
     if (device.GetDriverID() != VK_DRIVER_ID_NVIDIA_PROPRIETARY) {

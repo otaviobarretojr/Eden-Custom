@@ -44,6 +44,9 @@ struct Dlss5VulkanResourceDescription {
     }
 };
 
+[[nodiscard]] bool ValidateStreamlineVulkanResource(
+    const Dlss5VulkanResourceDescription& resource) noexcept;
+
 struct Dlss5ProcessedOutput {
     u32 width{};
     u32 height{};
