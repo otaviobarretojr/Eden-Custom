@@ -162,8 +162,8 @@ bool StreamlineBootstrap::TagDepthResource(
     depth_resource.width = resource.width;
     depth_resource.height = resource.height;
     depth_resource.nativeFormat = static_cast<u32>(resource.format);
-    depth_resource.mipLevels = 1;
-    depth_resource.arrayLayers = 1;
+    depth_resource.mipLevels = resource.mip_levels;
+    depth_resource.arrayLayers = resource.array_layers;
     depth_resource.usage = static_cast<u32>(resource.usage);
 
     sl::ResourceTag depth_tag{&depth_resource, sl::kBufferTypeDepth,
