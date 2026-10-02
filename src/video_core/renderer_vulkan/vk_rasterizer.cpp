@@ -913,11 +913,15 @@ RasterizerVulkan::Dlss5DepthSnapshot RasterizerVulkan::GetDlss5DepthSnapshot() n
     const u64 depth_pixels = static_cast<u64>(depth_only.width) * depth_only.height;
     const auto& candidate = color_pixels >= depth_pixels ? color_linked : depth_only;
     const bool owner_alive = texture_cache.IsImageAlive(candidate.image_id);
-    const bool owner_matches_image =
-        owner_alive && texture_cache.GetImage(candidate.image_id).Handle() == candidate.image;
+    const auto* owner = owner_alive ? &texture_cache.GetImage(candidate.image_id) : nullptr;
+    const bool owner_matches_image = owner != nullptr && owner->Handle() == candidate.image;
+    const u32 mip_levels = owner_matches_image ? static_cast<u32>(owner->info.resources.levels) : 0;
+    const u32 array_layers = owner_matches_image ? static_cast<u32>(owner->info.resources.layers) : 0;
     return {
         .width = candidate.width,
         .height = candidate.height,
+        .mip_levels = mip_levels,
+        .array_layers = array_layers,
         .format = candidate.format,
         .image = candidate.image,
         .depth_view = candidate.depth_view,
