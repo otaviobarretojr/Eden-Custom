@@ -125,6 +125,8 @@ public:
     struct Dlss5DepthSnapshot {
         u32 width{};
         u32 height{};
+        u32 mip_levels{};
+        u32 array_layers{};
         VkFormat format{VK_FORMAT_UNDEFINED};
         VkImage image{VK_NULL_HANDLE};
         VkImageView depth_view{VK_NULL_HANDLE};
@@ -137,7 +139,8 @@ public:
         bool owner_matches_image{};
 
         [[nodiscard]] bool IsValid() const noexcept {
-            return width != 0 && height != 0 && format != VK_FORMAT_UNDEFINED &&
+            return width != 0 && height != 0 && mip_levels != 0 && array_layers != 0 &&
+                   format != VK_FORMAT_UNDEFINED &&
                    image != VK_NULL_HANDLE &&
                    (range.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
         }
