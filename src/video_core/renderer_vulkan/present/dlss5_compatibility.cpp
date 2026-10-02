@@ -30,6 +30,8 @@ namespace {
     result.state = resource.layout;
     result.width = resource.width;
     result.height = resource.height;
+    result.mipLevels = resource.mip_levels;
+    result.arrayLayers = resource.array_layers;
     result.nativeFormat = resource.format;
     result.usage = resource.usage;
     return result;
