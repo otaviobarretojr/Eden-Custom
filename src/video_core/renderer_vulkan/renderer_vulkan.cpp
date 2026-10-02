@@ -205,8 +205,9 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
     rasterizer.TracePresentationFrame(dlss5_compatibility.CurrentFrameId());
     const auto dlss5_depth_snapshot = rasterizer.GetDlss5DepthSnapshot();
+    Dlss5VulkanResourceDescription dlss5_depth_resource{};
     if (dlss5_depth_snapshot.IsValid()) {
-        const Dlss5VulkanResourceDescription dlss5_depth_resource{
+        dlss5_depth_resource = {
             .image = dlss5_depth_snapshot.image,
             .image_view = dlss5_depth_snapshot.depth_view,
             .layout = dlss5_depth_snapshot.layout,
@@ -244,11 +245,14 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
     const bool depth_lease_registered =
         rasterizer.LeaseDlss5Depth(dlss5_depth_snapshot, expected_submit_tick);
     const u64 presentation_submit_tick = scheduler.Flush(*frame->render_ready);
+    const bool depth_tagged = streamline_frame_ready && depth_lease_registered &&
+                              presentation_submit_tick == expected_submit_tick &&
+                              streamline_bootstrap.TagDepthResource(dlss5_depth_resource);
     LOG_INFO(Render_Vulkan,
              "DLSS5 presentation submission: frame_id={}, submit_tick={}, expected_tick={}, "
-             "tick_matches={}, depth_lease_registered={}, gpu_complete={}",
+             "tick_matches={}, depth_lease_registered={}, depth_tagged={}, gpu_complete={}",
              dlss5_compatibility.CurrentFrameId(), presentation_submit_tick, expected_submit_tick,
-             presentation_submit_tick == expected_submit_tick, depth_lease_registered,
+             presentation_submit_tick == expected_submit_tick, depth_lease_registered, depth_tagged,
              scheduler.IsFree(presentation_submit_tick));
 #else
     scheduler.Flush(*frame->render_ready);

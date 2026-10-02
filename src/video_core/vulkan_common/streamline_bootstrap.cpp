@@ -3,6 +3,8 @@
 
 #include "video_core/vulkan_common/streamline_bootstrap.h"
 
+#include "video_core/renderer_vulkan/present/dlss5_compatibility.h"
+
 #include <atomic>
 #include <string>
 #include <string_view>
@@ -135,6 +137,53 @@ bool StreamlineBootstrap::BeginFrame(u64 eden_frame_id) noexcept {
     return true;
 #else
     (void)eden_frame_id;
+    return false;
+#endif
+}
+
+bool StreamlineBootstrap::TagDepthResource(
+    const Dlss5VulkanResourceDescription& resource) noexcept {
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    if (!IsFrameTaggingReady() || !interposer || !ValidateStreamlineVulkanResource(resource)) {
+        return false;
+    }
+
+    PFun_slSetTagForFrame* sl_set_tag_for_frame{};
+    if (!interposer->GetSymbol("slSetTagForFrame", &sl_set_tag_for_frame) ||
+        sl_set_tag_for_frame == nullptr) {
+        LOG_WARNING(Render_Vulkan,
+                    "Streamline resource tagging: slSetTagForFrame export was not found");
+        return false;
+    }
+
+    sl::Resource depth_resource{sl::ResourceType::eTex2d, reinterpret_cast<void*>(resource.image),
+                                nullptr, reinterpret_cast<void*>(resource.image_view),
+                                static_cast<u32>(resource.layout)};
+    depth_resource.width = resource.width;
+    depth_resource.height = resource.height;
+    depth_resource.nativeFormat = static_cast<u32>(resource.format);
+    depth_resource.mipLevels = 1;
+    depth_resource.arrayLayers = 1;
+    depth_resource.usage = static_cast<u32>(resource.usage);
+
+    sl::ResourceTag depth_tag{&depth_resource, sl::kBufferTypeDepth,
+                              sl::ResourceLifecycle::eValidUntilPresent};
+    const sl::ViewportHandle viewport{0u};
+    const sl::Result result =
+        sl_set_tag_for_frame(*current_frame_token, viewport, &depth_tag, 1, nullptr);
+    if (result != sl::Result::eOk) {
+        LOG_WARNING(Render_Vulkan,
+                    "Streamline depth tagging failed: frame_id={}, result={}",
+                    current_eden_frame_id, static_cast<int>(result));
+        return false;
+    }
+
+    LOG_INFO(Render_Vulkan, "Streamline depth tagged: frame_id={}, image=0x{:x}, {}x{}",
+             current_eden_frame_id, reinterpret_cast<uintptr_t>(resource.image), resource.width,
+             resource.height);
+    return true;
+#else
+    (void)resource;
     return false;
 #endif
 }

@@ -17,6 +17,8 @@ class DynamicLibrary;
 
 namespace Vulkan {
 
+struct Dlss5VulkanResourceDescription;
+
 class StreamlineBootstrap final {
 public:
     StreamlineBootstrap();
@@ -32,6 +34,10 @@ public:
     // Reserves the Streamline token corresponding to Eden's presentation frame. This is
     // intentionally feature-agnostic; it does not tag resources or evaluate any plugin.
     [[nodiscard]] bool BeginFrame(u64 eden_frame_id) noexcept;
+
+    // Tags the submitted depth resource for the current presentation frame. The caller must
+    // submit the GPU work that produces the resource before calling this method.
+    [[nodiscard]] bool TagDepthResource(const Dlss5VulkanResourceDescription& resource) noexcept;
 
     [[nodiscard]] u64 CurrentEdenFrameId() const noexcept {
         return current_eden_frame_id;
