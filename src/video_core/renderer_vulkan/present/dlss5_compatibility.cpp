@@ -109,6 +109,7 @@ void Dlss5CompatibilityFilter::ObservePresentFrame(const Frame& frame) {
     // The presentation frame is the only input Eden can guarantee at this stage. Keep the
     // auxiliary-input contract explicit so future Streamline evaluation never mistakes generated
     // or unavailable data for native game-engine buffers.
+    frame_constants_readiness = {};
     inputs = {
         .width = frame.width,
         .height = frame.height,
@@ -143,8 +144,9 @@ void Dlss5CompatibilityFilter::ObservePresentFrame(const Frame& frame) {
     last_height = frame.height;
 
     LOG_INFO(Render_Vulkan,
-             "DLSS 5 compatibility filter: observing final presentation frame {}x{} (frame #{})",
-             last_width, last_height, frames_observed);
+             "DLSS 5 compatibility filter: observing final presentation frame {}x{} (frame #{}); "
+             "Streamline frame constants ready={}",
+             last_width, last_height, frames_observed, frame_constants_readiness.IsReady());
 }
 
 } // namespace Vulkan
