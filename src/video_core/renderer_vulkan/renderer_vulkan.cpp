@@ -215,6 +215,8 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
             .usage = dlss5_depth_snapshot.usage,
             .width = dlss5_depth_snapshot.width,
             .height = dlss5_depth_snapshot.height,
+            .mip_levels = dlss5_depth_snapshot.mip_levels,
+            .array_layers = dlss5_depth_snapshot.array_layers,
         };
         const bool streamline_depth_resource_valid =
             ValidateStreamlineVulkanResource(dlss5_depth_resource);
