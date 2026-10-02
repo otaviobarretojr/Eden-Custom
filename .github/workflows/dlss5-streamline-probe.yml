@@ -115,6 +115,13 @@ jobs:
             "eHUDLessColor"
             "eValidUntilPresent"
             "PFun_slSetTagForFrame"
+            "slSetConstants"
+            "struct Constants"
+            "cameraViewToClip"
+            "clipToCameraView"
+            "clipToPrevClip"
+            "jitterOffset"
+            "depthInverted"
           )) {
             Write-Host "=== $pattern ==="
             Get-ChildItem -Path $include -Filter "*.h" -File -Recurse |
