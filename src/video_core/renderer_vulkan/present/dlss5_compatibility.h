@@ -36,11 +36,13 @@ struct Dlss5VulkanResourceDescription {
     VkImageUsageFlags usage{};
     u32 width{};
     u32 height{};
+    u32 mip_levels{1};
+    u32 array_layers{1};
 
     [[nodiscard]] bool IsValid() const noexcept {
         return image != VK_NULL_HANDLE && image_view != VK_NULL_HANDLE &&
                layout != VK_IMAGE_LAYOUT_UNDEFINED && format != VK_FORMAT_UNDEFINED &&
-               usage != 0 && width != 0 && height != 0;
+               usage != 0 && width != 0 && height != 0 && mip_levels != 0 && array_layers != 0;
     }
 };
 
