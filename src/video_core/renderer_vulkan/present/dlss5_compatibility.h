@@ -75,6 +75,22 @@ enum class Dlss5CompatibilityState {
 // Inputs associated with the final presentation frame only. Auxiliary resources must remain
 // unavailable unless they can be proven to describe the same presented frame. In particular,
 // rasterizer depth attachments are transient per-pass resources and must not be forwarded here.
+struct Dlss5FrameConstantsReadiness {
+    bool projection_matrices{};
+    bool temporal_transform{};
+    bool jitter{};
+    bool camera_basis{};
+    bool camera_planes{};
+    bool depth_convention{};
+    bool motion_vector_convention{};
+    bool reset_state{};
+
+    [[nodiscard]] bool IsReady() const noexcept {
+        return projection_matrices && temporal_transform && jitter && camera_basis &&
+               camera_planes && depth_convention && motion_vector_convention && reset_state;
+    }
+};
+
 struct Dlss5CompatibilityInputs {
     u32 width{};
     u32 height{};
@@ -133,6 +149,10 @@ public:
         return inputs;
     }
 
+    [[nodiscard]] const Dlss5FrameConstantsReadiness& FrameConstantsReadiness() const noexcept {
+        return frame_constants_readiness;
+    }
+
     [[nodiscard]] const Dlss5VulkanResourceDescription& FinalColorResource() const noexcept {
         return final_color_resource;
     }
@@ -140,6 +160,7 @@ public:
 private:
     Dlss5CompatibilityState state{Dlss5CompatibilityState::UnsupportedGpu};
     Dlss5CompatibilityInputs inputs{};
+    Dlss5FrameConstantsReadiness frame_constants_readiness{};
     Dlss5VulkanResourceDescription final_color_resource{};
     Dlss5ProcessedOutput processed_output{};
     u64 frames_observed{};
