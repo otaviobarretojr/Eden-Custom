@@ -277,6 +277,9 @@ private:
         size_t pipeline_hash{};
         u64 vertex_shader_hash{};
         bool ndc_minus_one_to_one{};
+        std::array<VkFormat, NUM_RT> color_formats{};
+        std::array<VkImageUsageFlags, NUM_RT> color_usages{};
+        std::array<VkImage, NUM_RT> color_images{};
     };
 
     struct Dlss5DepthCandidateTrace {

@@ -2532,6 +2532,14 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                                               : color_buffer->size.height);
         attachments.push_back(color_buffer->RenderTarget());
         renderpass_key.color_formats[index] = color_buffer->format;
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+        streamline_color_formats[index] =
+            MaxwellToVK::SurfaceFormat(runtime.device, FormatType::Optimal, false,
+                                       color_buffer->format)
+                .format;
+        streamline_color_usages[index] = color_buffer->UsageFlags();
+        streamline_color_images[index] = color_buffer->ImageHandle();
+#endif
         num_layers = (std::max)(num_layers, color_buffer->range.extent.layers);
         images[num_images] = color_buffer->ImageHandle();
         image_ranges[num_images] = MakeSubresourceRange(color_buffer);

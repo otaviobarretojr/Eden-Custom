@@ -223,6 +223,17 @@ public:
     [[nodiscard]] ImageId DepthImageId() const noexcept {
         return depth_image_id;
     }
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    [[nodiscard]] const std::array<VkFormat, NUM_RT>& StreamlineColorFormats() const noexcept {
+        return streamline_color_formats;
+    }
+    [[nodiscard]] const std::array<VkImageUsageFlags, NUM_RT>& StreamlineColorUsages() const noexcept {
+        return streamline_color_usages;
+    }
+    [[nodiscard]] const std::array<VkImage, NUM_RT>& StreamlineColorImages() const noexcept {
+        return streamline_color_images;
+    }
+#endif
 
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
     [[nodiscard]] VkImageView StreamlineDepthView() const noexcept {
@@ -252,6 +263,9 @@ private:
     VkImageUsageFlags depth_usage{};
     ImageId depth_image_id{};
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    std::array<VkFormat, NUM_RT> streamline_color_formats{};
+    std::array<VkImageUsageFlags, NUM_RT> streamline_color_usages{};
+    std::array<VkImage, NUM_RT> streamline_color_images{};
     VkImageView streamline_depth_view{VK_NULL_HANDLE};
 #endif
     bool has_depth{};
