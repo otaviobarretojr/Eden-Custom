@@ -2539,6 +2539,12 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                 .format;
         streamline_color_usages[index] = color_buffer->UsageFlags();
         streamline_color_images[index] = color_buffer->ImageHandle();
+        streamline_color_extents[index] = VkExtent2D{
+            .width = static_cast<u32>(is_rescaled ? resolution.ScaleUp(color_buffer->size.width)
+                                                  : color_buffer->size.width),
+            .height = static_cast<u32>(is_rescaled ? resolution.ScaleUp(color_buffer->size.height)
+                                                   : color_buffer->size.height),
+        };
 #endif
         num_layers = (std::max)(num_layers, color_buffer->range.extent.layers);
         images[num_images] = color_buffer->ImageHandle();

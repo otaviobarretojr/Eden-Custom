@@ -286,6 +286,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
             candidate.color_formats = dlss5_framebuffer->StreamlineColorFormats();
             candidate.color_usages = dlss5_framebuffer->StreamlineColorUsages();
             candidate.color_images = dlss5_framebuffer->StreamlineColorImages();
+            candidate.color_extents = dlss5_framebuffer->StreamlineColorExtents();
             const auto& vertex_info = pipeline->StageInfo(0);
             candidate.vertex_cbuf_mask = vertex_info.constant_buffer_mask;
             candidate.vertex_cbuf_used_sizes = vertex_info.constant_buffer_used_sizes;
@@ -306,6 +307,30 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
                 hash_value(size);
             }
             candidate.vertex_cbuf_signature = cbuf_signature;
+        }
+        if (candidate.pipeline_hash == pipeline->PipelineHash() &&
+            candidate.vertex_shader_hash == pipeline->ShaderHash(0)) {
+            const auto vertex_bindings = buffer_cache.StreamlineUniformBufferBindings(0);
+            u64 binding_signature = 1469598103934665603ULL;
+            for (u32 index = 0; index < candidate.vertex_cbuf_addresses.size(); ++index) {
+                if ((candidate.vertex_cbuf_mask & (1U << index)) == 0) continue;
+                const auto& binding = vertex_bindings[index];
+                candidate.vertex_cbuf_addresses[index] = binding.device_addr;
+                candidate.vertex_cbuf_bound_sizes[index] = binding.size;
+                const u64 values[] = {static_cast<u64>(index), static_cast<u64>(binding.device_addr),
+                                      static_cast<u64>(binding.size)};
+                for (const u64 value : values) {
+                    for (u32 byte = 0; byte < sizeof(value); ++byte) {
+                        binding_signature ^= static_cast<u8>(value >> (byte * 8));
+                        binding_signature *= 1099511628211ULL;
+                    }
+                }
+            }
+            if (candidate.temporal_binding_signature != 0 &&
+                candidate.temporal_binding_signature != binding_signature) {
+                ++candidate.temporal_binding_changes;
+            }
+            candidate.temporal_binding_signature = binding_signature;
         }
     }
 #endif
@@ -928,8 +953,9 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
         for (u32 index = 0; index < candidate.color_images.size(); ++index) {
             if (candidate.color_images[index] == VK_NULL_HANDLE) continue;
             if (!color_targets.empty()) color_targets += ',';
-            fmt::format_to(std::back_inserter(color_targets), "rt{}:fmt{}:usage0x{:x}:img0x{:x}",
-                           index, static_cast<u32>(candidate.color_formats[index]),
+            fmt::format_to(std::back_inserter(color_targets), "rt{}:{}x{}:fmt{}:usage0x{:x}:img0x{:x}", index,
+                           candidate.color_extents[index].width, candidate.color_extents[index].height,
+                           static_cast<u32>(candidate.color_formats[index]),
                            static_cast<u32>(candidate.color_usages[index]),
                            reinterpret_cast<uintptr_t>(candidate.color_images[index]));
         }
@@ -948,7 +974,8 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                  "image=0x{:x}, last_image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, "
                  "rescaled={}, pipeline_hash=0x{:016x}, vertex_shader_hash=0x{:016x}, ndc_range={}, "
                  "vertex_cbuf_mask=0x{:x}, vertex_cbuf_signature=0x{:016x}, vertex_cbufs=[{}], "
-                 "vertex_cbuf_bindings=[{}], color_targets=[{}]",
+                 "vertex_cbuf_bindings=[{}], temporal_binding_signature=0x{:016x}, "
+                 "temporal_binding_changes={}, color_targets=[{}]",
                  frame_id, kind, candidate.observations, candidate.image_switches, candidate.width,
                  candidate.height, candidate.color_buffers, static_cast<u32>(candidate.samples),
                  static_cast<u32>(candidate.format), static_cast<u32>(candidate.usage),
@@ -959,7 +986,8 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                  candidate.rescaled, candidate.pipeline_hash, candidate.vertex_shader_hash,
                  candidate.ndc_minus_one_to_one ? "minus-one-to-one" : "zero-to-one",
                  candidate.vertex_cbuf_mask, candidate.vertex_cbuf_signature, vertex_cbuf_signature,
-                 vertex_cbuf_bindings, color_targets);
+                 vertex_cbuf_bindings, candidate.temporal_binding_signature,
+                 candidate.temporal_binding_changes, color_targets);
     };
     log_candidate("color-linked", dlss5_depth_candidate_trace.color_linked);
     log_candidate("depth-only", dlss5_depth_candidate_trace.depth_only);

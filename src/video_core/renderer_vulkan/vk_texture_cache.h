@@ -233,6 +233,9 @@ public:
     [[nodiscard]] const std::array<VkImage, NUM_RT>& StreamlineColorImages() const noexcept {
         return streamline_color_images;
     }
+    [[nodiscard]] const std::array<VkExtent2D, NUM_RT>& StreamlineColorExtents() const noexcept {
+        return streamline_color_extents;
+    }
 #endif
 
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
@@ -266,6 +269,7 @@ private:
     std::array<VkFormat, NUM_RT> streamline_color_formats{};
     std::array<VkImageUsageFlags, NUM_RT> streamline_color_usages{};
     std::array<VkImage, NUM_RT> streamline_color_images{};
+    std::array<VkExtent2D, NUM_RT> streamline_color_extents{};
     VkImageView streamline_depth_view{VK_NULL_HANDLE};
 #endif
     bool has_depth{};
