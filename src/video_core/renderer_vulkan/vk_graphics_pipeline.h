@@ -82,6 +82,10 @@ public:
         const std::array<const Shader::Info*, NUM_STAGES>& infos);
 
     bool HasDynamicVertexInput() const noexcept { return key.state.dynamic_vertex_input; }
+    [[nodiscard]] const Shader::Info& StageInfo(size_t stage) const noexcept {
+        return stage_infos[stage];
+    }
+
     bool SupportsAlphaToCoverage() const noexcept {
         return fragment_has_color0_output;
     }
