@@ -247,9 +247,40 @@ public:
     void SetComputeUniformBufferState(u32 mask, const ComputeUniformBufferSizes* sizes);
 
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    struct StreamlineUniformBufferSample {
+        u64 hash{};
+        u32 size{};
+        bool gpu_modified{};
+        bool valid{};
+    };
+
     [[nodiscard]] std::array<Binding, NUM_GRAPHICS_UNIFORM_BUFFERS>
     StreamlineUniformBufferBindings(size_t stage) const noexcept {
         return channel_state->uniform_buffers[stage];
+    }
+
+    [[nodiscard]] StreamlineUniformBufferSample StreamlineSampleUniformBuffer(
+        size_t stage, size_t index, size_t requested_size) {
+        StreamlineUniformBufferSample result{};
+        if (stage >= NUM_STAGES || index >= NUM_GRAPHICS_UNIFORM_BUFFERS || requested_size == 0) {
+            return result;
+        }
+        const Binding& binding = channel_state->uniform_buffers[stage][index];
+        if (binding.device_addr == 0 || binding.size == 0) return result;
+        const size_t sample_size = (std::min)({requested_size, static_cast<size_t>(binding.size),
+                                               static_cast<size_t>(64)});
+        result.size = static_cast<u32>(sample_size);
+        result.gpu_modified = IsRegionGpuModified(binding.device_addr, sample_size);
+        if (result.gpu_modified) return result;
+        const auto bytes = ImmediateBufferWithData(binding.device_addr, sample_size);
+        u64 hash = 1469598103934665603ULL;
+        for (const u8 value : bytes) {
+            hash ^= value;
+            hash *= 1099511628211ULL;
+        }
+        result.hash = hash;
+        result.valid = true;
+        return result;
     }
 #endif
 

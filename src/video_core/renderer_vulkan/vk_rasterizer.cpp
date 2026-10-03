@@ -317,6 +317,19 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
                 const auto& binding = vertex_bindings[index];
                 candidate.vertex_cbuf_addresses[index] = binding.device_addr;
                 candidate.vertex_cbuf_bound_sizes[index] = binding.size;
+                const size_t used_size = candidate.vertex_cbuf_used_sizes[index];
+                const auto sample = buffer_cache.StreamlineSampleUniformBuffer(
+                    0, index, (std::min)(used_size, static_cast<size_t>(64)));
+                if (sample.gpu_modified) {
+                    candidate.vertex_cbuf_gpu_modified_mask |= (1U << index);
+                } else if (sample.valid) {
+                    candidate.vertex_cbuf_gpu_modified_mask &= ~(1U << index);
+                    const u64 previous_hash = candidate.vertex_cbuf_content_hashes[index];
+                    if (previous_hash != 0 && previous_hash != sample.hash) {
+                        ++candidate.vertex_cbuf_content_changes[index];
+                    }
+                    candidate.vertex_cbuf_content_hashes[index] = sample.hash;
+                }
                 const u64 values[] = {static_cast<u64>(index), static_cast<u64>(binding.device_addr),
                                       static_cast<u64>(binding.size)};
                 for (const u64 value : values) {
@@ -960,6 +973,7 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                            reinterpret_cast<uintptr_t>(candidate.color_images[index]));
         }
         std::string vertex_cbuf_bindings;
+        std::string vertex_cbuf_content;
         for (u32 index = 0; index < candidate.vertex_cbuf_addresses.size(); ++index) {
             if ((candidate.vertex_cbuf_mask & (1U << index)) == 0) continue;
             if (!vertex_cbuf_bindings.empty()) vertex_cbuf_bindings += ',';
@@ -967,6 +981,11 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                            index, candidate.vertex_cbuf_addresses[index],
                            candidate.vertex_cbuf_bound_sizes[index],
                            candidate.vertex_cbuf_used_sizes[index]);
+            if (!vertex_cbuf_content.empty()) vertex_cbuf_content += ',';
+            fmt::format_to(std::back_inserter(vertex_cbuf_content), "{}:hash0x{:016x}:changes{}:gpu{}",
+                           index, candidate.vertex_cbuf_content_hashes[index],
+                           candidate.vertex_cbuf_content_changes[index],
+                           (candidate.vertex_cbuf_gpu_modified_mask & (1U << index)) != 0);
         }
         LOG_INFO(Render_Vulkan,
                  "DLSS5 depth candidate: frame_id={}, kind={}, observations={}, switches={}, "
@@ -975,7 +994,7 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                  "rescaled={}, pipeline_hash=0x{:016x}, vertex_shader_hash=0x{:016x}, ndc_range={}, "
                  "vertex_cbuf_mask=0x{:x}, vertex_cbuf_signature=0x{:016x}, vertex_cbufs=[{}], "
                  "vertex_cbuf_bindings=[{}], temporal_binding_signature=0x{:016x}, "
-                 "temporal_binding_changes={}, color_targets=[{}]",
+                 "temporal_binding_changes={}, vertex_cbuf_content=[{}], color_targets=[{}]",
                  frame_id, kind, candidate.observations, candidate.image_switches, candidate.width,
                  candidate.height, candidate.color_buffers, static_cast<u32>(candidate.samples),
                  static_cast<u32>(candidate.format), static_cast<u32>(candidate.usage),
@@ -987,7 +1006,7 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                  candidate.ndc_minus_one_to_one ? "minus-one-to-one" : "zero-to-one",
                  candidate.vertex_cbuf_mask, candidate.vertex_cbuf_signature, vertex_cbuf_signature,
                  vertex_cbuf_bindings, candidate.temporal_binding_signature,
-                 candidate.temporal_binding_changes, color_targets);
+                 candidate.temporal_binding_changes, vertex_cbuf_content, color_targets);
     };
     log_candidate("color-linked", dlss5_depth_candidate_trace.color_linked);
     log_candidate("depth-only", dlss5_depth_candidate_trace.depth_only);
