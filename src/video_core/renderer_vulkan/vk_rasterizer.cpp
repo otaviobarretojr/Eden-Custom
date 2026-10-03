@@ -890,11 +890,22 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
         if (candidate.observations == 0) {
             return;
         }
+        std::string vertex_cbuf_signature;
+        for (u32 index = 0; index < candidate.vertex_cbuf_used_sizes.size(); ++index) {
+            if ((candidate.vertex_cbuf_mask & (1U << index)) == 0) {
+                continue;
+            }
+            if (!vertex_cbuf_signature.empty()) {
+                vertex_cbuf_signature += ',';
+            }
+            fmt::format_to(std::back_inserter(vertex_cbuf_signature), "{}:{}",
+                           index, candidate.vertex_cbuf_used_sizes[index]);
+        }
         LOG_INFO(Render_Vulkan,
                  "DLSS5 depth candidate: frame_id={}, kind={}, observations={}, switches={}, "
                  "largest={}x{}, colors={}, samples={}, format={}, usage=0x{:x}, layout={}, "
                  "image=0x{:x}, last_image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, "
-                 "rescaled={}",
+                 "rescaled={}, vertex_cbuf_mask=0x{:x}, vertex_cbufs=[{}]",
                  frame_id, kind, candidate.observations, candidate.image_switches, candidate.width,
                  candidate.height, candidate.color_buffers, static_cast<u32>(candidate.samples),
                  static_cast<u32>(candidate.format), static_cast<u32>(candidate.usage),
@@ -902,7 +913,8 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                  reinterpret_cast<uintptr_t>(candidate.last_image),
                  static_cast<u32>(candidate.range.aspectMask), candidate.range.baseMipLevel,
                  candidate.range.levelCount, candidate.range.baseArrayLayer,
-                 candidate.range.layerCount, candidate.rescaled);
+                 candidate.range.layerCount, candidate.rescaled, candidate.vertex_cbuf_mask,
+                 vertex_cbuf_signature);
     };
     log_candidate("color-linked", dlss5_depth_candidate_trace.color_linked);
     log_candidate("depth-only", dlss5_depth_candidate_trace.depth_only);
