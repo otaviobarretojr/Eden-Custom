@@ -283,6 +283,18 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
             const auto& vertex_info = pipeline->StageInfo(0);
             candidate.vertex_cbuf_mask = vertex_info.constant_buffer_mask;
             candidate.vertex_cbuf_used_sizes = vertex_info.constant_buffer_used_sizes;
+            u64 cbuf_signature = 1469598103934665603ULL;
+            const auto hash_value = [&cbuf_signature](u32 value) {
+                for (u32 byte = 0; byte < sizeof(value); ++byte) {
+                    cbuf_signature ^= static_cast<u8>(value >> (byte * 8));
+                    cbuf_signature *= 1099511628211ULL;
+                }
+            };
+            hash_value(candidate.vertex_cbuf_mask);
+            for (const u32 size : candidate.vertex_cbuf_used_sizes) {
+                hash_value(size);
+            }
+            candidate.vertex_cbuf_signature = cbuf_signature;
         }
     }
 #endif
@@ -905,7 +917,8 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                  "DLSS5 depth candidate: frame_id={}, kind={}, observations={}, switches={}, "
                  "largest={}x{}, colors={}, samples={}, format={}, usage=0x{:x}, layout={}, "
                  "image=0x{:x}, last_image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, "
-                 "rescaled={}, vertex_cbuf_mask=0x{:x}, vertex_cbufs=[{}]",
+                 "rescaled={}, vertex_cbuf_mask=0x{:x}, vertex_cbuf_signature=0x{:016x}, "
+                 "vertex_cbufs=[{}]",
                  frame_id, kind, candidate.observations, candidate.image_switches, candidate.width,
                  candidate.height, candidate.color_buffers, static_cast<u32>(candidate.samples),
                  static_cast<u32>(candidate.format), static_cast<u32>(candidate.usage),
@@ -914,7 +927,7 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                  static_cast<u32>(candidate.range.aspectMask), candidate.range.baseMipLevel,
                  candidate.range.levelCount, candidate.range.baseArrayLayer,
                  candidate.range.layerCount, candidate.rescaled, candidate.vertex_cbuf_mask,
-                 vertex_cbuf_signature);
+                 candidate.vertex_cbuf_signature, vertex_cbuf_signature);
     };
     log_candidate("color-linked", dlss5_depth_candidate_trace.color_linked);
     log_candidate("depth-only", dlss5_depth_candidate_trace.depth_only);
