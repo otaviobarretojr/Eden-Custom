@@ -289,6 +289,11 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
             const auto& vertex_info = pipeline->StageInfo(0);
             candidate.vertex_cbuf_mask = vertex_info.constant_buffer_mask;
             candidate.vertex_cbuf_used_sizes = vertex_info.constant_buffer_used_sizes;
+            const auto vertex_bindings = buffer_cache.StreamlineUniformBufferBindings(0);
+            for (u32 index = 0; index < candidate.vertex_cbuf_addresses.size(); ++index) {
+                candidate.vertex_cbuf_addresses[index] = vertex_bindings[index].device_addr;
+                candidate.vertex_cbuf_bound_sizes[index] = vertex_bindings[index].size;
+            }
             u64 cbuf_signature = 1469598103934665603ULL;
             const auto hash_value = [&cbuf_signature](u32 value) {
                 for (u32 byte = 0; byte < sizeof(value); ++byte) {
@@ -919,21 +924,42 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
             fmt::format_to(std::back_inserter(vertex_cbuf_signature), "{}:{}",
                            index, candidate.vertex_cbuf_used_sizes[index]);
         }
+        std::string color_targets;
+        for (u32 index = 0; index < candidate.color_images.size(); ++index) {
+            if (candidate.color_images[index] == VK_NULL_HANDLE) continue;
+            if (!color_targets.empty()) color_targets += ',';
+            fmt::format_to(std::back_inserter(color_targets), "rt{}:fmt{}:usage0x{:x}:img0x{:x}",
+                           index, static_cast<u32>(candidate.color_formats[index]),
+                           static_cast<u32>(candidate.color_usages[index]),
+                           reinterpret_cast<uintptr_t>(candidate.color_images[index]));
+        }
+        std::string vertex_cbuf_bindings;
+        for (u32 index = 0; index < candidate.vertex_cbuf_addresses.size(); ++index) {
+            if ((candidate.vertex_cbuf_mask & (1U << index)) == 0) continue;
+            if (!vertex_cbuf_bindings.empty()) vertex_cbuf_bindings += ',';
+            fmt::format_to(std::back_inserter(vertex_cbuf_bindings), "{}:addr0x{:x}:bound{}:used{}",
+                           index, candidate.vertex_cbuf_addresses[index],
+                           candidate.vertex_cbuf_bound_sizes[index],
+                           candidate.vertex_cbuf_used_sizes[index]);
+        }
         LOG_INFO(Render_Vulkan,
                  "DLSS5 depth candidate: frame_id={}, kind={}, observations={}, switches={}, "
                  "largest={}x{}, colors={}, samples={}, format={}, usage=0x{:x}, layout={}, "
                  "image=0x{:x}, last_image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, "
-                 "rescaled={}, vertex_cbuf_mask=0x{:x}, vertex_cbuf_signature=0x{:016x}, "
-                 "vertex_cbufs=[{}]",
+                 "rescaled={}, pipeline_hash=0x{:016x}, vertex_shader_hash=0x{:016x}, ndc_range={}, "
+                 "vertex_cbuf_mask=0x{:x}, vertex_cbuf_signature=0x{:016x}, vertex_cbufs=[{}], "
+                 "vertex_cbuf_bindings=[{}], color_targets=[{}]",
                  frame_id, kind, candidate.observations, candidate.image_switches, candidate.width,
                  candidate.height, candidate.color_buffers, static_cast<u32>(candidate.samples),
                  static_cast<u32>(candidate.format), static_cast<u32>(candidate.usage),
                  static_cast<u32>(candidate.layout), reinterpret_cast<uintptr_t>(candidate.image),
                  reinterpret_cast<uintptr_t>(candidate.last_image),
                  static_cast<u32>(candidate.range.aspectMask), candidate.range.baseMipLevel,
-                 candidate.range.levelCount, candidate.range.baseArrayLayer,
-                 candidate.range.layerCount, candidate.rescaled, candidate.vertex_cbuf_mask,
-                 candidate.vertex_cbuf_signature, vertex_cbuf_signature);
+                 candidate.range.levelCount, candidate.range.baseArrayLayer, candidate.range.layerCount,
+                 candidate.rescaled, candidate.pipeline_hash, candidate.vertex_shader_hash,
+                 candidate.ndc_minus_one_to_one ? "minus-one-to-one" : "zero-to-one",
+                 candidate.vertex_cbuf_mask, candidate.vertex_cbuf_signature, vertex_cbuf_signature,
+                 vertex_cbuf_bindings, color_targets);
     };
     log_candidate("color-linked", dlss5_depth_candidate_trace.color_linked);
     log_candidate("depth-only", dlss5_depth_candidate_trace.depth_only);

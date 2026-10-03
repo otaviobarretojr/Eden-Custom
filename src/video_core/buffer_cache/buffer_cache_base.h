@@ -246,6 +246,13 @@ public:
 
     void SetComputeUniformBufferState(u32 mask, const ComputeUniformBufferSizes* sizes);
 
+#if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    [[nodiscard]] std::array<Binding, NUM_GRAPHICS_UNIFORM_BUFFERS>
+    StreamlineUniformBufferBindings(size_t stage) const noexcept {
+        return channel_state->uniform_buffers[stage];
+    }
+#endif
+
     void UnbindGraphicsStorageBuffers(size_t stage);
 
     bool BindGraphicsStorageBuffer(size_t stage, size_t ssbo_index, u32 cbuf_index, u32 cbuf_offset,

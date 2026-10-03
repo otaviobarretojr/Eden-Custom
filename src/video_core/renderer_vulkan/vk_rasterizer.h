@@ -280,6 +280,8 @@ private:
         std::array<VkFormat, NUM_RT> color_formats{};
         std::array<VkImageUsageFlags, NUM_RT> color_usages{};
         std::array<VkImage, NUM_RT> color_images{};
+        std::array<DAddr, Shader::Info::MAX_CBUFS> vertex_cbuf_addresses{};
+        std::array<u32, Shader::Info::MAX_CBUFS> vertex_cbuf_bound_sizes{};
     };
 
     struct Dlss5DepthCandidateTrace {
