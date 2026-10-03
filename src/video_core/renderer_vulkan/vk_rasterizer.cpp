@@ -943,13 +943,30 @@ void RasterizerVulkan::FlushCommands() {
 }
 
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
-void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
+void RasterizerVulkan::TracePresentationFrame(u64 frame_id) {
     if (dlss5_depth_candidate_trace.observations == 0) {
         return;
     }
-    const auto log_candidate = [frame_id](const char* kind, const Dlss5DepthCandidate& candidate) {
+    const auto log_candidate = [frame_id](const char* kind, Dlss5DepthCandidate& candidate) {
         if (candidate.observations == 0) {
             return;
+        }
+        if (candidate.last_presented_frame != frame_id) {
+            ++candidate.presented_frames;
+            for (u32 index = 0; index < candidate.vertex_cbuf_content_hashes.size(); ++index) {
+                if ((candidate.vertex_cbuf_mask & (1U << index)) == 0 ||
+                    (candidate.vertex_cbuf_gpu_modified_mask & (1U << index)) != 0) {
+                    continue;
+                }
+                const u64 current_hash = candidate.vertex_cbuf_content_hashes[index];
+                if (current_hash == 0) continue;
+                const u64 previous_hash = candidate.last_presented_hashes[index];
+                if (previous_hash != 0 && previous_hash != current_hash) {
+                    ++candidate.changed_presented_frames[index];
+                }
+                candidate.last_presented_hashes[index] = current_hash;
+            }
+            candidate.last_presented_frame = frame_id;
         }
         std::string vertex_cbuf_signature;
         for (u32 index = 0; index < candidate.vertex_cbuf_used_sizes.size(); ++index) {
@@ -982,10 +999,17 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                            candidate.vertex_cbuf_bound_sizes[index],
                            candidate.vertex_cbuf_used_sizes[index]);
             if (!vertex_cbuf_content.empty()) vertex_cbuf_content += ',';
-            fmt::format_to(std::back_inserter(vertex_cbuf_content), "{}:hash0x{:016x}:changes{}:gpu{}",
+            const bool gpu_modified = (candidate.vertex_cbuf_gpu_modified_mask & (1U << index)) != 0;
+            const bool matrix_sized = candidate.vertex_cbuf_used_sizes[index] >= 64;
+            const u32 changed_frames = candidate.changed_presented_frames[index];
+            const u32 comparable_frames = candidate.presented_frames > 0 ? candidate.presented_frames - 1 : 0;
+            const u32 temporal_percent = comparable_frames > 0 ?
+                static_cast<u32>((static_cast<u64>(changed_frames) * 100) / comparable_frames) : 0;
+            fmt::format_to(std::back_inserter(vertex_cbuf_content),
+                           "{}:hash0x{:016x}:draw_changes{}:frame_changes{}/{}:{}pct:matrix_sized{}:gpu{}",
                            index, candidate.vertex_cbuf_content_hashes[index],
-                           candidate.vertex_cbuf_content_changes[index],
-                           (candidate.vertex_cbuf_gpu_modified_mask & (1U << index)) != 0);
+                           candidate.vertex_cbuf_content_changes[index], changed_frames,
+                           comparable_frames, temporal_percent, matrix_sized, gpu_modified);
         }
         LOG_INFO(Render_Vulkan,
                  "DLSS5 depth candidate: frame_id={}, kind={}, observations={}, switches={}, "
@@ -994,7 +1018,7 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                  "rescaled={}, pipeline_hash=0x{:016x}, vertex_shader_hash=0x{:016x}, ndc_range={}, "
                  "vertex_cbuf_mask=0x{:x}, vertex_cbuf_signature=0x{:016x}, vertex_cbufs=[{}], "
                  "vertex_cbuf_bindings=[{}], temporal_binding_signature=0x{:016x}, "
-                 "temporal_binding_changes={}, vertex_cbuf_content=[{}], color_targets=[{}]",
+                 "temporal_binding_changes={}, presented_frames={}, vertex_cbuf_content=[{}], color_targets=[{}]",
                  frame_id, kind, candidate.observations, candidate.image_switches, candidate.width,
                  candidate.height, candidate.color_buffers, static_cast<u32>(candidate.samples),
                  static_cast<u32>(candidate.format), static_cast<u32>(candidate.usage),
@@ -1006,7 +1030,8 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) const {
                  candidate.ndc_minus_one_to_one ? "minus-one-to-one" : "zero-to-one",
                  candidate.vertex_cbuf_mask, candidate.vertex_cbuf_signature, vertex_cbuf_signature,
                  vertex_cbuf_bindings, candidate.temporal_binding_signature,
-                 candidate.temporal_binding_changes, vertex_cbuf_content, color_targets);
+                 candidate.temporal_binding_changes, candidate.presented_frames,
+                 vertex_cbuf_content, color_targets);
     };
     log_candidate("color-linked", dlss5_depth_candidate_trace.color_linked);
     log_candidate("depth-only", dlss5_depth_candidate_trace.depth_only);

@@ -146,7 +146,7 @@ public:
         }
     };
 
-    void TracePresentationFrame(u64 frame_id) const;
+    void TracePresentationFrame(u64 frame_id);
     [[nodiscard]] Dlss5DepthSnapshot GetDlss5DepthSnapshot() noexcept;
     [[nodiscard]] bool LeaseDlss5Depth(const Dlss5DepthSnapshot& snapshot, u64 gpu_tick) noexcept;
 #endif
@@ -288,6 +288,10 @@ private:
         std::array<u64, Shader::Info::MAX_CBUFS> vertex_cbuf_content_hashes{};
         std::array<u32, Shader::Info::MAX_CBUFS> vertex_cbuf_content_changes{};
         u32 vertex_cbuf_gpu_modified_mask{};
+        u64 last_presented_frame{};
+        u32 presented_frames{};
+        std::array<u64, Shader::Info::MAX_CBUFS> last_presented_hashes{};
+        std::array<u32, Shader::Info::MAX_CBUFS> changed_presented_frames{};
     };
 
     struct Dlss5DepthCandidateTrace {
