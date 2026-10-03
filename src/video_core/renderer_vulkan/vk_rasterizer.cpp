@@ -280,6 +280,9 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
                 candidate.range = dlss5_framebuffer->ImageRanges()[depth_index];
             }
             candidate.rescaled = dlss5_framebuffer->IsRescaled();
+            const auto& vertex_info = pipeline->StageInfo(0);
+            candidate.vertex_cbuf_mask = vertex_info.constant_buffer_mask;
+            candidate.vertex_cbuf_used_sizes = vertex_info.constant_buffer_used_sizes;
         }
     }
 #endif
