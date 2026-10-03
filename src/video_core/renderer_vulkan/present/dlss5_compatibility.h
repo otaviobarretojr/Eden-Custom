@@ -91,6 +91,18 @@ struct Dlss5FrameConstantsReadiness {
     }
 };
 
+struct Dlss5FrameInputSet {
+    u64 frame_id{};
+    Dlss5VulkanResourceDescription depth{};
+    Dlss5VulkanResourceDescription motion_vectors{};
+    Dlss5FrameConstantsReadiness constants_readiness{};
+
+    [[nodiscard]] bool IsReady(u64 expected_frame_id) const noexcept {
+        return frame_id != 0 && frame_id == expected_frame_id && depth.IsValid() &&
+               motion_vectors.IsValid() && constants_readiness.IsReady();
+    }
+};
+
 struct Dlss5CompatibilityInputs {
     u32 width{};
     u32 height{};
@@ -161,10 +173,15 @@ public:
         return final_color_resource;
     }
 
+    [[nodiscard]] const Dlss5FrameInputSet& FrameInputSet() const noexcept {
+        return frame_input_set;
+    }
+
 private:
     Dlss5CompatibilityState state{Dlss5CompatibilityState::UnsupportedGpu};
     Dlss5CompatibilityInputs inputs{};
     Dlss5FrameConstantsReadiness frame_constants_readiness{};
+    Dlss5FrameInputSet frame_input_set{};
     bool temporal_reset_required{true};
     Dlss5VulkanResourceDescription final_color_resource{};
     Dlss5ProcessedOutput processed_output{};
