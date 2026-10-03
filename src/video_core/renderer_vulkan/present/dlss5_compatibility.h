@@ -153,6 +153,10 @@ public:
         return frame_constants_readiness;
     }
 
+    [[nodiscard]] bool TemporalResetRequired() const noexcept {
+        return temporal_reset_required;
+    }
+
     [[nodiscard]] const Dlss5VulkanResourceDescription& FinalColorResource() const noexcept {
         return final_color_resource;
     }
@@ -161,6 +165,7 @@ private:
     Dlss5CompatibilityState state{Dlss5CompatibilityState::UnsupportedGpu};
     Dlss5CompatibilityInputs inputs{};
     Dlss5FrameConstantsReadiness frame_constants_readiness{};
+    bool temporal_reset_required{true};
     Dlss5VulkanResourceDescription final_color_resource{};
     Dlss5ProcessedOutput processed_output{};
     u64 frames_observed{};
