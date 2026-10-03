@@ -271,6 +271,8 @@ private:
         VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
         VkImageSubresourceRange range{};
         bool rescaled{};
+        u32 vertex_cbuf_mask{};
+        std::array<u32, Shader::Info::MAX_CBUFS> vertex_cbuf_used_sizes{};
     };
 
     struct Dlss5DepthCandidateTrace {
