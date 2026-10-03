@@ -274,6 +274,9 @@ private:
         u32 vertex_cbuf_mask{};
         std::array<u32, Shader::Info::MAX_CBUFS> vertex_cbuf_used_sizes{};
         u64 vertex_cbuf_signature{};
+        size_t pipeline_hash{};
+        u64 vertex_shader_hash{};
+        bool ndc_minus_one_to_one{};
     };
 
     struct Dlss5DepthCandidateTrace {

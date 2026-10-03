@@ -85,6 +85,15 @@ public:
     [[nodiscard]] const Shader::Info& StageInfo(size_t stage) const noexcept {
         return stage_infos[stage];
     }
+    [[nodiscard]] size_t PipelineHash() const noexcept {
+        return key.Hash();
+    }
+    [[nodiscard]] u64 ShaderHash(size_t stage) const noexcept {
+        return key.unique_hashes[stage];
+    }
+    [[nodiscard]] bool NdcMinusOneToOne() const noexcept {
+        return key.state.ndc_minus_one_to_one != 0;
+    }
 
     bool SupportsAlphaToCoverage() const noexcept {
         return fragment_has_color0_output;
