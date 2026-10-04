@@ -282,6 +282,14 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
             candidate.rescaled = dlss5_framebuffer->IsRescaled();
             candidate.pipeline_hash = pipeline->PipelineHash();
             candidate.vertex_shader_hash = pipeline->ShaderHash(0);
+            candidate.fragment_shader_hash = pipeline->ShaderHash(GraphicsPipeline::NUM_STAGES - 1);
+            const auto& fragment_info = pipeline->StageInfo(GraphicsPipeline::NUM_STAGES - 1);
+            candidate.fragment_color_output_mask = 0;
+            for (u32 output = 0; output < fragment_info.stores_frag_color.size(); ++output) {
+                if (fragment_info.stores_frag_color[output]) {
+                    candidate.fragment_color_output_mask |= static_cast<u8>(1U << output);
+                }
+            }
             candidate.ndc_minus_one_to_one = pipeline->NdcMinusOneToOne();
             candidate.color_formats = dlss5_framebuffer->StreamlineColorFormats();
             candidate.color_usages = dlss5_framebuffer->StreamlineColorUsages();
@@ -1031,7 +1039,7 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) {
                  "DLSS5 depth candidate: frame_id={}, kind={}, observations={}, switches={}, "
                  "largest={}x{}, colors={}, samples={}, format={}, usage=0x{:x}, layout={}, "
                  "image=0x{:x}, last_image=0x{:x}, aspect=0x{:x}, mip={}+{}, layer={}+{}, "
-                 "rescaled={}, pipeline_hash=0x{:016x}, vertex_shader_hash=0x{:016x}, ndc_range={}, "
+                 "rescaled={}, pipeline_hash=0x{:016x}, vertex_shader_hash=0x{:016x}, fragment_shader_hash=0x{:016x}, frag_output_mask=0x{:02x}, ndc_range={}, "
                  "vertex_cbuf_mask=0x{:x}, vertex_cbuf_signature=0x{:016x}, vertex_cbufs=[{}], "
                  "vertex_cbuf_bindings=[{}], temporal_binding_signature=0x{:016x}, "
                  "temporal_binding_changes={}, presented_frames={}, vertex_cbuf_content=[{}], color_targets=[{}]",

@@ -276,6 +276,8 @@ private:
         u64 vertex_cbuf_signature{};
         size_t pipeline_hash{};
         u64 vertex_shader_hash{};
+        u64 fragment_shader_hash{};
+        u8 fragment_color_output_mask{};
         bool ndc_minus_one_to_one{};
         std::array<VkFormat, NUM_RT> color_formats{};
         std::array<VkImageUsageFlags, NUM_RT> color_usages{};
