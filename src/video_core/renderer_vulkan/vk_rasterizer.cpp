@@ -282,8 +282,8 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
             candidate.rescaled = dlss5_framebuffer->IsRescaled();
             candidate.pipeline_hash = pipeline->PipelineHash();
             candidate.vertex_shader_hash = pipeline->ShaderHash(0);
-            candidate.fragment_shader_hash = pipeline->ShaderHash(GraphicsPipeline::NUM_STAGES - 1);
-            const auto& fragment_info = pipeline->StageInfo(GraphicsPipeline::NUM_STAGES - 1);
+            candidate.fragment_shader_hash = pipeline->ShaderHash(Maxwell::MaxShaderStage - 1);
+            const auto& fragment_info = pipeline->StageInfo(Maxwell::MaxShaderStage - 1);
             candidate.fragment_color_output_mask = 0;
             for (u32 output = 0; output < fragment_info.stores_frag_color.size(); ++output) {
                 if (fragment_info.stores_frag_color[output]) {
