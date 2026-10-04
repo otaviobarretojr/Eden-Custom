@@ -264,6 +264,16 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
         const u64 candidate_pixels = static_cast<u64>(area.width) * area.height;
         const u64 current_pixels = static_cast<u64>(candidate.width) * candidate.height;
         if (candidate_pixels > current_pixels) {
+            // A larger selected candidate represents a new semantic producer. Keep only
+            // trace-wide observation counters; temporal CBUF/RT history must not leak
+            // across different selected pipelines or attachments.
+            const u32 observations = candidate.observations;
+            const u32 image_switches = candidate.image_switches;
+            const VkImage last_image = candidate.last_image;
+            candidate = {};
+            candidate.observations = observations;
+            candidate.image_switches = image_switches;
+            candidate.last_image = last_image;
             candidate.width = area.width;
             candidate.height = area.height;
             candidate.color_buffers = dlss5_framebuffer->NumColorBuffers();
