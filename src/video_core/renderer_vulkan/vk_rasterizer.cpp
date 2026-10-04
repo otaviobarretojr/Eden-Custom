@@ -329,6 +329,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
                         ++candidate.vertex_cbuf_content_changes[index];
                     }
                     candidate.vertex_cbuf_content_hashes[index] = sample.hash;
+                    if (sample.size >= 64) candidate.vertex_cbuf_sample_words[index] = sample.words;
                 }
                 const u64 values[] = {static_cast<u64>(index), static_cast<u64>(binding.device_addr),
                                       static_cast<u64>(binding.size)};
@@ -1005,11 +1006,26 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) {
             const u32 comparable_frames = candidate.presented_frames > 0 ? candidate.presented_frames - 1 : 0;
             const u32 temporal_percent = comparable_frames > 0 ?
                 static_cast<u32>((static_cast<u64>(changed_frames) * 100) / comparable_frames) : 0;
+            bool finite16 = matrix_sized && !gpu_modified;
+            u32 zero_count = 0;
+            u32 unit_count = 0;
+            if (finite16) {
+                for (const u32 word : candidate.vertex_cbuf_sample_words[index]) {
+                    const float value = std::bit_cast<float>(word);
+                    if (!std::isfinite(value)) {
+                        finite16 = false;
+                        break;
+                    }
+                    if (std::abs(value) < 1.0e-6f) ++zero_count;
+                    if (std::abs(std::abs(value) - 1.0f) < 1.0e-4f) ++unit_count;
+                }
+            }
             fmt::format_to(std::back_inserter(vertex_cbuf_content),
-                           "{}:hash0x{:016x}:draw_changes{}:frame_changes{}/{}:{}pct:matrix_sized{}:gpu{}",
+                           "{}:hash0x{:016x}:draw_changes{}:frame_changes{}/{}:{}pct:matrix_sized{}:finite16{}:zeros{}:units{}:gpu{}",
                            index, candidate.vertex_cbuf_content_hashes[index],
                            candidate.vertex_cbuf_content_changes[index], changed_frames,
-                           comparable_frames, temporal_percent, matrix_sized, gpu_modified);
+                           comparable_frames, temporal_percent, matrix_sized, finite16,
+                           zero_count, unit_count, gpu_modified);
         }
         LOG_INFO(Render_Vulkan,
                  "DLSS5 depth candidate: frame_id={}, kind={}, observations={}, switches={}, "

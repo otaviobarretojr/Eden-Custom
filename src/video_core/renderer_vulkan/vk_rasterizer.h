@@ -286,6 +286,7 @@ private:
         u64 temporal_binding_signature{};
         u32 temporal_binding_changes{};
         std::array<u64, Shader::Info::MAX_CBUFS> vertex_cbuf_content_hashes{};
+        std::array<std::array<u32, 16>, Shader::Info::MAX_CBUFS> vertex_cbuf_sample_words{};
         std::array<u32, Shader::Info::MAX_CBUFS> vertex_cbuf_content_changes{};
         u32 vertex_cbuf_gpu_modified_mask{};
         u64 last_presented_frame{};

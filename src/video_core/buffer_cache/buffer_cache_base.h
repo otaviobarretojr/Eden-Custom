@@ -250,6 +250,7 @@ public:
     struct StreamlineUniformBufferSample {
         u64 hash{};
         u32 size{};
+        std::array<u32, 16> words{};
         bool gpu_modified{};
         bool valid{};
     };
@@ -279,6 +280,9 @@ public:
             hash *= 1099511628211ULL;
         }
         result.hash = hash;
+        if (sample_size >= 64) {
+            std::memcpy(result.words.data(), bytes.data(), 64);
+        }
         result.valid = true;
         return result;
     }
