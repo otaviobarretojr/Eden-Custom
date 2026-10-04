@@ -1016,16 +1016,32 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) {
                                            candidate.color_extents[index].height == candidate.height;
             const bool float2 = candidate.color_formats[index] == VK_FORMAT_R16G16_SFLOAT ||
                                 candidate.color_formats[index] == VK_FORMAT_R32G32_SFLOAT;
+            const u32 presented = candidate.color_presented_frames[index];
+            const u32 written = candidate.color_written_frames[index];
+            const u32 switches = candidate.color_image_switches[index];
+            const u32 write_rate = presented > 0 ? (written * 100U) / presented : 0U;
+            const u32 switch_rate = presented > 1 ? (switches * 100U) / (presented - 1U) : 0U;
+            u32 mv_score = (write_rate * 45U) / 100U;
+            if (same_depth_extent) mv_score += 30U;
+            if (float2) mv_score += 15U;
+            if (presented >= 8) mv_score += 10U;
+            const u32 switch_penalty = (std::min)(switch_rate, 100U) / 5U;
+            mv_score = mv_score > switch_penalty ? mv_score - switch_penalty : 0U;
+            mv_score = (std::min)(mv_score, 100U);
+            const bool mv_strong_candidate = presented >= 8 && mv_score >= 75U;
+            const u64 producer_id =
+                static_cast<u64>(candidate.pipeline_hash) ^
+                (candidate.fragment_shader_hash + 0x9e3779b97f4a7c15ULL +
+                 (static_cast<u64>(index) << 6) + (static_cast<u64>(index) >> 2));
             fmt::format_to(std::back_inserter(color_targets),
-                           "rt{}:{}x{}:fmt{}:usage0x{:x}:img0x{:x}:present{}:written{}:switches{}:same_depth{}:float2{}",
+                           "rt{}:{}x{}:fmt{}:usage0x{:x}:img0x{:x}:present{}:written{}:write_rate{}:switches{}:switch_rate{}:same_depth{}:float2{}:mv_score{}:strong{}:producer0x{:x}",
                            index, candidate.color_extents[index].width,
                            candidate.color_extents[index].height,
                            static_cast<u32>(candidate.color_formats[index]),
                            static_cast<u32>(candidate.color_usages[index]),
-                           reinterpret_cast<uintptr_t>(candidate.color_images[index]),
-                           candidate.color_presented_frames[index],
-                           candidate.color_written_frames[index],
-                           candidate.color_image_switches[index], same_depth_extent, float2);
+                           reinterpret_cast<uintptr_t>(candidate.color_images[index]), presented,
+                           written, write_rate, switches, switch_rate, same_depth_extent, float2,
+                           mv_score, mv_strong_candidate, producer_id);
         }
         std::string vertex_cbuf_bindings;
         std::string vertex_cbuf_content;
