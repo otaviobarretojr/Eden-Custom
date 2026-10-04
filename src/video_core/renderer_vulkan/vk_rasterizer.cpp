@@ -1051,6 +1051,7 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) {
                  static_cast<u32>(candidate.range.aspectMask), candidate.range.baseMipLevel,
                  candidate.range.levelCount, candidate.range.baseArrayLayer, candidate.range.layerCount,
                  candidate.rescaled, candidate.pipeline_hash, candidate.vertex_shader_hash,
+                 candidate.fragment_shader_hash, candidate.fragment_color_output_mask,
                  candidate.ndc_minus_one_to_one ? "minus-one-to-one" : "zero-to-one",
                  candidate.vertex_cbuf_mask, candidate.vertex_cbuf_signature, vertex_cbuf_signature,
                  vertex_cbuf_bindings, candidate.temporal_binding_signature,
