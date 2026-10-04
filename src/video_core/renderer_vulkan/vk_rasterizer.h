@@ -291,10 +291,17 @@ private:
         std::array<std::array<u32, 16>, Shader::Info::MAX_CBUFS> vertex_cbuf_sample_words{};
         std::array<u32, Shader::Info::MAX_CBUFS> vertex_cbuf_content_changes{};
         u32 vertex_cbuf_gpu_modified_mask{};
+        u32 vertex_cbuf_valid_mask{};
         u64 last_presented_frame{};
         u32 presented_frames{};
         std::array<u64, Shader::Info::MAX_CBUFS> last_presented_hashes{};
+        u32 last_presented_cbuf_valid_mask{};
+        std::array<u32, Shader::Info::MAX_CBUFS> sampled_presented_frames{};
         std::array<u32, Shader::Info::MAX_CBUFS> changed_presented_frames{};
+        std::array<VkImage, NUM_RT> last_presented_color_images{};
+        std::array<u32, NUM_RT> color_presented_frames{};
+        std::array<u32, NUM_RT> color_written_frames{};
+        std::array<u32, NUM_RT> color_image_switches{};
     };
 
     struct Dlss5DepthCandidateTrace {

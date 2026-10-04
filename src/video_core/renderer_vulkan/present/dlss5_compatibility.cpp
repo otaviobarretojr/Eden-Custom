@@ -105,6 +105,7 @@ void Dlss5CompatibilityFilter::ObservePresentFrame(const Frame& frame) {
     // A processed result from any previous frame must never become eligible merely because the
     // next frame has identical dimensions.
     processed_output = {};
+    frame_input_set = {};
 
     // The presentation frame is the only input Eden can guarantee at this stage. Keep the
     // auxiliary-input contract explicit so future Streamline evaluation never mistakes generated

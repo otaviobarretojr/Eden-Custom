@@ -330,13 +330,16 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
                     0, index, (std::min)(used_size, static_cast<size_t>(64)));
                 if (sample.gpu_modified) {
                     candidate.vertex_cbuf_gpu_modified_mask |= (1U << index);
+                    candidate.vertex_cbuf_valid_mask &= ~(1U << index);
                 } else if (sample.valid) {
                     candidate.vertex_cbuf_gpu_modified_mask &= ~(1U << index);
+                    const bool had_previous = (candidate.vertex_cbuf_valid_mask & (1U << index)) != 0;
                     const u64 previous_hash = candidate.vertex_cbuf_content_hashes[index];
-                    if (previous_hash != 0 && previous_hash != sample.hash) {
+                    if (had_previous && previous_hash != sample.hash) {
                         ++candidate.vertex_cbuf_content_changes[index];
                     }
                     candidate.vertex_cbuf_content_hashes[index] = sample.hash;
+                    candidate.vertex_cbuf_valid_mask |= (1U << index);
                     if (sample.size >= 64) candidate.vertex_cbuf_sample_words[index] = sample.words;
                 }
                 const u64 values[] = {static_cast<u64>(index), static_cast<u64>(binding.device_addr),
@@ -967,13 +970,30 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) {
                     (candidate.vertex_cbuf_gpu_modified_mask & (1U << index)) != 0) {
                     continue;
                 }
+                if ((candidate.vertex_cbuf_valid_mask & (1U << index)) == 0) continue;
                 const u64 current_hash = candidate.vertex_cbuf_content_hashes[index];
-                if (current_hash == 0) continue;
+                const bool had_previous =
+                    (candidate.last_presented_cbuf_valid_mask & (1U << index)) != 0;
                 const u64 previous_hash = candidate.last_presented_hashes[index];
-                if (previous_hash != 0 && previous_hash != current_hash) {
+                if (had_previous && previous_hash != current_hash) {
                     ++candidate.changed_presented_frames[index];
                 }
                 candidate.last_presented_hashes[index] = current_hash;
+                candidate.last_presented_cbuf_valid_mask |= (1U << index);
+                ++candidate.sampled_presented_frames[index];
+            }
+            for (u32 index = 0; index < candidate.color_images.size(); ++index) {
+                const VkImage current_image = candidate.color_images[index];
+                if (current_image == VK_NULL_HANDLE) continue;
+                ++candidate.color_presented_frames[index];
+                if ((candidate.fragment_color_output_mask & (1U << index)) != 0) {
+                    ++candidate.color_written_frames[index];
+                }
+                const VkImage previous_image = candidate.last_presented_color_images[index];
+                if (previous_image != VK_NULL_HANDLE && previous_image != current_image) {
+                    ++candidate.color_image_switches[index];
+                }
+                candidate.last_presented_color_images[index] = current_image;
             }
             candidate.last_presented_frame = frame_id;
         }
@@ -992,11 +1012,20 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) {
         for (u32 index = 0; index < candidate.color_images.size(); ++index) {
             if (candidate.color_images[index] == VK_NULL_HANDLE) continue;
             if (!color_targets.empty()) color_targets += ',';
-            fmt::format_to(std::back_inserter(color_targets), "rt{}:{}x{}:fmt{}:usage0x{:x}:img0x{:x}", index,
-                           candidate.color_extents[index].width, candidate.color_extents[index].height,
+            const bool same_depth_extent = candidate.color_extents[index].width == candidate.width &&
+                                           candidate.color_extents[index].height == candidate.height;
+            const bool float2 = candidate.color_formats[index] == VK_FORMAT_R16G16_SFLOAT ||
+                                candidate.color_formats[index] == VK_FORMAT_R32G32_SFLOAT;
+            fmt::format_to(std::back_inserter(color_targets),
+                           "rt{}:{}x{}:fmt{}:usage0x{:x}:img0x{:x}:present{}:written{}:switches{}:same_depth{}:float2{}",
+                           index, candidate.color_extents[index].width,
+                           candidate.color_extents[index].height,
                            static_cast<u32>(candidate.color_formats[index]),
                            static_cast<u32>(candidate.color_usages[index]),
-                           reinterpret_cast<uintptr_t>(candidate.color_images[index]));
+                           reinterpret_cast<uintptr_t>(candidate.color_images[index]),
+                           candidate.color_presented_frames[index],
+                           candidate.color_written_frames[index],
+                           candidate.color_image_switches[index], same_depth_extent, float2);
         }
         std::string vertex_cbuf_bindings;
         std::string vertex_cbuf_content;
@@ -1011,7 +1040,8 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) {
             const bool gpu_modified = (candidate.vertex_cbuf_gpu_modified_mask & (1U << index)) != 0;
             const bool matrix_sized = candidate.vertex_cbuf_used_sizes[index] >= 64;
             const u32 changed_frames = candidate.changed_presented_frames[index];
-            const u32 comparable_frames = candidate.presented_frames > 0 ? candidate.presented_frames - 1 : 0;
+            const u32 sampled_frames = candidate.sampled_presented_frames[index];
+            const u32 comparable_frames = sampled_frames > 0 ? sampled_frames - 1 : 0;
             const u32 temporal_percent = comparable_frames > 0 ?
                 static_cast<u32>((static_cast<u64>(changed_frames) * 100) / comparable_frames) : 0;
             bool finite16 = matrix_sized && !gpu_modified;
