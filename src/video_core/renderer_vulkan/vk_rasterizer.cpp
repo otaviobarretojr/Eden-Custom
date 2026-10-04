@@ -1085,9 +1085,9 @@ void RasterizerVulkan::TracePresentationFrame(u64 frame_id) {
                 }
             }
             fmt::format_to(std::back_inserter(vertex_cbuf_content),
-                           "{}:hash0x{:016x}:draw_changes{}:frame_changes{}/{}:{}pct:matrix_sized{}:finite16{}:zeros{}:units{}:gpu{}",
+                           "{}:hash0x{:016x}:draw_changes{}:valid_samples{}:sample_changes{}/{}:{}pct:matrix_sized{}:finite16{}:zeros{}:units{}:gpu{}",
                            index, candidate.vertex_cbuf_content_hashes[index],
-                           candidate.vertex_cbuf_content_changes[index], changed_frames,
+                           candidate.vertex_cbuf_content_changes[index], sampled_frames, changed_frames,
                            comparable_frames, temporal_percent, matrix_sized, finite16,
                            zero_count, unit_count, gpu_modified);
         }
