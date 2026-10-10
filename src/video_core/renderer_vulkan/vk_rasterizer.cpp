@@ -325,6 +325,40 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
                 hash_value(size);
             }
             candidate.vertex_cbuf_signature = cbuf_signature;
+
+            // Rehydrate only temporal telemetry when the same semantic producer returns
+            // on a later frame. The per-frame candidate itself is intentionally rebuilt.
+            const auto& history = dlss5_framebuffer->NumColorBuffers() > 0
+                                      ? dlss5_color_linked_history
+                                      : dlss5_depth_only_history;
+            const bool same_history_producer =
+                history.width == candidate.width && history.height == candidate.height &&
+                history.format == candidate.format &&
+                history.color_buffers == candidate.color_buffers &&
+                history.pipeline_hash == candidate.pipeline_hash &&
+                history.vertex_shader_hash == candidate.vertex_shader_hash &&
+                history.fragment_shader_hash == candidate.fragment_shader_hash &&
+                history.vertex_cbuf_signature == candidate.vertex_cbuf_signature;
+            if (same_history_producer) {
+                candidate.temporal_binding_signature = history.temporal_binding_signature;
+                candidate.temporal_binding_changes = history.temporal_binding_changes;
+                candidate.vertex_cbuf_content_hashes = history.vertex_cbuf_content_hashes;
+                candidate.vertex_cbuf_sample_words = history.vertex_cbuf_sample_words;
+                candidate.vertex_cbuf_content_changes = history.vertex_cbuf_content_changes;
+                candidate.vertex_cbuf_gpu_modified_mask = history.vertex_cbuf_gpu_modified_mask;
+                candidate.vertex_cbuf_valid_mask = history.vertex_cbuf_valid_mask;
+                candidate.last_presented_frame = history.last_presented_frame;
+                candidate.presented_frames = history.presented_frames;
+                candidate.last_presented_hashes = history.last_presented_hashes;
+                candidate.last_presented_cbuf_valid_mask =
+                    history.last_presented_cbuf_valid_mask;
+                candidate.sampled_presented_frames = history.sampled_presented_frames;
+                candidate.changed_presented_frames = history.changed_presented_frames;
+                candidate.last_presented_color_images = history.last_presented_color_images;
+                candidate.color_presented_frames = history.color_presented_frames;
+                candidate.color_written_frames = history.color_written_frames;
+                candidate.color_image_switches = history.color_image_switches;
+            }
         }
         if (candidate.pipeline_hash == pipeline->PipelineHash() &&
             candidate.vertex_shader_hash == pipeline->ShaderHash(0)) {
@@ -1165,6 +1199,14 @@ bool RasterizerVulkan::LeaseDlss5Depth(const Dlss5DepthSnapshot& snapshot, u64 g
 
 void RasterizerVulkan::TickFrame() {
 #if defined(_WIN32) && defined(HAS_NVIDIA_STREAMLINE)
+    // Preserve the selected producer's temporal telemetry across presentation frames.
+    // Per-frame candidate discovery is still reset so a new largest attachment can win.
+    if (dlss5_depth_candidate_trace.color_linked.width != 0) {
+        dlss5_color_linked_history = dlss5_depth_candidate_trace.color_linked;
+    }
+    if (dlss5_depth_candidate_trace.depth_only.width != 0) {
+        dlss5_depth_only_history = dlss5_depth_candidate_trace.depth_only;
+    }
     dlss5_depth_candidate_trace = {};
 #endif
     draw_counter = 0;

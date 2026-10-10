@@ -311,6 +311,8 @@ private:
     };
 
     Dlss5DepthCandidateTrace dlss5_depth_candidate_trace{};
+    Dlss5DepthCandidate dlss5_color_linked_history{};
+    Dlss5DepthCandidate dlss5_depth_only_history{};
 #endif
     u32 draw_counter = 0;
 };
