@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="s25_profile_title">Galaxy S25 Ultra · Perfis</string>
+    <string name="s25_profile_description">Perfis reversíveis de renderização para Snapdragon 8 Elite</string>
+    <string name="s25_diagnostics_title">Galaxy S25 Ultra · Diagnóstico</string>
+    <string name="s25_diagnostics_description">GPU, Vulkan, memória e estado térmico do Android</string>
+    <string name="s25_performance_profile">Desempenho · 0,75× · com FPS e frametime</string>
+    <string name="s25_balanced_profile">Equilibrado · 1× · uso diário</string>
+    <string name="s25_quality_profile">Qualidade · 1,5× · mais carga gráfica</string>
+    <string name="s25_apply_profile">Aplicar</string>
+    <string name="s25_restore_settings">Restaurar original</string>
+    <string name="s25_profile_applied">Perfil salvo. Reinicie o jogo para aplicar tudo.</string>
+    <string name="s25_profile_restored">Configurações originais restauradas.</string>
+    <string name="s25_profile_error">Não foi possível salvar. Confira as configurações.</string>
+    <string name="s25_nothing_to_restore">Ainda não existe cópia para restaurar.</string>
+    <string name="s25_close_game_warning">Feche o jogo antes de mudar o perfil global.</string>
+    <string name="s25_device_only_title">Perfil não disponível</string>
+    <string name="s25_device_only_message">Esta versão do perfil foi feita para modelos Galaxy S25 Ultra (SM-S938).</string>
+    <string name="s25_share_diagnostics">Compartilhar</string>
+    <string name="s25_diagnostics_disclaimer">Diagnóstico de leitura. Não mede FPS real, compatibilidade dos jogos nem elimina limitação térmica.</string>
+</resources>
