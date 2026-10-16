@@ -198,6 +198,19 @@ android {
             }
         }
 
+        // Independent package: install beside the official Eden Android build.
+        create("s25Ultra") {
+            dimension = "version"
+            minSdk = 35
+            applicationId = "dev.eden.eden_emulator.s25ultra"
+            manifestPlaceholders += mapOf("appNameBase" to "Eden S25 Ultra")
+            resValue("string", "app_name_suffixed", "Eden S25 Ultra")
+
+            ndk {
+                abiFilters += listOf("arm64-v8a")
+            }
+        }
+
         create("genshinSpoof") {
             dimension = "version"
             minSdk = 35
