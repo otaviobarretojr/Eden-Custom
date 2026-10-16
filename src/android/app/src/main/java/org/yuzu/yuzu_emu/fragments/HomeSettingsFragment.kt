@@ -43,6 +43,7 @@ import org.yuzu.yuzu_emu.model.HomeViewModel
 import org.yuzu.yuzu_emu.ui.main.MainActivity
 import org.yuzu.yuzu_emu.utils.FileUtil
 import org.yuzu.yuzu_emu.utils.GpuDriverHelper
+import org.yuzu.yuzu_emu.utils.S25UltraProfile
 import org.yuzu.yuzu_emu.utils.Log
 import org.yuzu.yuzu_emu.utils.LosslessScalingHelper
 import org.yuzu.yuzu_emu.utils.ViewUtils.updateMargins
@@ -122,6 +123,25 @@ class HomeSettingsFragment : Fragment() {
                     }
                 )
             )
+            // Galaxy-specific tools stay hidden on other Android devices.
+            if (S25UltraProfile.isSupportedDevice()) {
+                add(
+                    HomeSetting(
+                        R.string.s25_profile_title,
+                        R.string.s25_profile_description,
+                        R.drawable.ic_graphics,
+                        { S25UltraProfile.showPresetDialog(requireContext()) }
+                    )
+                )
+                add(
+                    HomeSetting(
+                        R.string.s25_diagnostics_title,
+                        R.string.s25_diagnostics_description,
+                        R.drawable.ic_system,
+                        { S25UltraProfile.showDiagnosticsDialog(requireContext()) }
+                    )
+                )
+            }
             add(
                 HomeSetting(
                     R.string.profile_manager,
