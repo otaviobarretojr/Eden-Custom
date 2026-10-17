@@ -100,8 +100,8 @@ class S25TorrentDownloadService : Service() {
                     continue
                 }
                 val torrentStatus = th.status()
-                val msg = torrentStatus.errorMessage()
-                if (msg.isNotBlank()) error(msg)
+                val nativeError = torrentStatus.errorCode()
+                if (nativeError.value() != 0) error(nativeError.message())
                 val progress = (torrentStatus.progress() * 100f).toInt().coerceIn(0, 100)
                 val kib = torrentStatus.downloadRate() / 1024
                 save("running", name, progress, "${kib} KiB/s · ${torrentStatus.numPeers()} pares")
