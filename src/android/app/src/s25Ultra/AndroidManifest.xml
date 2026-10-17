@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <application>
+        <activity android:name="org.yuzu.yuzu_emu.activities.S25UltraModBrowserActivity"
+            android:exported="false" android:theme="@style/Theme.Yuzu.Main"/>
         <activity android:name="org.yuzu.yuzu_emu.activities.S25UltraConverterActivity"
             android:exported="false" android:theme="@style/Theme.Yuzu.Main"/>
         <service android:name="org.yuzu.yuzu_emu.activities.S25ConversionService"

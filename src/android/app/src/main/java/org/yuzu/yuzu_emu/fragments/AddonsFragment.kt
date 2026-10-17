@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.MenuItem
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -24,6 +25,7 @@ import org.yuzu.yuzu_emu.databinding.FragmentAddonsBinding
 import org.yuzu.yuzu_emu.model.AddonViewModel
 import org.yuzu.yuzu_emu.model.HomeViewModel
 import org.yuzu.yuzu_emu.utils.AddonUtil
+import org.yuzu.yuzu_emu.utils.S25UltraProfile
 import org.yuzu.yuzu_emu.utils.FileUtil.copyFilesTo
 import org.yuzu.yuzu_emu.utils.InstallableActions
 import org.yuzu.yuzu_emu.utils.ViewUtils.updateMargins
@@ -65,6 +67,25 @@ class AddonsFragment : Fragment() {
         }
 
         binding.toolbarAddons.title = getString(R.string.addons_game, args.game.title)
+
+        // The catalog is opt-in and specific to S25 Ultra build flavor.
+        if (S25UltraProfile.isSupportedDevice() && runCatching {
+                Class.forName("org.yuzu.yuzu_emu.activities.S25UltraModBrowserActivity")
+            }.isSuccess) {
+            binding.toolbarAddons.menu.add("Mods e traduções").apply {
+                setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                setOnMenuItemClickListener {
+                    val browser = Intent().setClassName(
+                        requireContext(),
+                        "org.yuzu.yuzu_emu.activities.S25UltraModBrowserActivity"
+                    )
+                    browser.putExtra("s25_mod_title_id", args.game.programIdHex)
+                    browser.putExtra("s25_mod_game_title", args.game.title)
+                    startActivity(browser)
+                    true
+                }
+            }
+        }
 
         binding.listAddons.apply {
             layoutManager = LinearLayoutManager(requireContext())

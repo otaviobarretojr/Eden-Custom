@@ -1,0 +1,247 @@
+// SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+package org.yuzu.yuzu_emu.activities
+
+import android.content.Intent
+import android.net.Uri
+import android.os.Bundle
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.util.Locale
+import java.util.concurrent.Executors
+
+/**
+ * Opt-in per-game ZIP mod manager. Only uses existing native load/<TitleID>
+ * folders and does not install game updates or firmware.
+ */
+class S25UltraModBrowserActivity : AppCompatActivity() {
+    private val executor = Executors.newSingleThreadExecutor()
+    private lateinit var body: LinearLayout
+    private lateinit var status: TextView
+    private lateinit var gameId: String
+    private lateinit var gameTitle: String
+    private var busy = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        gameId = intent.getStringExtra(EXTRA_TITLE_ID).orEmpty().uppercase(Locale.ROOT)
+        gameTitle = intent.getStringExtra(EXTRA_GAME_TITLE).orEmpty()
+        if (!Regex("^[A-F0-9]{16}$").matches(gameId)) {
+            MaterialAlertDialogBuilder(this).setTitle("Mods e traduções")
+                .setMessage("O jogo não possui um Title ID válido. Abra um jogo instalado e tente novamente.")
+                .setPositiveButton("Fechar") { _, _ -> finish() }.setCancelable(false).show()
+            return
+        }
+        title = "Mods e traduções"
+        val dp = resources.displayMetrics.density
+        fun px(v: Int) = (v * dp).toInt()
+        body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(18), px(18), px(18), px(32))
+        }
+        fun caption(text: String, size: Float) = TextView(this).apply {
+            this.text = text
+            textSize = size
+            setPadding(0, px(3), 0, px(10))
+        }
+        body.addView(caption(gameTitle, 22f))
+        body.addView(caption("Title ID: $gameId", 13f))
+        body.addView(caption(
+            "Downloads de patches da comunidade. Não inclui jogos, DLCs, firmware ou chaves. " +
+                "Sempre confira a versão do jogo e a autoria do mod.", 14f))
+        action("Pesquisar mods") { load(false) }
+        action("Pesquisar traduções PT-BR") { load(true) }
+        action("Gerenciar mods instalados") { showInstalled() }
+        status = caption("Escolha uma categoria para pesquisar.", 14f)
+        body.addView(status)
+        setContentView(ScrollView(this).apply { addView(body) })
+        load(false)
+    }
+
+    override fun onDestroy() {
+        executor.shutdownNow()
+        super.onDestroy()
+    }
+
+    private fun action(label: String, handler: () -> Unit) {
+        val button = MaterialButton(this).apply {
+            text = label
+            setOnClickListener { if (!busy) handler() }
+        }
+        body.addView(button, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+    }
+
+    private fun label(s: String, size: Float = 14f) {
+        val t = TextView(this).apply {
+            text = s; textSize = size
+            setPadding(0, (8 * resources.displayMetrics.density).toInt(), 0,
+                (8 * resources.displayMetrics.density).toInt())
+        }
+        body.addView(t)
+    }
+
+    private fun clearResults() {
+        val starting = body.indexOfChild(status)
+        if (starting >= 0 && body.childCount > starting + 1) {
+            body.removeViews(starting + 1, body.childCount - starting - 1)
+        }
+    }
+
+    private fun inform(value: String) = runOnUiThread {
+        if (!isFinishing && !isDestroyed) status.text = value
+    }
+
+    private fun load(translations: Boolean) {
+        if (busy) return
+        clearResults()
+        busy = true
+        status.text = if (translations) "Buscando traduções por Title ID…" else "Buscando mods por Title ID…"
+        executor.execute {
+            val offers = mutableListOf<S25ModOffer>()
+            val warnings = mutableListOf<String>()
+            if (translations) {
+                runCatching { S25ModCatalog.portugueseTranslations(gameId) }
+                    .onSuccess { offers.addAll(it) }
+                    .onFailure { warnings.add("Índice histórico CNX: ${it.message}") }
+            } else {
+                runCatching { S25ModCatalog.githubPacks(gameId) }
+                    .onSuccess { offers.addAll(it) }
+                    .onFailure { warnings.add("GitHub: ${it.message}") }
+            }
+            runCatching { S25ModCatalog.gameBanana(gameTitle, translations) }
+                .onSuccess { offers.addAll(it) }
+                .onFailure { warnings.add("GameBanana: ${it.message}") }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                busy = false
+                renderOffers(offers.distinctBy { it.sourceUrl }, warnings, translations)
+            }
+        }
+    }
+
+    private fun renderOffers(offers: List<S25ModOffer>, warnings: List<String>, translations: Boolean) {
+        clearResults()
+        status.text = "Resultados para $gameTitle: ${offers.size}"
+        if (translations) label(
+            "Atenção: o índice PT-BR do CNX é histórico (2023). Links podem estar removidos " +
+                "e patches podem exigir versões antigas. Não há verificação de compatibilidade automática.")
+        if (offers.isEmpty()) label(
+            "Nenhum pacote confirmado para este Title ID nesta busca. " +
+                "Isso não significa que não existam mods para o jogo.")
+        if (warnings.isNotEmpty()) label("Avisos de rede: " + warnings.joinToString(" | "), 12f)
+        offers.take(40).forEach { offer ->
+            label("• ${offer.title}\n${offer.source}\n${offer.description}")
+            if (offer.downloadUrl != null || offer.gameBananaId > 0) {
+                action("Baixar e instalar · ${offer.title.take(28)}") { confirmInstall(offer) }
+            }
+            action("Ver página do autor") { openWeb(offer.sourceUrl) }
+        }
+        action("Pesquisar manualmente no GameBanana") {
+            openWeb("https://gamebanana.com/search?_sSearchString=" + Uri.encode(gameTitle))
+        }
+        if (translations) action("Ver projetos de tradução PT-BR") { openWeb("https://patcheados.org/") }
+    }
+
+    private fun confirmInstall(offer: S25ModOffer) {
+        MaterialAlertDialogBuilder(this).setTitle("Instalar: ${offer.title}?")
+            .setMessage(
+                "${offer.source}\n\n${offer.description}\n\n" +
+                    "A versão do jogo e a licença do patch precisam ser verificadas por você. " +
+                    "Arquivos serão validados antes de instalar e mods existentes não serão substituídos. " +
+                    "ZIPs acima de 150 MiB não são aceitos."
+            )
+            .setPositiveButton("Baixar e instalar") { _, _ -> install(offer) }
+            .setNeutralButton("Fonte") { _, _ -> openWeb(offer.sourceUrl) }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun install(offer: S25ModOffer) {
+        if (busy) return
+        busy = true
+        inform("Preparando download autorizado…")
+        executor.execute {
+            var zip: java.io.File? = null
+            val outcome = runCatching {
+                val url = offer.downloadUrl ?: S25ModCatalog.gameBananaArchive(offer.gameBananaId)
+                    ?: error("Sem ZIP direto válido. Abra a página do autor para instalar manualmente.")
+                inform("Conectando à fonte…")
+                zip = S25ModInstaller.download(applicationContext, url, ::inform)
+                inform("Validando estrutura do pacote…")
+                S25ModInstaller.install(applicationContext, zip!!, gameId, offer.title, ::inform)
+            }
+            zip?.delete()
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                busy = false
+                outcome.onSuccess { names ->
+                    status.text = "Instalado: ${names.joinToString(", ")}. Reinicie o jogo."
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("Mods instalados")
+                        .setMessage("Pasta(s): ${names.joinToString(", ")}.\nO Eden detectará os mods ao reiniciar o jogo.")
+                        .setPositiveButton("Gerenciar") { _, _ -> showInstalled() }
+                        .setNegativeButton("OK", null).show()
+                }.onFailure { ex ->
+                    status.text = "Falha: ${ex.message}"
+                    MaterialAlertDialogBuilder(this).setTitle("Download ou instalação não concluída")
+                        .setMessage(ex.message ?: "Erro desconhecido.")
+                        .setPositiveButton("OK", null).show()
+                }
+            }
+        }
+    }
+
+    private fun showInstalled() {
+        if (busy) return
+        clearResults()
+        val result = runCatching { S25ModInstaller.installed(gameId) }
+        result.onFailure { status.text = "Não foi possível ler os mods: ${it.message}" }
+        val (active, disabled) = result.getOrNull() ?: return
+        status.text = "Ativos: ${active.size} · Desativados: ${disabled.size}"
+        active.forEach { name ->
+            label("Ativo: $name")
+            action("Desativar · $name") { confirmToggle(name, false) }
+        }
+        disabled.forEach { name ->
+            label("Desativado: $name")
+            action("Reativar · $name") { confirmToggle(name, true) }
+        }
+        if (active.isEmpty() && disabled.isEmpty()) label("Nenhum mod do tipo romfs/exefs/cheats encontrado.")
+        label("Desativar move apenas a pasta do mod para o armazenamento interno do Eden; " +
+            "não modifica os saves nem remove os arquivos do jogo.", 12f)
+    }
+
+    private fun confirmToggle(name: String, enable: Boolean) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle((if (enable) "Reativar" else "Desativar") + " $name?")
+            .setMessage("Feche o jogo antes de alterar os mods. Nenhum save será apagado.")
+            .setPositiveButton("Confirmar") { _, _ ->
+                runCatching { S25ModInstaller.toggle(gameId, name, enable) }
+                    .onSuccess { showInstalled() }
+                    .onFailure {
+                        MaterialAlertDialogBuilder(this).setTitle("Erro no mod")
+                            .setMessage(it.message).setPositiveButton("OK", null).show()
+                    }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun openWeb(url: String) {
+        if (!url.startsWith("https://", true)) return
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+            .onFailure { inform("Não foi possível abrir o navegador.") }
+    }
+
+    companion object {
+        const val EXTRA_TITLE_ID = "s25_mod_title_id"
+        const val EXTRA_GAME_TITLE = "s25_mod_game_title"
+    }
+}
