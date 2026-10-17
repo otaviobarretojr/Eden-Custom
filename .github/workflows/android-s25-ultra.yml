@@ -8,6 +8,10 @@ on:
     branches:
       - android/s25-ultra-profile-v1
 
+concurrency:
+  group: eden-s25-ultra-build
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -54,6 +58,16 @@ jobs:
           export ANDROID_SDK_ROOT="$ANDROID_HOME"
           export ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/28.2.13676358"
           ./gradlew :app:assembleS25UltraRelWithDebInfo --no-daemon --stacktrace
+
+      - name: Verify upgrade identity and APK signature
+        run: |
+          APK="src/android/app/build/outputs/apk/s25Ultra/relWithDebInfo/app-s25Ultra-relWithDebInfo.apk"
+          test -f "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -v 4 "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/s25-apk-signature.txt
+          grep -qi "9d09b2001be0dde93ea0444c536b72270fab3eb1a2fccfd56e1a3c46cc0d7af1" /tmp/s25-apk-signature.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | head -n 5 | tee /tmp/s25-apk-identity.txt
+          grep -q "name='dev.eden.eden_emulator.s25ultra.relWithDebInfo'" /tmp/s25-apk-identity.txt
 
       - name: Upload compiled test APK
         if: success()
