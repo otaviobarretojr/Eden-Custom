@@ -143,10 +143,10 @@ class HomeSettingsFragment : Fragment() {
                 )
                 add(
                     HomeSetting(
-                        R.string.s25_torrent_title,
-                        R.string.s25_torrent_description,
+                        R.string.s25_converter_title,
+                        R.string.s25_converter_description,
                         R.drawable.ic_install,
-                        { startActivity(Intent().setClassName(requireContext(), "org.yuzu.yuzu_emu.activities.S25UltraTorrentActivity")) }
+                        { startActivity(Intent().setClassName(requireContext(), "org.yuzu.yuzu_emu.activities.S25UltraConverterActivity")) }
                     )
                 )
             }

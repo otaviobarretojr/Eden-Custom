@@ -51,24 +51,28 @@ jobs:
             "ndk;28.2.13676358" \
             "cmake;3.31.6"
 
-      - name: Download and verify pinned jlibtorrent binaries
+      - name: Build pinned MIT licensed NSZ converter for Android ARM64
         run: |
           set -euo pipefail
-          VERSION="2.0.12.9"
-          BASE="https://github.com/frostwire/frostwire-jlibtorrent/releases/download/release/${VERSION}"
-          JAVA_JAR="src/android/app/libs/jlibtorrent-${VERSION}.jar"
-          ARM_JAR="/tmp/jlibtorrent-android-arm64-${VERSION}.jar"
-          mkdir -p src/android/app/libs src/android/app/src/s25Ultra/jniLibs/arm64-v8a
-          curl -fL --retry 3 --retry-delay 2 -o "$JAVA_JAR" "$BASE/jlibtorrent-${VERSION}.jar"
-          curl -fL --retry 3 --retry-delay 2 -o "$ARM_JAR" "$BASE/jlibtorrent-android-arm64-${VERSION}.jar"
-          echo "c96316e640397249ecfbbe56c355afef472190b8d47d51a94a03e47eb60c219a  $JAVA_JAR" | sha256sum --check
-          echo "8e48600b74a9f497ce2c7e1e6a025ce550f039658baef986ad634298758d5b9d  $ARM_JAR" | sha256sum --check
-          NATIVE_FILE=$(unzip -Z1 "$ARM_JAR" | grep -E '(^|/)libjlibtorrent([^/]*)\.so$' | head -n 1)
-          test -n "$NATIVE_FILE"
-          echo "Native binary: $NATIVE_FILE"
-          unzip -p "$ARM_JAR" "$NATIVE_FILE" > src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libjlibtorrent.so
-          file src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libjlibtorrent.so
-          test -s src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libjlibtorrent.so
+          REV="57fed17c76c4dcb35420f7dad7c5aefc8fd49d7c"
+          SRC="/tmp/andro-nsz-src"
+          BUILD="/tmp/andro-nsz-build"
+          mkdir -p "$SRC" src/android/app/src/s25Ultra/jniLibs/arm64-v8a src/android/app/src/s25Ultra/assets
+          curl -fL --retry 3 --retry-delay 3 \
+            "https://github.com/Fast-and-Pythonic/Andro-NSZ-unpacker/archive/$REV.tar.gz" \
+            -o /tmp/andro-nsz.tar.gz
+          tar -xzf /tmp/andro-nsz.tar.gz --strip-components=1 -C "$SRC"
+          test -s "$SRC/LICENSE"
+          cp "$SRC/LICENSE" src/android/app/src/s25Ultra/assets/AndroNSZ-MIT-LICENSE.txt
+          cmake -S "$SRC/app/src/main/cpp" -B "$BUILD" -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/28.2.13676358/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-35 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$BUILD" --target AndroNSZ -j 4
+          cp "$BUILD/libAndroNSZ.so" src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libAndroNSZ.so
+          file src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libAndroNSZ.so
+          test -s src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libAndroNSZ.so
 
       - name: Build S25 Ultra variant
         working-directory: src/android
