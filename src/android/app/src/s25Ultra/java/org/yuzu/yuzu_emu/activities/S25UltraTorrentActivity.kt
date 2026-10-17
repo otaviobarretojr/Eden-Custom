@@ -9,7 +9,6 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.StatFs
-import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.provider.Settings
 import android.view.ViewGroup
@@ -38,6 +37,7 @@ class S25UltraTorrentActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var downloadButton: MaterialButton
     private lateinit var selectButton: MaterialButton
+    private lateinit var stopButton: MaterialButton
     private var selectedTorrent: File? = null
     private val ui = Handler(Looper.getMainLooper())
 
@@ -93,10 +93,11 @@ class S25UltraTorrentActivity : AppCompatActivity() {
         downloadButton.isEnabled = false
         status = text("Aguardando arquivo.", 14f)
         column.addView(status)
-        button("Interromper download") {
+        stopButton = button("Interromper download") {
             startService(Intent(this, S25TorrentDownloadService::class.java).apply {
                 action = S25TorrentDownloadService.ACTION_STOP
             })
+            notifyUser("Solicitado encerramento do download.")
         }
         button("3 · Adicionar pasta à biblioteca Eden") {
             MaterialAlertDialogBuilder(this)
@@ -107,8 +108,10 @@ class S25UltraTorrentActivity : AppCompatActivity() {
                 .show()
         }
         button("Abrir configurações de acesso aos arquivos") { requestFileAccess() }
+        column.addView(text("O download pode continuar ao sair desta tela, enquanto o serviço permanecer ativo. Se o Android encerrar a tarefa, use Retomar download.", 13f))
         column.addView(text("Formatos de jogos reconhecidos: .nsp e .xci. O formato .nro é homebrew, sujeito a compatibilidade. Arquivos .zip/.7z/.rar/.nsz/.xcz não são convertidos automaticamente; extraia ou converta somente com ferramentas apropriadas e autorização.", 13f))
         setContentView(ScrollView(this).apply { addView(column) })
+        restoreSavedTorrentSelection()
     }
 
     override fun onResume() {
@@ -130,7 +133,9 @@ class S25UltraTorrentActivity : AppCompatActivity() {
             return
         }
         val prefs = getSharedPreferences(S25TorrentDownloadService.PREFS, MODE_PRIVATE)
-        if (prefs.getString("state", "") == "running") {
+        if (prefs.getString("state", "") in listOf("running", "starting", "stopping") &&
+            S25TorrentDownloadService.isDownloadServiceActive
+        ) {
             showError("Interrompa o download atual antes de selecionar outro torrent.")
             return
         }
@@ -170,8 +175,14 @@ class S25UltraTorrentActivity : AppCompatActivity() {
                 }
                 runOnUiThread {
                     selectedTorrent = target
-                    downloadButton.isEnabled = true
-                    details.text = "${info.name()}\n${storage.numFiles()} arquivo(s) · ${formatBytes(info.totalSize())}\n${gameCount} arquivo(s) com extensão de jogo/homebrew reconhecível."
+                    val summary = "${info.name()}\n${storage.numFiles()} arquivo(s) · ${formatBytes(info.totalSize())}\n${gameCount} arquivo(s) com extensão de jogo/homebrew reconhecível."
+                    getSharedPreferences(S25TorrentDownloadService.PREFS, MODE_PRIVATE)
+                        .edit()
+                        .putString("torrent_path", target.absolutePath)
+                        .putString("selection_summary", summary)
+                        .apply()
+                    details.text = summary
+                    refreshStatus()
                 }
             } catch (ex: Throwable) {
                 runOnUiThread {
@@ -185,6 +196,14 @@ class S25UltraTorrentActivity : AppCompatActivity() {
 
     private fun startTorrent() {
         val torrent = selectedTorrent ?: return
+        val prefs = getSharedPreferences(S25TorrentDownloadService.PREFS, MODE_PRIVATE)
+        if (S25TorrentDownloadService.isDownloadServiceActive ||
+            (prefs.getString("state", "") == "starting" &&
+                System.currentTimeMillis() - prefs.getLong("heartbeat_at", 0L) < 12_000L)
+        ) {
+            showError("Já existe um download em execução ou iniciando.")
+            return
+        }
         if (!Environment.isExternalStorageManager()) {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Permissão de armazenamento")
@@ -209,8 +228,24 @@ class S25UltraTorrentActivity : AppCompatActivity() {
                     action = S25TorrentDownloadService.ACTION_START
                     putExtra(S25TorrentDownloadService.EXTRA_TORRENT, torrent.absolutePath)
                 }
-                ContextCompat.startForegroundService(this, intent)
-                notifyUser("Download solicitado; acompanhe pelo progresso.")
+                prefs.edit()
+                    .putString("state", "starting")
+                    .putString("torrent_path", torrent.absolutePath)
+                    .putString("message", "Preparando o serviço BitTorrent…")
+                    .putLong("heartbeat_at", System.currentTimeMillis())
+                    .apply()
+                runCatching {
+                    ContextCompat.startForegroundService(this, intent)
+                }.onSuccess {
+                    notifyUser("Download iniciado. O progresso aparece nesta tela e nas notificações.")
+                }.onFailure { problem ->
+                    prefs.edit()
+                        .putString("state", "failed")
+                        .putString("message", problem.message ?: "Android bloqueou o serviço.")
+                        .apply()
+                    showError("Não foi possível iniciar o download: ${problem.message}")
+                }
+                refreshStatus()
             }
             .setNegativeButton("Cancelar", null)
             .show()
@@ -225,21 +260,69 @@ class S25UltraTorrentActivity : AppCompatActivity() {
         }
     }
 
+    private fun restoreSavedTorrentSelection() {
+        val prefs = getSharedPreferences(S25TorrentDownloadService.PREFS, MODE_PRIVATE)
+        val savedPath = prefs.getString("torrent_path", null)
+        if (selectedTorrent == null && savedPath != null) {
+            val torrent = File(savedPath)
+            if (torrent.isFile && torrent.length() in 1..(5L * 1024L * 1024L)) {
+                selectedTorrent = torrent
+                details.text = prefs.getString("selection_summary", null)
+                    ?: "Arquivo .torrent recuperado: ${torrent.name}"
+            }
+        }
+    }
+
     private fun refreshStatus() {
         val prefs = getSharedPreferences(S25TorrentDownloadService.PREFS, MODE_PRIVATE)
-        val state = prefs.getString("state", "idle")
+        restoreSavedTorrentSelection()
+        var state = prefs.getString("state", "idle").orEmpty()
+        val lastHeartbeat = prefs.getLong("heartbeat_at", 0L)
+        val age = System.currentTimeMillis() - lastHeartbeat
+        val serviceActive = S25TorrentDownloadService.isDownloadServiceActive
+
+        // Android may kill a background process without invoking the Service cleanup.
+        // A stale saved "running" state must never permanently lock the download UI.
+        if (state in listOf("running", "starting", "stopping") &&
+            !serviceActive && (lastHeartbeat == 0L || age > 12_000L || age < 0L)
+        ) {
+            state = "interrupted"
+            prefs.edit()
+                .putString("state", state)
+                .putString("message", "Serviço encerrado pelo Android ou aplicativo. Retome o torrent.")
+                .apply()
+        }
+
         val name = prefs.getString("name", "").orEmpty()
         val progress = prefs.getInt("progress", 0)
         val message = prefs.getString("message", "").orEmpty()
+        val transferred = prefs.getLong("downloaded_bytes", 0L)
+        val total = prefs.getLong("total_bytes", 0L)
+        val bytesText = if (total > 0) {
+            " · ${formatBytes(transferred)} / ${formatBytes(total)}"
+        } else {
+            ""
+        }
         status.text = when (state) {
-            "running" -> "Baixando: $name\n$progress% · $message"
+            "running" -> "Baixando: $name\n$progress%$bytesText\n$message"
+            "starting" -> "Iniciando download…\n$message"
+            "stopping" -> "Interrompendo download…\n$message"
+            "interrupted" -> "Download interrompido pelo sistema.\n$progress%$bytesText\nToque em Retomar download para tentar continuar."
             "completed" -> "Download concluído: $name\nVerifique Download/EdenS25 e adicione essa pasta ao Eden."
-            "stopped" -> "Download interrompido. $message"
-            "failed" -> "Falha no download: $message"
+            "stopped" -> "Download interrompido. $progress%$bytesText\nVocê pode retomar o arquivo selecionado."
+            "failed" -> "Falha no download: $message\nVocê pode tentar retomar."
             else -> "Nenhum download em execução."
         }
-        selectButton.isEnabled = state != "running"
-        downloadButton.isEnabled = selectedTorrent != null && state != "running"
+
+        val busy = state in listOf("running", "starting", "stopping")
+        selectButton.isEnabled = !busy
+        stopButton.isEnabled = busy
+        downloadButton.isEnabled = selectedTorrent != null && !busy
+        downloadButton.text = if (state in listOf("stopped", "interrupted", "failed")) {
+            "2 · Retomar download"
+        } else {
+            "2 · Iniciar download"
+        }
     }
 
     private fun formatBytes(bytes: Long): String = if (bytes < 0) "desconhecido" else
