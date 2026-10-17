@@ -18,4 +18,6 @@
     <string name="s25_device_only_message">Esta versão do perfil foi feita para modelos Galaxy S25 Ultra (SM-S938).</string>
     <string name="s25_share_diagnostics">Compartilhar</string>
     <string name="s25_diagnostics_disclaimer">Diagnóstico de leitura. Não mede FPS real, compatibilidade dos jogos nem elimina limitação térmica.</string>
+    <string name="s25_torrent_title">Downloads de jogos · Torrent</string>
+    <string name="s25_torrent_description">Importar arquivos .torrent autorizados, baixar e adicionar à biblioteca</string>
 </resources>
