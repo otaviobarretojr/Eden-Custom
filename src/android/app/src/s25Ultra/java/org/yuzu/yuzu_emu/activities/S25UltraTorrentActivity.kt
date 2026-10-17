@@ -47,6 +47,9 @@ class S25UltraTorrentActivity : AppCompatActivity() {
     private val selectTorrent = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) readTorrent(uri)
     }
+    private val inspectGameFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) inspectFormat(uri)
+    }
     private val selectGameFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@registerForActivityResult
         try {
@@ -109,6 +112,9 @@ class S25UltraTorrentActivity : AppCompatActivity() {
                 .setPositiveButton("Selecionar pasta") { _, _ -> selectGameFolder.launch(null) }
                 .setNegativeButton("Cancelar", null)
                 .show()
+        }
+        button("Verificar formato de jogo baixado") {
+            inspectGameFile.launch(arrayOf("*/*"))
         }
         button("Diagnóstico do download") { showDownloadDiagnostics() }
         button("Abrir configurações de acesso aos arquivos") { requestFileAccess() }
@@ -177,9 +183,18 @@ class S25UltraTorrentActivity : AppCompatActivity() {
                         p.endsWith(".nsp") || p.endsWith(".xci") || p.endsWith(".nro")
                     }
                 }
+                val compressedCount = (0 until storage.numFiles()).count {
+                    storage.filePath(it).lowercase(Locale.ROOT).let { p ->
+                        p.endsWith(".nsz") || p.endsWith(".xcz")
+                    }
+                }
                 runOnUiThread {
                     selectedTorrent = target
-                    val summary = "${info.name()}\n${storage.numFiles()} arquivo(s) · ${formatBytes(info.totalSize())}\n${gameCount} arquivo(s) com extensão de jogo/homebrew reconhecível."
+                    val compressedWarning = if (compressedCount > 0) {
+                        "\nAtenção: $compressedCount arquivo(s) NSZ/XCZ compactado(s). " +
+                            "Esses formatos não são executados diretamente pelo Eden."
+                    } else ""
+                    val summary = "${info.name()}\n${storage.numFiles()} arquivo(s) · ${formatBytes(info.totalSize())}\n${gameCount} arquivo(s) com extensão de jogo/homebrew reconhecível.$compressedWarning"
                     getSharedPreferences(S25TorrentDownloadService.PREFS, MODE_PRIVATE)
                         .edit()
                         .putString("torrent_path", target.absolutePath)
@@ -262,6 +277,43 @@ class S25UltraTorrentActivity : AppCompatActivity() {
         runCatching { startActivity(intent) }.onFailure {
             showError("Abra Configurações > Apps > Eden S25 Ultra > Acesso a todos os arquivos.")
         }
+    }
+
+    private fun inspectFormat(uri: Uri) {
+        val name = contentResolver.query(
+            uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        } ?: uri.lastPathSegment.orEmpty()
+        val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
+        val isCompressed = extension == "nsz" || extension == "xcz"
+        val message = when (extension) {
+            "nsz" -> "NSZ identificado. É um contêiner compacto de NSP. " +
+                "O Eden ainda não o executa diretamente. Para um backup autorizado, " +
+                "converta-o com uma ferramenta compatível para NSP e depois atualize a biblioteca."
+            "xcz" -> "XCZ identificado. É a variante compactada de XCI. " +
+                "O Eden ainda não o executa diretamente. Converta um backup autorizado " +
+                "para XCI antes de adicioná-lo à biblioteca."
+            "nsp", "xci" -> "Formato suportado pelo leitor de jogos do Eden. " +
+                "Se o arquivo não aparece na biblioteca, verifique a pasta configurada, " +
+                "a integridade do arquivo e suas chaves legítimas."
+            "nro" -> "Arquivo de homebrew NRO detectado. A compatibilidade depende do aplicativo."
+            else -> "Extensão .$extension não reconhecida pelo leitor de jogos do Eden. " +
+                "Mudar o nome ou extensão do arquivo não converte seu conteúdo."
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Análise de formato: ${name.take(80)}")
+            .setMessage(message)
+            .setPositiveButton("OK", null)
+            .apply {
+                if (isCompressed) {
+                    setNeutralButton("Documentação NSZ") { _, _ ->
+                        val guide = Uri.parse("https://github.com/nicoboss/nsz")
+                        startActivity(Intent(Intent.ACTION_VIEW, guide))
+                    }
+                }
+            }
+            .show()
     }
 
     private fun showDownloadDiagnostics() {
