@@ -503,8 +503,9 @@ object FileUtil {
                 DocumentsContract.getDocumentId(uri)
             }
             val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(uri, docId)
-            resolver.query(childrenUri, columns, null, null, null)
-            true
+            // A null cursor means the provider could not open this tree.
+            // Always close cursors to avoid leaking descriptors on repeated scans.
+            resolver.query(childrenUri, columns, null, null, null)?.use { true } ?: false
         } catch (_: Exception) {
             false
         }
