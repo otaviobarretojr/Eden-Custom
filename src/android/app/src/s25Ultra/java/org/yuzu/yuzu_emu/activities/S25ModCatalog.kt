@@ -51,32 +51,98 @@ internal object S25ModCatalog {
         return result
     }
 
-    /** Last updated 2023. User must accept that downloads can be broken or outdated. */
-    fun portugueseTranslations(titleId: String): List<S25ModOffer> {
-        val doc = JSONObject(readText(LEGACY_TRANSLATIONS, MAX_CATALOG_BYTES))
-        val translations = doc.optJSONObject("translations") ?: return emptyList()
-        val result = mutableListOf<S25ModOffer>()
-        val keys = translations.keys()
-        while (keys.hasNext()) {
-            val name = keys.next()
-            val item = translations.optJSONObject(name) ?: continue
-            if (!item.optBoolean("enabled", false)) continue
-            val url = item.optString("link")
-            if (!url.startsWith("https://github.com/", true) ||
-                !url.substringBefore('?').endsWith(".zip", true)) continue
-            val hash = item.optJSONObject("installed")?.optString("hash_file").orEmpty()
-            val fromHash = Regex("(?i)^([0-9a-f]{16})/").find(hash)?.groupValues?.get(1)
-            val fromLink = Regex("(?i)([0-9a-f]{16})\\.zip").find(url)?.groupValues?.get(1)
-            if (fromHash?.equals(titleId, true) != true &&
-                fromLink?.equals(titleId, true) != true) continue
-            result.add(S25ModOffer(
-                name, "CNX · catálogo histórico (2023)", url, url,
-                "Tradução PT-BR antiga: disponibilidade e versão NÃO verificadas.",
-                true
-            ))
-        }
-        return result
+    /**
+     * Curated source pages of original translators. These pages are live,
+     * but an external link is NEVER reported as an automated, tested download.
+     *
+     * IDs are taken from the game's installed program ID. Do not use fuzzy
+     * matching to install a translation for a different region/title.
+     */
+    fun authorTranslationPages(titleId: String): List<S25ModOffer> {
+        val originalPages = mapOf(
+            "0100000000010000" to ("Super Mario Odyssey · PT-BR v1.1" to "mario-odyssey"),
+            "010048701995E000" to ("Luigi's Mansion 2 HD · PT-BR v1.0" to "luigi-mansions-2-hd"),
+            "0100152000022000" to ("Mario Kart 8 Deluxe · PT-BR v2.5" to "mario-kart8"),
+            "010012101468C000" to ("Metroid Prime Remastered · PT-BR v1.0" to "metroid-prime"),
+            "010093801237C000" to ("Metroid Dread · PT-BR v2.1" to "metroid-dread"),
+            "0100DCA0064A6800" to ("Luigi's Mansion 3 · PT-BR v1.0" to "luigi-mansions-3"),
+            "010028600EBDA000" to ("Super Mario 3D World + Bowser's Fury · PT-BR v1.1" to "mario-3d-bowser")
+        )
+        val page = originalPages[titleId.uppercase(Locale.ROOT)] ?: return emptyList()
+        return listOf(S25ModOffer(
+            title = page.first,
+            source = "JumpmanClub Brasil · página oficial do autor",
+            sourceUrl = "https://www.jumpmanclubbrasil.com.br/post/" + page.second,
+            downloadUrl = null,
+            description = "Página do tradutor com instruções de instalação e alternativas " +
+                "para emuladores. Abra a página e baixe o patch do autor; " +
+                "depois use 'Instalar ZIP baixado'. Compatibilidade de versão não confirmada.",
+            translation = true
+        ))
     }
+
+    /**
+     * Only original author repositories with known Switch Title IDs.
+     * Resolve actual GitHub Releases assets at request time (not dead ZIP links
+     * copied from the unsupported 2023 CNX index).
+     */
+    fun githubReleaseTranslations(titleId: String): List<S25ModOffer> {
+        data class AuthorRepo(val repo: String, val label: String, val compatibility: String)
+        val authorRepos = mapOf(
+            "01001B700BA7C000" to AuthorRepo(
+                "JUNIORGBJ/The_Escapists_Complete_Edition_PT-BR",
+                "The Escapists: Complete Edition · Tradução PT-BR",
+                "Port para Nintendo Switch de Traduções GBJ; confira a versão do jogo."),
+            "010031200E044000" to AuthorRepo(
+                "JUNIORGBJ/Two_Point_Hospital_PT-BR",
+                "Two Point Hospital · Tradução PT-BR",
+                "Traduções GBJ: exige atualização 1.0.3 (v196608)."),
+            "0100582010AE0000" to AuthorRepo(
+                "JUNIORGBJ/Crysis_2_Remastered_PT-BR",
+                "Crysis 2 Remastered · Tradução PT-BR",
+                "Port para Nintendo Switch por Traduções GBJ.")
+        )
+        val author = authorRepos[titleId.uppercase(Locale.ROOT)] ?: return emptyList()
+        val url = "https://api.github.com/repos/" + author.repo + "/releases?per_page=8"
+        val releases = JSONArray(readText(url, MAX_CATALOG_BYTES))
+        val found = mutableListOf<S25ModOffer>()
+        for (i in 0 until releases.length()) {
+            val release = releases.optJSONObject(i) ?: continue
+            if (release.optBoolean("draft", false) || release.optBoolean("prerelease", false)) continue
+            val files = release.optJSONArray("assets") ?: continue
+            for (j in 0 until files.length()) {
+                val asset = files.optJSONObject(j) ?: continue
+                val name = asset.optString("name")
+                val download = asset.optString("browser_download_url")
+                val size = asset.optLong("size")
+                if (!name.endsWith(".zip", true) || size <= 0 ||
+                    size > 150L * 1024 * 1024 ||
+                    !download.startsWith("https://github.com/" + author.repo + "/releases/download/") ||
+                    !isApprovedUrl(download)) continue
+                val page = release.optString("html_url")
+                if (!isApprovedUrl(page)) continue
+                found.add(S25ModOffer(
+                    title = author.label + " · " + release.optString("tag_name"),
+                    source = "GitHub Releases · Traduções GBJ",
+                    sourceUrl = page,
+                    downloadUrl = download,
+                    description = author.compatibility +
+                        " Arquivo do autor publicado no GitHub (" + (size / 1024) +
+                        " KiB). A existência do ZIP não garante compatibilidade no Eden.",
+                    translation = true
+                ))
+            }
+            // Most recent compatible ZIP release only; avoid stale alternatives.
+            if (found.isNotEmpty()) break
+        }
+        return found.take(1)
+    }
+
+    /**
+     * Deliberately not a download source: this retired index contains links
+     * into removed repositories, so never advertise its ZIPs as online.
+     */
+    fun historicalTranslationsDisabled(): Boolean = true
 
     /** GameBanana public game-name lookup, then mod listing scoped to its game ID. */
     fun gameBanana(gameName: String, translationsOnly: Boolean): List<S25ModOffer> {
@@ -173,7 +239,13 @@ internal object S25ModCatalog {
             } else {
                 if (status !in 200..299) {
                     connection.disconnect()
-                    error("Servidor retornou HTTP $status.")
+                    error(when (status) {
+                        404, 410 -> "Arquivo removido da origem (HTTP $status). " +
+                            "Abra a página do autor e procure outra versão."
+                        403, 429 -> "Servidor bloqueou ou limitou a solicitação (HTTP $status). " +
+                            "Tente novamente mais tarde."
+                        else -> "Servidor retornou HTTP $status."
+                    })
                 }
                 return connection
             }

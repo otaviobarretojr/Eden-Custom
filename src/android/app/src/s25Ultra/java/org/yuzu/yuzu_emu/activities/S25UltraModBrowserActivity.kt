@@ -5,6 +5,8 @@ package org.yuzu.yuzu_emu.activities
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
+import androidx.activity.result.contract.ActivityResultContracts
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -26,6 +28,12 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
     private lateinit var gameId: String
     private lateinit var gameTitle: String
     private var busy = false
+
+    private val chooseTranslationZip =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null && !busy) confirmLocalZip(uri)
+        }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +64,7 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                 "Sempre confira a versão do jogo e a autoria do mod.", 14f))
         action("Pesquisar mods") { load(false) }
         action("Pesquisar traduções PT-BR") { load(true) }
+        action("Instalar tradução baixada (ZIP)") { chooseTranslationZip.launch(arrayOf("*/*")) }
         action("Gerenciar mods instalados") { showInstalled() }
         status = caption("Escolha uma categoria para pesquisar.", 14f)
         body.addView(status)
@@ -107,9 +116,10 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
             val offers = mutableListOf<S25ModOffer>()
             val warnings = mutableListOf<String>()
             if (translations) {
-                runCatching { S25ModCatalog.portugueseTranslations(gameId) }
-                    .onSuccess { offers.addAll(it) }
-                    .onFailure { warnings.add("Índice histórico CNX: ${it.message}") }
+                offers.addAll(S25ModCatalog.authorTranslationPages(gameId))
+                runCatching { S25ModCatalog.githubReleaseTranslations(gameId) }
+                    .onSuccess { offers.addAll(0, it) }
+                    .onFailure { warnings.add("GitHub Releases: ${it.message}") }
             } else {
                 runCatching { S25ModCatalog.githubPacks(gameId) }
                     .onSuccess { offers.addAll(it) }
@@ -130,10 +140,13 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
         clearResults()
         status.text = "Resultados para $gameTitle: ${offers.size}"
         if (translations) label(
-            "Atenção: o índice PT-BR do CNX é histórico (2023). Links podem estar removidos " +
-                "e patches podem exigir versões antigas. Não há verificação de compatibilidade automática.")
+            "Fontes PT-BR: publicações dos tradutores e GitHub Releases. " +
+                "O catálogo CNX antigo, com links removidos, não é mais usado para download. " +
+                "A versão exigida por cada patch deve ser conferida antes da instalação.")
         if (offers.isEmpty()) label(
-            "Nenhum pacote confirmado para este Title ID nesta busca. " +
+            if (translations) "Nenhuma tradução conhecida encontrada para este Title ID nas fontes consultadas. " +
+                "Você também pode baixar um patch do autor e usar 'Instalar tradução baixada (ZIP)'."
+            else "Nenhum pacote confirmado para este Title ID nesta busca. " +
                 "Isso não significa que não existam mods para o jogo.")
         if (warnings.isNotEmpty()) label("Avisos de rede: " + warnings.joinToString(" | "), 12f)
         offers.take(40).forEach { offer ->
@@ -141,12 +154,92 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
             if (offer.downloadUrl != null || offer.gameBananaId > 0) {
                 action("Baixar e instalar · ${offer.title.take(28)}") { confirmInstall(offer) }
             }
-            action("Ver página do autor") { openWeb(offer.sourceUrl) }
+            action(
+                if (offer.translation && offer.downloadUrl == null && offer.gameBananaId == 0L)
+                    "Abrir página da tradução" else "Ver página do autor"
+            ) { openWeb(offer.sourceUrl) }
         }
         action("Pesquisar manualmente no GameBanana") {
             openWeb("https://gamebanana.com/search?_sSearchString=" + Uri.encode(gameTitle))
         }
-        if (translations) action("Ver projetos de tradução PT-BR") { openWeb("https://patcheados.org/") }
+        if (translations) {
+            action("Ver catálogo JumpmanClub Brasil") {
+                openWeb("https://www.jumpmanclubbrasil.com.br/category/nintendo-switch")
+            }
+            action("Ver projetos de tradução PT-BR") { openWeb("https://patcheados.org/") }
+        }
+    }
+
+    private fun confirmLocalZip(uri: Uri) {
+        val displayName = runCatching {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { if (it.moveToFirst()) it.getString(0) else null }
+        }.getOrNull().orEmpty()
+        if (!displayName.endsWith(".zip", true)) {
+            MaterialAlertDialogBuilder(this).setTitle("Formato não suportado")
+                .setMessage("Selecione um arquivo ZIP de tradução. RAR, 7z, EXE e ROMs não são aceitos.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        MaterialAlertDialogBuilder(this).setTitle("Importar tradução PT-BR?")
+            .setMessage("Arquivo: $displayName\n\nO conteúdo será validado para o Title ID " +
+                "$gameId. O Eden não substituirá mods instalados. " +
+                "Feche o jogo e confirme que o patch corresponde à versão correta.")
+            .setPositiveButton("Validar e instalar") { _, _ -> installLocalZip(uri) }
+            .setNegativeButton("Cancelar", null).show()
+    }
+
+    private fun installLocalZip(uri: Uri) {
+        if (busy) return
+        busy = true
+        inform("Preparando ZIP selecionado…")
+        executor.execute {
+            var temp: java.io.File? = null
+            val result = runCatching {
+                val file = java.io.File.createTempFile("eden-ptbr-", ".zip", cacheDir)
+                temp = file
+                val stream = contentResolver.openInputStream(uri) ?: error("Arquivo não acessível.")
+                stream.use { input ->
+                    file.outputStream().buffered().use { output ->
+                        var total = 0L
+                        val buffer = ByteArray(32768)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            total += read
+                            if (total > 150L * 1024 * 1024) {
+                                error("ZIP acima de 150 MiB. Use instalação manual para pacotes maiores.")
+                            }
+                            output.write(buffer, 0, read)
+                        }
+                        if (total < 22L) error("ZIP vazio ou incompleto.")
+                    }
+                }
+                inform("Validando estrutura e instalando…")
+                S25ModInstaller.install(
+                    applicationContext, file, gameId,
+                    "Tradução PT-BR", ::inform
+                )
+            }
+            temp?.delete()
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                busy = false
+                result.onSuccess { names ->
+                    status.text = "Tradução importada: ${names.joinToString(", ")}. Reinicie o jogo."
+                    MaterialAlertDialogBuilder(this).setTitle("Tradução instalada")
+                        .setMessage("Pasta(s): ${names.joinToString(", ")}. " +
+                            "O idioma só mudará se o patch for compatível com a versão do jogo.")
+                        .setPositiveButton("Gerenciar") { _, _ -> showInstalled() }
+                        .setNegativeButton("OK", null).show()
+                }.onFailure { problem ->
+                    status.text = "Falha ao importar: ${problem.message}"
+                    MaterialAlertDialogBuilder(this).setTitle("ZIP não instalado")
+                        .setMessage(problem.message ?: "Falha ao validar o arquivo.")
+                        .setPositiveButton("OK", null).show()
+                }
+            }
+        }
     }
 
     private fun confirmInstall(offer: S25ModOffer) {
