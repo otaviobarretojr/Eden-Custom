@@ -40,7 +40,6 @@ import org.yuzu.yuzu_emu.features.settings.ui.SettingsSubscreen
 import org.yuzu.yuzu_emu.model.DriverViewModel
 import org.yuzu.yuzu_emu.model.HomeSetting
 import org.yuzu.yuzu_emu.model.HomeViewModel
-import org.yuzu.yuzu_emu.activities.S25UltraTorrentActivity
 import org.yuzu.yuzu_emu.ui.main.MainActivity
 import org.yuzu.yuzu_emu.utils.FileUtil
 import org.yuzu.yuzu_emu.utils.GpuDriverHelper
@@ -147,7 +146,7 @@ class HomeSettingsFragment : Fragment() {
                         R.string.s25_torrent_title,
                         R.string.s25_torrent_description,
                         R.drawable.ic_install,
-                        { startActivity(Intent(requireContext(), S25UltraTorrentActivity::class.java)) }
+                        { startActivity(Intent().setClassName(requireContext(), "org.yuzu.yuzu_emu.activities.S25UltraTorrentActivity")) }
                     )
                 )
             }
