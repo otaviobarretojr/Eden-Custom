@@ -39,6 +39,7 @@ import org.yuzu.yuzu_emu.NativeLibrary
 import org.yuzu.yuzu_emu.databinding.CardGameGridCompactBinding
 import org.yuzu.yuzu_emu.features.settings.model.BooleanSetting
 import org.yuzu.yuzu_emu.features.settings.model.Settings
+import org.yuzu.yuzu_emu.features.settings.utils.SettingsFile
 
 class GameAdapter(private val activity: AppCompatActivity) :
     AbstractDiffAdapter<Game, GameAdapter.GameViewHolder>(exact = false) {
@@ -268,7 +269,13 @@ class GameAdapter(private val activity: AppCompatActivity) :
                     }
                 }
 
-                val action = HomeNavigationDirections.actionGlobalEmulationActivity(game, true)
+                // A normal tap should use global settings unless the user
+                // actually saved per-game settings. Previously all launches
+                // requested custom mode, even for games without a config file.
+                val hasCustomConfig = SettingsFile.getCustomSettingsFile(game).exists()
+                val action = HomeNavigationDirections.actionGlobalEmulationActivity(
+                    game, hasCustomConfig
+                )
                 binding.root.findNavController().navigate(action)
             }
 
