@@ -55,12 +55,12 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="2.0.12.9"
-          BASE="https://github.com/frostwire/frostwire-jlibtorrent/releases/download/release/\${VERSION}"
-          JAVA_JAR="src/android/app/libs/jlibtorrent-\${VERSION}.jar"
-          ARM_JAR="/tmp/jlibtorrent-android-arm64-\${VERSION}.jar"
+          BASE="https://github.com/frostwire/frostwire-jlibtorrent/releases/download/release/${VERSION}"
+          JAVA_JAR="src/android/app/libs/jlibtorrent-${VERSION}.jar"
+          ARM_JAR="/tmp/jlibtorrent-android-arm64-${VERSION}.jar"
           mkdir -p src/android/app/libs src/android/app/src/s25Ultra/jniLibs/arm64-v8a
-          curl -fL --retry 3 --retry-delay 2 -o "$JAVA_JAR" "$BASE/jlibtorrent-\${VERSION}.jar"
-          curl -fL --retry 3 --retry-delay 2 -o "$ARM_JAR" "$BASE/jlibtorrent-android-arm64-\${VERSION}.jar"
+          curl -fL --retry 3 --retry-delay 2 -o "$JAVA_JAR" "$BASE/jlibtorrent-${VERSION}.jar"
+          curl -fL --retry 3 --retry-delay 2 -o "$ARM_JAR" "$BASE/jlibtorrent-android-arm64-${VERSION}.jar"
           echo "c96316e640397249ecfbbe56c355afef472190b8d47d51a94a03e47eb60c219a  $JAVA_JAR" | sha256sum --check
           echo "8e48600b74a9f497ce2c7e1e6a025ce550f039658baef986ad634298758d5b9d  $ARM_JAR" | sha256sum --check
           NATIVE_FILE=$(unzip -Z1 "$ARM_JAR" | grep -E '(^|/)libjlibtorrent([^/]*)\.so$' | head -n 1)
