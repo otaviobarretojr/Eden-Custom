@@ -151,6 +151,21 @@ class HomeSettingsFragment : Fragment() {
                 )
                 add(
                     HomeSetting(
+                        R.string.s25_library_scan_title,
+                        R.string.s25_library_scan_description,
+                        R.drawable.ic_folder_open,
+                        {
+                            startActivity(
+                                Intent().setClassName(
+                                    requireContext(),
+                                    "org.yuzu.yuzu_emu.activities.S25LibraryDiagnosticsActivity"
+                                )
+                            )
+                        }
+                    )
+                )
+                add(
+                    HomeSetting(
                         R.string.s25_online_library_title,
                         R.string.s25_online_library_description,
                         R.drawable.ic_folder_open,
