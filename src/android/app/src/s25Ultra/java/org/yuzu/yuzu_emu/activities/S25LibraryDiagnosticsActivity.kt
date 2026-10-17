@@ -20,6 +20,7 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.yuzu.yuzu_emu.NativeLibrary
 import org.yuzu.yuzu_emu.model.Game
 import org.yuzu.yuzu_emu.utils.FileUtil
 import org.yuzu.yuzu_emu.utils.NativeConfig
@@ -35,6 +36,8 @@ class S25LibraryDiagnosticsActivity : AppCompatActivity() {
     private var scanning = false
 
     private class ScanReport {
+        var keysPresent: Boolean? = null
+        var firmwarePresent: Boolean? = null
         var folders = 0
         var readableFolders = 0
         var inaccessibleFolders = 0
@@ -53,6 +56,8 @@ class S25LibraryDiagnosticsActivity : AppCompatActivity() {
 
         fun safeSummary(): String = buildString {
             appendLine("Eden S25 Ultra - diagnostico da biblioteca")
+            appendLine("Chaves importadas no Eden S25: " + keysPresent)
+            appendLine("Firmware presente no Eden S25: " + firmwarePresent)
             appendLine("Pastas configuradas: " + folders)
             appendLine("Pastas acessiveis: " + readableFolders)
             appendLine("Pastas sem acesso: " + inaccessibleFolders)
@@ -68,6 +73,24 @@ class S25LibraryDiagnosticsActivity : AppCompatActivity() {
 
         fun onScreen(): String = buildString {
             appendLine("DIAGNÓSTICO DA BIBLIOTECA")
+            appendLine()
+            appendLine("CHAVES E FIRMWARE DO APLICATIVO ATUAL")
+            appendLine("Chaves: " + when (keysPresent) {
+                true -> "encontradas"
+                false -> "ausentes"
+                null -> "verificação indisponível"
+            })
+            appendLine("Firmware: " + when (firmwarePresent) {
+                true -> "encontrado"
+                false -> "ausente"
+                null -> "verificação indisponível"
+            })
+            if (keysPresent == false) appendLine(
+                "AÇÃO: importe suas próprias prod.keys neste Eden. As chaves do Eden convencional não são compartilhadas automaticamente."
+            )
+            if (firmwarePresent == false) appendLine(
+                "AÇÃO: importe seu firmware obtido legitimamente neste Eden, se exigido pelo jogo."
+            )
             appendLine()
             appendLine("Pastas de jogos: " + folders)
             appendLine("Com acesso: " + readableFolders + "  |  Sem acesso: " + inaccessibleFolders)
@@ -184,6 +207,8 @@ class S25LibraryDiagnosticsActivity : AppCompatActivity() {
 
     private fun scanLibrary(): ScanReport {
         val result = ScanReport()
+        result.keysPresent = runCatching { NativeLibrary.areKeysPresent() }.getOrNull()
+        result.firmwarePresent = runCatching { NativeLibrary.isFirmwareAvailable() }.getOrNull()
         val directories = NativeConfig.getGameDirs().toList()
         result.folders = directories.size
         val maxEntries = 4000
