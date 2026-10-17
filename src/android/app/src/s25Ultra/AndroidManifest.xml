@@ -4,6 +4,8 @@
     <application>
         <activity android:name="org.yuzu.yuzu_emu.activities.S25UltraModBrowserActivity"
             android:exported="false" android:theme="@style/Theme.Yuzu.Main"/>
+        <activity android:name="org.yuzu.yuzu_emu.activities.S25OnlineLibraryActivity"
+            android:exported="false" android:theme="@style/Theme.Yuzu.Main"/>
         <activity android:name="org.yuzu.yuzu_emu.activities.S25UltraConverterActivity"
             android:exported="false" android:theme="@style/Theme.Yuzu.Main"/>
         <service android:name="org.yuzu.yuzu_emu.activities.S25ConversionService"

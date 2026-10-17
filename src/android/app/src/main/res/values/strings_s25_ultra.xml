@@ -23,4 +23,6 @@
     <string name="s25_diagnostics_disclaimer">Diagnóstico de leitura. Não mede FPS real, compatibilidade dos jogos nem elimina limitação térmica.</string>
     <string name="s25_converter_title">Conversor de jogos · NSZ / XCZ</string>
     <string name="s25_converter_description">Converter backups NSZ em NSP e XCZ em XCI no celular</string>
+    <string name="s25_online_library_title">Biblioteca Online · Catálogos</string>
+    <string name="s25_online_library_description">Explorar homebrew e fontes HTTPS configuradas; downloads pelo Android</string>
 </resources>
