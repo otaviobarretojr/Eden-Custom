@@ -64,6 +64,8 @@ import org.yuzu.yuzu_emu.utils.NativeConfig
 import org.yuzu.yuzu_emu.utils.NfcReader
 import org.yuzu.yuzu_emu.utils.ParamPackage
 import org.yuzu.yuzu_emu.utils.ThemeHelper
+import org.yuzu.yuzu_emu.utils.S25UltraProfile
+import org.yuzu.yuzu_emu.utils.S25ThermalGuardian
 import java.text.NumberFormat
 import kotlin.math.roundToInt
 import org.yuzu.yuzu_emu.utils.ForegroundService
@@ -92,6 +94,7 @@ class EmulationActivity : AppCompatActivity(), SensorEventListener, InputManager
     private val emulationViewModel: EmulationViewModel by viewModels()
 
     private var foregroundService: Intent? = null
+    private var thermalGuardian: S25ThermalGuardian? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pendingRomSwapIntent: Intent? = null
     private var isWaitingForRomSwapStop = false
@@ -249,6 +252,23 @@ class EmulationActivity : AppCompatActivity(), SensorEventListener, InputManager
             }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (S25UltraProfile.isSupportedDevice()) {
+            if (thermalGuardian == null) {
+                thermalGuardian = S25ThermalGuardian(this) { warning ->
+                    Toast.makeText(this, warning, Toast.LENGTH_LONG).show()
+                }
+            }
+            thermalGuardian?.start()
+        }
+    }
+
+    override fun onStop() {
+        thermalGuardian?.stop()
+        super.onStop()
     }
 
     override fun onResume() {
