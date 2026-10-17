@@ -148,17 +148,18 @@ object GameHelper {
         }
 
         files.forEach {
-            if (it.isDirectory) {
-                addGamesRecursive(
-                    games,
-                    gamesByProgramId,
-                    FileUtil.listFiles(it.uri),
-                    depth - 1,
-                    mountedContainerUris
-                )
-            } else {
-                val extension = FileUtil.getExtension(it.uri).lowercase()
-                val filePath = it.uri.toString()
+            try {
+                if (it.isDirectory) {
+                    addGamesRecursive(
+                        games,
+                        gamesByProgramId,
+                        FileUtil.listFiles(it.uri),
+                        depth - 1,
+                        mountedContainerUris
+                    )
+                } else {
+                    val extension = it.filename.substringAfterLast('.', "").lowercase()
+                    val filePath = it.uri.toString()
 
                 val mountedContainer = externalContentExtensions.contains(extension) &&
                     mountedContainerUris.add(filePath)
@@ -186,6 +187,11 @@ object GameHelper {
                         }
                     }
                 }
+                }
+            } catch (error: Exception) {
+                // One inaccessible or malformed entry must not hide every other game.
+                Log.error("[GameHelper] Skipping unreadable entry: " +
+                    error.javaClass.simpleName)
             }
         }
     }
@@ -280,7 +286,8 @@ object GameHelper {
 
         // If the game's ID field is empty, use the filename without extension.
         if (programId.isEmpty()) {
-            programId = name.substring(0, name.lastIndexOf("."))
+            // Metadata titles often have no extension; avoid substring(-1).
+            programId = FileUtil.getFilename(uri).substringBeforeLast('.', name)
         }
 
         val newGame = Game(
