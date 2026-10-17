@@ -35,4 +35,7 @@
     <string name="s25_game_performance">Desempenho · 0,75× · GPU rápida, shaders assíncronos</string>
     <string name="s25_game_quality">Qualidade · 1,5× · precisão alta, shaders síncronos</string>
     <string name="s25_game_applied">Perfil do jogo salvo. Reinicie o jogo e compare a mesma cena; o backup permite restaurar o estado anterior.</string>
+    <string name="s25_thermal_early_warning">Eden S25: calor em elevação. Para sessões longas, considere o perfil Econômico térmico e reduza a carga gráfica na próxima abertura.</string>
+    <string name="s25_thermal_high_warning">Eden S25: limitação térmica detectada. Salve seu progresso, considere pausar para resfriar o aparelho e use um perfil gráfico mais leve.</string>
+    <string name="s25_game_thermal">Econômico térmico · 0,5× · menor carga gráfica</string>
 </resources>
