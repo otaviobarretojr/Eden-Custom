@@ -70,12 +70,6 @@ jobs:
           file src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libjlibtorrent.so
           test -s src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libjlibtorrent.so
 
-      - name: Compile S25 Kotlin integration before native build
-        working-directory: src/android
-        run: |
-          chmod +x gradlew
-          ./gradlew :app:compileS25UltraRelWithDebInfoKotlin --no-daemon --stacktrace
-
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
