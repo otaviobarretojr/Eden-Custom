@@ -48,7 +48,8 @@ object S25UltraGameTuning {
         val labels = arrayOf(
             context.getString(R.string.s25_game_compatibility),
             context.getString(R.string.s25_game_performance),
-            context.getString(R.string.s25_game_quality)
+            context.getString(R.string.s25_game_quality),
+            context.getString(R.string.s25_game_thermal)
         )
         var selected = 0
 
@@ -89,11 +90,12 @@ object S25UltraGameTuning {
                             when (selected) {
                                 1 -> 2 // performance, 0.75x
                                 2 -> 5 // quality, 1.5x
+                                3 -> 1 // cool, 0.5x: reduces GPU pixel work
                                 else -> 3 // compatibility, 1x
                             }
                         )
                         // Low accuracy boosts speed, High fixes some render/memory ordering defects.
-                        IntSetting.RENDERER_ACCURACY.setInt(if (selected == 1) 0 else 1)
+                        IntSetting.RENDERER_ACCURACY.setInt(if (selected == 1 || selected == 3) 0 else 1)
                         BooleanSetting.RENDERER_USE_DISK_SHADER_CACHE.setBoolean(true)
                         // Compatibility prioritizes reproducible graphics over concurrency.
                         BooleanSetting.RENDERER_ASYNCHRONOUS_GPU_EMULATION.setBoolean(selected != 0)
