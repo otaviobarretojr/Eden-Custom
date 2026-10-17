@@ -82,6 +82,10 @@ class S25TorrentDownloadService : Service() {
 
     private fun download(path: String?) {
         var session: SessionManager? = null
+        var resultState = "failed"
+        var resultMessage = "O download foi encerrado antes de terminar."
+        var resultName = ""
+        var resultProgress = 0
         try {
             val torrent = File(path ?: error("Arquivo .torrent não informado."))
             require(torrent.isFile && torrent.length() in 1..(5L * 1024 * 1024)) {
@@ -92,6 +96,7 @@ class S25TorrentDownloadService : Service() {
             require(Environment.isExternalStorageManager()) { "Permissão de acesso aos arquivos revogada." }
             require(dest.isDirectory || dest.mkdirs()) { "Impossível criar Download/EdenS25." }
             val name = info.name().take(120)
+            resultName = name
             save("running", name, 0, "Buscando pares…", 0L, info.totalSize())
             session = SessionManager()
             session.addListener(object : AlertListener {
@@ -119,6 +124,7 @@ class S25TorrentDownloadService : Service() {
                 val nativeError = torrentStatus.errorCode()
                 if (nativeError.value() != 0) error(nativeError.message())
                 val progress = (torrentStatus.progress() * 100f).toInt().coerceIn(0, 100)
+                resultProgress = progress
                 val kib = torrentStatus.downloadRate() / 1024
                 val downloadedBytes = torrentStatus.totalWantedDone().coerceAtLeast(0L)
                 val totalBytes = torrentStatus.totalWanted().coerceAtLeast(0L)
@@ -131,26 +137,32 @@ class S25TorrentDownloadService : Service() {
                     lastProgress = progress
                 }
                 if (torrentStatus.isFinished() || torrentStatus.isSeeding()) {
-                    save("completed", name, 100, "Arquivos verificados pelo cliente BitTorrent.")
-                    (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
-                        .notify(NOTICE_ID, notification("Download concluído: $name", 100))
+                    resultState = "completed"
+                    resultProgress = 100
+                    resultMessage = "Download concluído e peças verificadas pelo BitTorrent."
                     break
                 }
             }
             if (stopped) {
-                val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-                save("stopped", name, prefs.getInt("progress", 0),
-                    "Conexão encerrada; os arquivos parciais foram preservados.")
+                resultState = "stopped"
+                resultMessage = "Conexão encerrada; arquivos parciais preservados."
             }
         } catch (ex: Throwable) {
-            val message = ex.message ?: ex.javaClass.simpleName
             android.util.Log.e("S25Torrent", "Download failed", ex)
-            save(if (stopped) "stopped" else "failed", "", 0, message.take(200))
+            resultState = if (stopped) "stopped" else "failed"
+            resultMessage = (ex.message ?: ex.javaClass.simpleName).take(200)
         } finally {
-            runCatching { session?.stop() }
+            // Keep UI in 'stopping' until native torrent resources are released.
+            runCatching { session?.stop() }.onFailure {
+                android.util.Log.w("S25Torrent", "Native session cleanup failed", it)
+            }
             handle = null
             running.set(false)
             isDownloadServiceActive = false
+            val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+            save(resultState, resultName.ifBlank { prefs.getString("name", "").orEmpty() },
+                if (resultProgress > 0) resultProgress else prefs.getInt("progress", 0),
+                resultMessage)
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
