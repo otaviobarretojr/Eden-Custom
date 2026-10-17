@@ -27,4 +27,11 @@
     <string name="s25_online_library_description">Explorar homebrew e fontes HTTPS configuradas; downloads pelo Android</string>
     <string name="s25_library_scan_title">Diagnóstico da biblioteca</string>
     <string name="s25_library_scan_description">Verificar jogos ausentes, pastas, formatos e permissões</string>
+    <string name="s25_game_title">Ajustes S25 · %1$s</string>
+    <string name="s25_game_description">Testar velocidade, precisão gráfica e restauração por jogo</string>
+    <string name="s25_game_warning">Escolha um perfil experimental somente para este jogo. Compatibilidade usa maior precisão e shaders síncronos; desempenho reduz resolução e permite shaders assíncronos; qualidade aumenta a resolução. Nenhum modo garante mais FPS ou remove todas as falhas visuais. Feche o jogo antes de aplicar.</string>
+    <string name="s25_game_compatibility">Compatibilidade · 1× · GPU precisa, shaders síncronos</string>
+    <string name="s25_game_performance">Desempenho · 0,75× · GPU rápida, shaders assíncronos</string>
+    <string name="s25_game_quality">Qualidade · 1,5× · precisão alta, shaders síncronos</string>
+    <string name="s25_game_applied">Perfil do jogo salvo. Reinicie o jogo e compare a mesma cena; o backup permite restaurar o estado anterior.</string>
 </resources>
