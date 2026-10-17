@@ -18,7 +18,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
- * Opt-in per-game ZIP mod manager. Only uses existing native load/<TitleID>
+ * Opt-in per-game ZIP/RAR mod manager. Only uses existing native load/<TitleID>
  * folders and does not install game updates or firmware.
  */
 class S25UltraModBrowserActivity : AppCompatActivity() {
@@ -29,9 +29,9 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
     private lateinit var gameTitle: String
     private var busy = false
 
-    private val chooseTranslationZip =
+    private val chooseTranslationArchive =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null && !busy) confirmLocalZip(uri)
+            if (uri != null && !busy) confirmLocalArchive(uri)
         }
 
 
@@ -64,7 +64,7 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                 "Sempre confira a versão do jogo e a autoria do mod.", 14f))
         action("Pesquisar mods") { load(false) }
         action("Pesquisar traduções PT-BR") { load(true) }
-        action("Instalar tradução baixada (ZIP)") { chooseTranslationZip.launch(arrayOf("*/*")) }
+        action("Instalar tradução baixada (ZIP/RAR)") { chooseTranslationArchive.launch(arrayOf("*/*")) }
         action("Gerenciar mods instalados") { showInstalled() }
         status = caption("Escolha uma categoria para pesquisar.", 14f)
         body.addView(status)
@@ -145,7 +145,7 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                 "A versão exigida por cada patch deve ser conferida antes da instalação.")
         if (offers.isEmpty()) label(
             if (translations) "Nenhuma tradução conhecida encontrada para este Title ID nas fontes consultadas. " +
-                "Você também pode baixar um patch do autor e usar 'Instalar tradução baixada (ZIP)'."
+                "Você também pode baixar um patch do autor e usar 'Instalar tradução baixada (ZIP/RAR)'."
             else "Nenhum pacote confirmado para este Title ID nesta busca. " +
                 "Isso não significa que não existam mods para o jogo.")
         if (warnings.isNotEmpty()) label("Avisos de rede: " + warnings.joinToString(" | "), 12f)
@@ -170,14 +170,15 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
         }
     }
 
-    private fun confirmLocalZip(uri: Uri) {
+    private fun confirmLocalArchive(uri: Uri) {
         val displayName = runCatching {
             contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
                 ?.use { if (it.moveToFirst()) it.getString(0) else null }
         }.getOrNull().orEmpty()
-        if (!displayName.endsWith(".zip", true)) {
+        val isRar = displayName.endsWith(".rar", true)
+        if (!isRar && !displayName.endsWith(".zip", true)) {
             MaterialAlertDialogBuilder(this).setTitle("Formato não suportado")
-                .setMessage("Selecione um arquivo ZIP de tradução. RAR, 7z, EXE e ROMs não são aceitos.")
+                .setMessage("Selecione um arquivo ZIP ou RAR de tradução. 7z, EXE e ROMs não são aceitos.")
                 .setPositiveButton("OK", null).show()
             return
         }
@@ -185,18 +186,21 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
             .setMessage("Arquivo: $displayName\n\nO conteúdo será validado para o Title ID " +
                 "$gameId. O Eden não substituirá mods instalados. " +
                 "Feche o jogo e confirme que o patch corresponde à versão correta.")
-            .setPositiveButton("Validar e instalar") { _, _ -> installLocalZip(uri) }
+            .setPositiveButton("Validar e instalar") { _, _ -> installLocalArchive(uri, isRar) }
             .setNegativeButton("Cancelar", null).show()
     }
 
-    private fun installLocalZip(uri: Uri) {
+    private fun installLocalArchive(uri: Uri, isRar: Boolean) {
         if (busy) return
         busy = true
-        inform("Preparando ZIP selecionado…")
+        inform(if (isRar) "Preparando RAR selecionado…" else "Preparando ZIP selecionado…")
         executor.execute {
             var temp: java.io.File? = null
+            var repacked: java.io.File? = null
             val result = runCatching {
-                val file = java.io.File.createTempFile("eden-ptbr-", ".zip", cacheDir)
+                val file = java.io.File.createTempFile(
+                    "eden-ptbr-", if (isRar) ".rar" else ".zip", cacheDir
+                )
                 temp = file
                 val stream = contentResolver.openInputStream(uri) ?: error("Arquivo não acessível.")
                 stream.use { input ->
@@ -208,20 +212,28 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                             if (read < 0) break
                             total += read
                             if (total > 150L * 1024 * 1024) {
-                                error("ZIP acima de 150 MiB. Use instalação manual para pacotes maiores.")
+                                error("Arquivo acima de 150 MiB. Use instalação manual para pacotes maiores.")
                             }
                             output.write(buffer, 0, read)
                         }
-                        if (total < 22L) error("ZIP vazio ou incompleto.")
+                        if (total < 8L) error("Arquivo vazio ou incompleto.")
                     }
                 }
-                inform("Validando estrutura e instalando…")
+                val packageToInstall = if (isRar) {
+                    inform("Descompactando RAR 4/5 e verificando os arquivos…")
+                    S25RarBridge.convert(applicationContext, file, gameId, ::inform)
+                        .also { repacked = it }
+                } else {
+                    file
+                }
+                inform("Validando a estrutura do patch e instalando…")
                 S25ModInstaller.install(
-                    applicationContext, file, gameId,
+                    applicationContext, packageToInstall, gameId,
                     "Tradução PT-BR", ::inform
                 )
             }
             temp?.delete()
+            repacked?.delete()
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 busy = false

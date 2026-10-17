@@ -344,6 +344,9 @@ play {
 }
 
 dependencies {
+    // RAR 4/5 extraction for the S25 Ultra translation importer only.
+    // Junrar's UnRAR license allows extraction, not implementing RAR compression.
+    add("s25UltraImplementation", "com.github.junrar:junrar:8.0.0")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
