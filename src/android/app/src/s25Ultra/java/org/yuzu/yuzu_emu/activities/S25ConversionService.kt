@@ -72,7 +72,9 @@ class S25ConversionService: Service() {
                 "Origem e destino inválidos."
             }
             val inputUri=Uri.parse(src)
-            require(inputUri.scheme=="content" && target?.scheme=="content") {
+            val outputUri=target ?: error("Destino não informado.")
+            val selectedFormat=fmt ?: error("Formato não informado.")
+            require(inputUri.scheme=="content" && outputUri.scheme=="content") {
                 "Escolha os arquivos pelo seletor de documentos Android."
             }
             save("running","Abrindo origem e destino…",0)
@@ -81,7 +83,7 @@ class S25ConversionService: Service() {
                 require(input.statSize>0L) {
                     "O provedor não disponibilizou leitura aleatória. Mova o arquivo para a memória interna."
                 }
-                val outputFd=contentResolver.openFileDescriptor(target,"rw")
+                val outputFd=contentResolver.openFileDescriptor(outputUri,"rw")
                     ?: error("Falha ao abrir destino")
                 outputFd.use { output ->
                     NszConverter.nativeSetVerification(false,null,null)
@@ -92,7 +94,7 @@ class S25ConversionService: Service() {
                             if(now-last<650L) return
                             last=now
                             val pct=if(total>0) (done*100.0/total).toInt().coerceIn(0,99) else 0
-                            save("running","${fmt.uppercase()}: ${pretty(done)} / ${pretty(total)}",pct)
+                            save("running","${selectedFormat.uppercase()}: ${pretty(done)} / ${pretty(total)}",pct)
                             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
                                 .notify(NOTICE,notification("Convertendo $pct%",pct))
                         }
