@@ -36,6 +36,16 @@ object S25UltraProfile {
         BooleanSetting.SHOW_FRAMETIME
     )
 
+    // These options were not managed by v1 presets. Back them up only when the
+    // user explicitly selects the new shader-fluidity preset, so upgrades do
+    // not overwrite shaders configured manually on earlier Eden versions.
+    private val shaderFluiditySettings = listOf(
+        BooleanSetting.RENDERER_ASYNCHRONOUS_SHADERS,
+        BooleanSetting.SHOW_SHADERS_BUILDING
+    )
+
+    private fun backupKey(setting: BooleanSetting) = "backup_" + setting.key
+
     fun isSupportedDevice(): Boolean =
         Build.MANUFACTURER.equals("samsung", ignoreCase = true) &&
             Build.MODEL.uppercase(Locale.ROOT).startsWith("SM-S938")
@@ -54,9 +64,10 @@ object S25UltraProfile {
         val labels = arrayOf(
             context.getString(R.string.s25_performance_profile),
             context.getString(R.string.s25_balanced_profile),
-            context.getString(R.string.s25_quality_profile)
+            context.getString(R.string.s25_quality_profile),
+            context.getString(R.string.s25_shader_fluidity_profile)
         )
-        var choice = preferences.getInt(CHOSEN_PROFILE, 1).coerceIn(0, 2)
+        var choice = preferences.getInt(CHOSEN_PROFILE, 1).coerceIn(0, 3)
 
         MaterialAlertDialogBuilder(context)
             .setTitle(R.string.s25_profile_title)
@@ -72,31 +83,68 @@ object S25UltraProfile {
                         preferences.edit().apply {
                             putInt("backup_resolution", IntSetting.RENDERER_RESOLUTION.getInt(true))
                             backedUpBooleanSettings.forEach { setting ->
-                                putBoolean("backup_" + setting.key, setting.getBoolean(true))
+                                putBoolean(backupKey(setting), setting.getBoolean(true))
                             }
                             putBoolean(BACKUP_VALID, true)
                             apply()
                         }
                     }
 
+                    val previouslySelected = preferences.getInt(CHOSEN_PROFILE, -1)
+
+                    if (choice == 3) {
+                        // Add only missing backup keys, including when migrating
+                        // an existing v1 backup from an earlier installed APK.
+                        preferences.edit().apply {
+                            shaderFluiditySettings.forEach { setting ->
+                                if (!preferences.contains(backupKey(setting))) {
+                                    putBoolean(backupKey(setting), setting.getBoolean(true))
+                                }
+                            }
+                            apply()
+                        }
+                    } else if (previouslySelected == 3) {
+                        // Leaving the opt-in profile must undo its experimental
+                        // shader options without touching the user's driver/cache.
+                        shaderFluiditySettings.forEach { setting ->
+                            if (preferences.contains(backupKey(setting))) {
+                                setting.setBoolean(
+                                    preferences.getBoolean(backupKey(setting), setting.getBoolean(true))
+                                )
+                            }
+                        }
+                    }
+
                     val resolution = when (choice) {
                         0 -> 2 // 0.75x
-                        1 -> 3 // 1.00x
-                        else -> 5 // 1.50x
+                        2 -> 5 // 1.50x
+                        else -> 3 // 1.00x (balanced or shader-fluidity)
                     }
                     IntSetting.RENDERER_RESOLUTION.setInt(resolution)
                     BooleanSetting.RENDERER_USE_DISK_SHADER_CACHE.setBoolean(true)
                     BooleanSetting.RENDERER_ASYNCHRONOUS_GPU_EMULATION.setBoolean(true)
 
-                    // Performance mode enables diagnostic overlays, not an FPS unlock.
-                    val monitoring = choice == 0
+                    if (choice == 3) {
+                        // Best-effort asynchronous compile. New shaders can still
+                        // briefly stall and some games can exhibit missing effects.
+                        BooleanSetting.RENDERER_ASYNCHRONOUS_SHADERS.setBoolean(true)
+                        BooleanSetting.SHOW_SHADERS_BUILDING.setBoolean(true)
+                    }
+
+                    // Performance or shader-fluidity modes show diagnostic overlays.
+                    // Never touch the Vulkan driver, clocks or pipeline worker count.
+                    val monitoring = choice == 0 || choice == 3
                     BooleanSetting.SHOW_PERFORMANCE_OVERLAY.setBoolean(monitoring)
                     BooleanSetting.SHOW_FPS.setBoolean(monitoring)
                     BooleanSetting.SHOW_FRAMETIME.setBoolean(monitoring)
 
                     NativeConfig.saveGlobalConfig()
                     preferences.edit().putInt(CHOSEN_PROFILE, choice).apply()
-                    showToast(context, R.string.s25_profile_applied)
+                    showToast(
+                        context,
+                        if (choice == 3) R.string.s25_shader_fluidity_applied
+                        else R.string.s25_profile_applied
+                    )
                 } catch (error: Exception) {
                     android.util.Log.e("S25UltraProfile", "Unable to apply preset", error)
                     showToast(context, R.string.s25_profile_error)
@@ -117,8 +165,17 @@ object S25UltraProfile {
                     )
                     backedUpBooleanSettings.forEach { setting ->
                         setting.setBoolean(
-                            preferences.getBoolean("backup_" + setting.key, setting.getBoolean(true))
+                            preferences.getBoolean(backupKey(setting), setting.getBoolean(true))
                         )
+                    }
+                    // v1 backups lack these keys. Leave the user's shader
+                    // preferences alone unless the opt-in preset saved them.
+                    shaderFluiditySettings.forEach { setting ->
+                        if (preferences.contains(backupKey(setting))) {
+                            setting.setBoolean(
+                                preferences.getBoolean(backupKey(setting), setting.getBoolean(true))
+                            )
+                        }
                     }
                     NativeConfig.saveGlobalConfig()
                     preferences.edit().clear().apply()
@@ -165,6 +222,27 @@ object S25UltraProfile {
             appendLine("Driver Vulkan: " + runCatching {
                 NativeLibrary.getVulkanDriverVersion()
             }.getOrDefault("Indisponivel"))
+
+            appendLine()
+            appendLine("Diagnóstico de fluidez (configuração global):")
+            fun enabled(setting: BooleanSetting): String =
+                if (setting.getBoolean(true)) "Ativado" else "Desativado"
+            appendLine("Cache de shaders: " +
+                enabled(BooleanSetting.RENDERER_USE_DISK_SHADER_CACHE))
+            appendLine("Shaders assíncronos: " +
+                enabled(BooleanSetting.RENDERER_ASYNCHRONOUS_SHADERS))
+            appendLine("GPU assíncrona: " +
+                enabled(BooleanSetting.RENDERER_ASYNCHRONOUS_GPU_EMULATION))
+            appendLine("Apresentação assíncrona: " +
+                enabled(BooleanSetting.RENDERER_ASYNC_PRESENTATION))
+            appendLine("Mostrar shaders compilando: " +
+                enabled(BooleanSetting.SHOW_SHADERS_BUILDING))
+            appendLine("Threads de pipelines: " +
+                IntSetting.ANDROID_PIPELINE_WORKERS.getInt(true))
+            appendLine("Escala da resolução (índice): " +
+                IntSetting.RENDERER_RESOLUTION.getInt(true))
+            appendLine()
+            appendLine(context.getString(R.string.s25_shader_fluidity_diagnostics_tip))
             appendLine()
             appendLine(context.getString(R.string.s25_diagnostics_disclaimer))
         }
