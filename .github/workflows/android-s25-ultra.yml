@@ -73,6 +73,7 @@ jobs:
           cp "$BUILD/libAndroNSZ.so" src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libAndroNSZ.so
           file src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libAndroNSZ.so
           test -s src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libAndroNSZ.so
+          "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" -D "$BUILD/libAndroNSZ.so" | grep -q Java_com_androNSZ_NszConverter_nativeConvert
 
       - name: Build S25 Ultra variant
         working-directory: src/android
@@ -91,6 +92,12 @@ jobs:
           grep -qi "9d09b2001be0dde93ea0444c536b72270fab3eb1a2fccfd56e1a3c46cc0d7af1" /tmp/s25-apk-signature.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | head -n 5 | tee /tmp/s25-apk-identity.txt
           grep -q "name='dev.eden.eden_emulator.s25ultra.relWithDebInfo'" /tmp/s25-apk-identity.txt
+          unzip -Z1 "$APK" | grep -q 'lib/arm64-v8a/libAndroNSZ.so'
+          if unzip -Z1 "$APK" | grep -E 'libjlibtorrent|S25TorrentDownloadService'; then
+            echo "Legacy BitTorrent code unexpectedly present in APK"
+            exit 1
+          fi
+          unzip -Z1 "$APK" | grep -q 'assets/AndroNSZ-MIT-LICENSE.txt'
 
       - name: Upload compiled test APK
         if: success()
