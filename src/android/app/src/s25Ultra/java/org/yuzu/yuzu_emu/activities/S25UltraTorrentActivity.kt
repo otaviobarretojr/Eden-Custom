@@ -3,6 +3,9 @@
 package org.yuzu.yuzu_emu.activities
 
 import android.content.Intent
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -107,6 +110,7 @@ class S25UltraTorrentActivity : AppCompatActivity() {
                 .setNegativeButton("Cancelar", null)
                 .show()
         }
+        button("Diagnóstico do download") { showDownloadDiagnostics() }
         button("Abrir configurações de acesso aos arquivos") { requestFileAccess() }
         column.addView(text("O download pode continuar ao sair desta tela, enquanto o serviço permanecer ativo. Se o Android encerrar a tarefa, use Retomar download.", 13f))
         column.addView(text("Formatos de jogos reconhecidos: .nsp e .xci. O formato .nro é homebrew, sujeito a compatibilidade. Arquivos .zip/.7z/.rar/.nsz/.xcz não são convertidos automaticamente; extraia ou converta somente com ferramentas apropriadas e autorização.", 13f))
@@ -258,6 +262,37 @@ class S25UltraTorrentActivity : AppCompatActivity() {
         runCatching { startActivity(intent) }.onFailure {
             showError("Abra Configurações > Apps > Eden S25 Ultra > Acesso a todos os arquivos.")
         }
+    }
+
+    private fun showDownloadDiagnostics() {
+        val prefs = getSharedPreferences(S25TorrentDownloadService.PREFS, MODE_PRIVATE)
+        val heartbeatAt = prefs.getLong("heartbeat_at", 0L)
+        val ageSeconds = if (heartbeatAt == 0L) -1L else
+            (System.currentTimeMillis() - heartbeatAt).coerceAtLeast(0L) / 1000L
+        val savedTorrent = prefs.getString("torrent_path", null)
+            ?.let { File(it).isFile } ?: false
+        // This diagnostic intentionally excludes torrent names, tracker URLs and peer IPs.
+        val report = buildString {
+            appendLine("Eden S25 Ultra · Diagnóstico BitTorrent")
+            appendLine("Estado: ${prefs.getString("state", "idle")}")
+            appendLine("Serviço ativo: ${S25TorrentDownloadService.isDownloadServiceActive}")
+            appendLine("Última atualização: ${if (ageSeconds < 0) "indisponível" else "${ageSeconds}s"}")
+            appendLine("Arquivo .torrent salvo: $savedTorrent")
+            appendLine("Progresso: ${prefs.getInt("progress", 0)}%")
+            appendLine("Transferidos: ${formatBytes(prefs.getLong("downloaded_bytes", 0L))}")
+            appendLine("Total: ${formatBytes(prefs.getLong("total_bytes", 0L))}")
+            appendLine("Situação: ${prefs.getString("message", "")}")
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Diagnóstico de downloads")
+            .setMessage(report)
+            .setPositiveButton("Copiar relatório") { _, _ ->
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Eden Torrent", report))
+                notifyUser("Relatório copiado, sem URLs de trackers ou IPs.")
+            }
+            .setNegativeButton("Fechar", null)
+            .show()
     }
 
     private fun restoreSavedTorrentSelection() {
