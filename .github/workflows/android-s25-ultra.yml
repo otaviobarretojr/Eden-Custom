@@ -55,40 +55,15 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="2.0.12.9"
-          BASE="https://github.com/frostwire/frostwire-jlibtorrent/releases/download/release/${VERSION}"
-          JAVA_JAR="src/android/app/libs/jlibtorrent-${VERSION}.jar"
-          ARM_JAR="/tmp/jlibtorrent-android-arm64-${VERSION}.jar"
+          BASE="https://github.com/frostwire/frostwire-jlibtorrent/releases/download/release/\${VERSION}"
+          JAVA_JAR="src/android/app/libs/jlibtorrent-\${VERSION}.jar"
+          ARM_JAR="/tmp/jlibtorrent-android-arm64-\${VERSION}.jar"
           mkdir -p src/android/app/libs src/android/app/src/s25Ultra/jniLibs/arm64-v8a
-          curl -fL --retry 3 --retry-delay 2 -o "$JAVA_JAR" "$BASE/jlibtorrent-${VERSION}.jar"
-          curl -fL --retry 3 --retry-delay 2 -o "$ARM_JAR" "$BASE/jlibtorrent-android-arm64-${VERSION}.jar"
+          curl -fL --retry 3 --retry-delay 2 -o "$JAVA_JAR" "$BASE/jlibtorrent-\${VERSION}.jar"
+          curl -fL --retry 3 --retry-delay 2 -o "$ARM_JAR" "$BASE/jlibtorrent-android-arm64-\${VERSION}.jar"
           echo "c96316e640397249ecfbbe56c355afef472190b8d47d51a94a03e47eb60c219a  $JAVA_JAR" | sha256sum --check
           echo "8e48600b74a9f497ce2c7e1e6a025ce550f039658baef986ad634298758d5b9d  $ARM_JAR" | sha256sum --check
-          NATIVE_FILE=$(unzip -Z1 "$ARM_JAR" | grep -E '(^|/)libjlibtorrent([^/]*)\\.so        working-directory: src/android
-        run: |
-          chmod +x gradlew
-          export ANDROID_SDK_ROOT="$ANDROID_HOME"
-          export ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/28.2.13676358"
-          ./gradlew :app:assembleS25UltraRelWithDebInfo --no-daemon --stacktrace
-
-      - name: Verify upgrade identity and APK signature
-        run: |
-          APK="src/android/app/build/outputs/apk/s25Ultra/relWithDebInfo/app-s25Ultra-relWithDebInfo.apk"
-          test -f "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -v 4 "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/s25-apk-signature.txt
-          grep -qi "9d09b2001be0dde93ea0444c536b72270fab3eb1a2fccfd56e1a3c46cc0d7af1" /tmp/s25-apk-signature.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | head -n 5 | tee /tmp/s25-apk-identity.txt
-          grep -q "name='dev.eden.eden_emulator.s25ultra.relWithDebInfo'" /tmp/s25-apk-identity.txt
-
-      - name: Upload compiled test APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Eden-S25-Ultra-test-APK
-          path: src/android/app/build/outputs/apk/**/*.apk
-          if-no-files-found: error
-          retention-days: 14
- | head -n 1)
+          NATIVE_FILE=$(unzip -Z1 "$ARM_JAR" | grep -E '(^|/)libjlibtorrent([^/]*)\.so$' | head -n 1)
           test -n "$NATIVE_FILE"
           echo "Native binary: $NATIVE_FILE"
           unzip -p "$ARM_JAR" "$NATIVE_FILE" > src/android/app/src/s25Ultra/jniLibs/arm64-v8a/libjlibtorrent.so
