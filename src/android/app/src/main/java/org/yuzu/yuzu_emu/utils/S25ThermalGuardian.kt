@@ -44,10 +44,11 @@ class S25ThermalGuardian(
     }
 
     fun start() {
-        if (running || !S25UltraProfile.isSupportedDevice() || power == null) return
+        if (running || !S25UltraProfile.isSupportedDevice()) return
+        val service = power ?: return
         running = true
         // A broadcast-style listener responds promptly to system thermal changes.
-        runCatching { power.addThermalStatusListener(appContext.mainExecutor, statusListener) }
+        runCatching { service.addThermalStatusListener(appContext.mainExecutor, statusListener) }
             .onFailure { android.util.Log.w("S25ThermalGuardian", "Thermal listener unavailable", it) }
         handler.post(sampler)
     }
