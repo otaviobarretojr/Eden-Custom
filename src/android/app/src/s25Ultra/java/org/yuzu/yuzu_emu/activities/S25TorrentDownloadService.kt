@@ -23,8 +23,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * One foreground torrent download at a time, triggered by explicit user consent.
- * Android 15+ imposes a time budget on dataSync foreground services. If stopped, the
- * already-downloaded pieces remain on disk but the user must reimport to restart.
+ * Android 15+ imposes a time budget on dataSync foreground services. When the
+ * service is stopped, users can explicitly restart a saved .torrent from the UI;
+ * libtorrent will attempt to validate existing pieces on disk.
  */
 class S25TorrentDownloadService : Service() {
     companion object {
@@ -32,6 +33,8 @@ class S25TorrentDownloadService : Service() {
         const val ACTION_START = "dev.eden.s25torrent.START"
         const val ACTION_STOP = "dev.eden.s25torrent.STOP"
         const val EXTRA_TORRENT = "torrent_path"
+        @Volatile var isDownloadServiceActive: Boolean = false
+            private set
         private const val CHANNEL = "s25_torrent_download"
         private const val NOTICE_ID = 9250
     }
@@ -45,13 +48,22 @@ class S25TorrentDownloadService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             stopped = true
-            if (!running.get()) stopSelf()
+            val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+            if (running.get()) {
+                save("stopping", prefs.getString("name", "").orEmpty(),
+                    prefs.getInt("progress", 0), "Encerrando conexão e preservando os arquivos…")
+            } else {
+                save("stopped", prefs.getString("name", "").orEmpty(),
+                    prefs.getInt("progress", 0), "Download interrompido. Você pode retomá-lo.")
+                stopSelf()
+            }
             return START_NOT_STICKY
         }
         if (intent?.action != ACTION_START || !running.compareAndSet(false, true)) {
             return START_NOT_STICKY
         }
         stopped = false
+        isDownloadServiceActive = true
         createChannel()
         startForeground(
             NOTICE_ID,
@@ -60,6 +72,10 @@ class S25TorrentDownloadService : Service() {
         )
 
         val path = intent.getStringExtra(EXTRA_TORRENT)
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+            .putString("torrent_path", path)
+            .putLong("heartbeat_at", System.currentTimeMillis())
+            .apply()
         Thread({ download(path) }, "S25TorrentDownload").start()
         return START_NOT_STICKY
     }
@@ -76,7 +92,7 @@ class S25TorrentDownloadService : Service() {
             require(Environment.isExternalStorageManager()) { "Permissão de acesso aos arquivos revogada." }
             require(dest.isDirectory || dest.mkdirs()) { "Impossível criar Download/EdenS25." }
             val name = info.name().take(120)
-            save("running", name, 0, "Buscando pares…")
+            save("running", name, 0, "Buscando pares…", 0L, info.totalSize())
             session = SessionManager()
             session.addListener(object : AlertListener {
                 override fun types(): IntArray? = null
@@ -104,7 +120,11 @@ class S25TorrentDownloadService : Service() {
                 if (nativeError.value() != 0) error(nativeError.message())
                 val progress = (torrentStatus.progress() * 100f).toInt().coerceIn(0, 100)
                 val kib = torrentStatus.downloadRate() / 1024
-                save("running", name, progress, "${kib} KiB/s · ${torrentStatus.numPeers()} pares")
+                val downloadedBytes = torrentStatus.totalWantedDone().coerceAtLeast(0L)
+                val totalBytes = torrentStatus.totalWanted().coerceAtLeast(0L)
+                save("running", name, progress,
+                    "${kib} KiB/s · ${torrentStatus.numPeers()} pares",
+                    downloadedBytes, totalBytes)
                 if (progress != lastProgress) {
                     (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
                         .notify(NOTICE_ID, notification(name, progress))
@@ -117,7 +137,11 @@ class S25TorrentDownloadService : Service() {
                     break
                 }
             }
-            if (stopped) save("stopped", name, 0, "Interrompido pelo usuário.")
+            if (stopped) {
+                val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+                save("stopped", name, prefs.getInt("progress", 0),
+                    "Conexão encerrada; os arquivos parciais foram preservados.")
+            }
         } catch (ex: Throwable) {
             val message = ex.message ?: ex.javaClass.simpleName
             android.util.Log.e("S25Torrent", "Download failed", ex)
@@ -126,18 +150,30 @@ class S25TorrentDownloadService : Service() {
             runCatching { session?.stop() }
             handle = null
             running.set(false)
+            isDownloadServiceActive = false
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
     }
 
-    private fun save(state: String, name: String, progress: Int, message: String) {
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-            .putString("state", state)
-            .putString("name", name)
-            .putInt("progress", progress)
-            .putString("message", message)
-            .apply()
+    private fun save(
+        state: String,
+        name: String,
+        progress: Int,
+        message: String,
+        downloadedBytes: Long? = null,
+        totalBytes: Long? = null
+    ) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().apply {
+            putString("state", state)
+            putString("name", name)
+            putInt("progress", progress)
+            putString("message", message)
+            putLong("heartbeat_at", System.currentTimeMillis())
+            if (downloadedBytes != null) putLong("downloaded_bytes", downloadedBytes)
+            if (totalBytes != null) putLong("total_bytes", totalBytes)
+            apply()
+        }
     }
 
     private fun createChannel() {
