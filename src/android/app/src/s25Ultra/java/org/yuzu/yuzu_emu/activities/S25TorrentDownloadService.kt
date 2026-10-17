@@ -273,6 +273,13 @@ class S25TorrentDownloadService : Service() {
     }
 
     private fun notification(label: String, percent: Int): Notification {
+        val openDownloads = PendingIntent.getActivity(
+            this, 100,
+            Intent(this, S25UltraTorrentActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val stopIntent = PendingIntent.getService(
             this,
             101,
@@ -283,6 +290,7 @@ class S25TorrentDownloadService : Service() {
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle("Eden S25 Ultra · Torrent")
             .setContentText(label)
+            .setContentIntent(openDownloads)
             .setOngoing(percent < 100)
             .setOnlyAlertOnce(true)
             .setProgress(100, percent, percent == 0)
