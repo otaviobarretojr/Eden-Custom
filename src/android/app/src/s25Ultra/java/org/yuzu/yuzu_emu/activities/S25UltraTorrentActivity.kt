@@ -263,13 +263,17 @@ class S25UltraTorrentActivity : AppCompatActivity() {
     private fun restoreSavedTorrentSelection() {
         val prefs = getSharedPreferences(S25TorrentDownloadService.PREFS, MODE_PRIVATE)
         val savedPath = prefs.getString("torrent_path", null)
-        if (selectedTorrent == null && savedPath != null) {
-            val torrent = File(savedPath)
-            if (torrent.isFile && torrent.length() in 1..(5L * 1024L * 1024L)) {
-                selectedTorrent = torrent
-                details.text = prefs.getString("selection_summary", null)
-                    ?: "Arquivo .torrent recuperado: ${torrent.name}"
-            }
+        // The first torrent-enabled APK saved the file but did not persist its path.
+        // Recover that existing local .torrent as well when updating over v2.
+        val torrent = savedPath?.let { File(it) }
+            ?: File(filesDir, "s25torrent/selected.torrent")
+        if (selectedTorrent == null &&
+            torrent.isFile && torrent.length() in 1..(5L * 1024L * 1024L)
+        ) {
+            selectedTorrent = torrent
+            prefs.edit().putString("torrent_path", torrent.absolutePath).apply()
+            details.text = prefs.getString("selection_summary", null)
+                ?: "Arquivo .torrent recuperado: ${torrent.name}"
         }
     }
 
