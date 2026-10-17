@@ -325,8 +325,16 @@ class S25UltraTorrentActivity : AppCompatActivity() {
         }
     }
 
-    private fun formatBytes(bytes: Long): String = if (bytes < 0) "desconhecido" else
-        String.format(Locale.ROOT, "%.2f GiB", bytes.toDouble() / (1024.0 * 1024 * 1024))
+    private fun formatBytes(bytes: Long): String = when {
+        bytes < 0 -> "desconhecido"
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024L * 1024L ->
+            String.format(Locale.ROOT, "%.1f KiB", bytes.toDouble() / 1024.0)
+        bytes < 1024L * 1024L * 1024L ->
+            String.format(Locale.ROOT, "%.1f MiB", bytes.toDouble() / (1024.0 * 1024.0))
+        else -> String.format(Locale.ROOT, "%.2f GiB",
+            bytes.toDouble() / (1024.0 * 1024.0 * 1024.0))
+    }
 
     private fun notifyUser(text: String) = Toast.makeText(this, text, Toast.LENGTH_LONG).show()
     private fun showError(text: String) = MaterialAlertDialogBuilder(this)
