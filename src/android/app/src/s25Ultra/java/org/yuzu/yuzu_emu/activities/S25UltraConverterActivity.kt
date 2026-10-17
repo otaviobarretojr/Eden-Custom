@@ -48,6 +48,8 @@ class S25UltraConverterActivity : AppCompatActivity() {
             if (uri == source) { errorMessage("Origem e destino não podem ser iguais."); return@registerForActivityResult }
             grant(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             destination = uri
+            getSharedPreferences(S25ConversionService.PREFS, MODE_PRIVATE).edit()
+                .putString("dest_uri", uri.toString()).apply()
             destLabel.text = "Destino: ${fileName(uri)}"
             controls()
         }
