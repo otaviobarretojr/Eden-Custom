@@ -119,6 +119,14 @@ class EmulationActivity : AppCompatActivity(), SensorEventListener, InputManager
         super.attachBaseContext(YuzuApplication.applyLanguage(base))
     }
 
+    private fun normalizeGameArguments(extras: Bundle?): Bundle =
+        Bundle(extras ?: Bundle()).apply {
+            if (BundleCompat.getParcelable(this, "game", Game::class.java) == null) {
+                BundleCompat.getParcelable(this, EXTRA_SELECTED_GAME, Game::class.java)
+                    ?.let { putParcelable("game", it) }
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.gameLaunched = true
         ThemeHelper.setTheme(this)
@@ -167,12 +175,12 @@ class EmulationActivity : AppCompatActivity(), SensorEventListener, InputManager
 
         val navHostFragment =
             supportFragmentManager.findFragmentById(R.id.fragment_container) as NavHostFragment
-        val initialArgs = if (shouldDeferLaunchForSwap) {
-            Bundle(intent.extras ?: Bundle()).apply {
+        // Some launchers use EXTRA_SELECTED_GAME whereas the navigation
+        // graph expects the argument named "game". Preserve both entry points.
+        val initialArgs = normalizeGameArguments(intent.extras).apply {
+            if (shouldDeferLaunchForSwap) {
                 processSessionGame?.let { putParcelable("game", it) }
             }
-        } else {
-            intent.extras
         }
         navHostFragment.navController.setGraph(R.navigation.emulation_navigation, initialArgs)
         if (shouldDeferLaunchForSwap) {
@@ -383,7 +391,7 @@ class EmulationActivity : AppCompatActivity(), SensorEventListener, InputManager
         val navHostFragment =
             supportFragmentManager.findFragmentById(R.id.fragment_container) as NavHostFragment
         val navController = navHostFragment.navController
-        val startArgs = intent.extras?.let { Bundle(it) } ?: Bundle()
+        val startArgs = normalizeGameArguments(intent.extras)
         val navOptions = NavOptions.Builder()
             .setPopUpTo(R.id.emulationFragment, true)
             .build()
