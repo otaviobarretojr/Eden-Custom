@@ -11,15 +11,21 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Environment
 import android.os.IBinder
+import android.util.AtomicFile
 import androidx.core.app.NotificationCompat
 import com.frostwire.jlibtorrent.AlertListener
 import com.frostwire.jlibtorrent.SessionManager
 import com.frostwire.jlibtorrent.TorrentHandle
 import com.frostwire.jlibtorrent.TorrentInfo
+import com.frostwire.jlibtorrent.Vectors
 import com.frostwire.jlibtorrent.alerts.AddTorrentAlert
 import com.frostwire.jlibtorrent.alerts.Alert
+import com.frostwire.jlibtorrent.alerts.SaveResumeDataAlert
+import com.frostwire.jlibtorrent.swig.libtorrent
+import com.frostwire.jlibtorrent.swig.torrent_flags_t
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * One foreground torrent download at a time, triggered by explicit user consent.
@@ -86,6 +92,9 @@ class S25TorrentDownloadService : Service() {
         var resultMessage = "O download foi encerrado antes de terminar."
         var resultName = ""
         var resultProgress = 0
+        var resumeFile: File? = null
+        val resumeSnapshot = AtomicReference<ByteArray?>(null)
+        var lastResumeSavedAt = 0L
         try {
             val torrent = File(path ?: error("Arquivo .torrent não informado."))
             require(torrent.isFile && torrent.length() in 1..(5L * 1024 * 1024)) {
@@ -97,23 +106,41 @@ class S25TorrentDownloadService : Service() {
             require(dest.isDirectory || dest.mkdirs()) { "Impossível criar Download/EdenS25." }
             val name = info.name().take(120)
             resultName = name
+            val hashId = info.infoHashV1()?.toHex() ?: info.infoHashV2()?.toHex()
+                ?: error("Torrent sem info-hash reconhecível.")
+            resumeFile = File(filesDir, "s25torrent/resume-$hashId.fastresume")
+            resumeFile.parentFile?.mkdirs()
             save("running", name, 0, "Buscando pares…", 0L, info.totalSize())
             session = SessionManager()
             session.addListener(object : AlertListener {
                 override fun types(): IntArray? = null
                 override fun alert(alert: Alert<*>) {
-                    if (alert is AddTorrentAlert) {
-                        handle = alert.handle()
-                        handle?.resume()
+                    when (alert) {
+                        is AddTorrentAlert -> {
+                            handle = alert.handle()
+                            handle?.resume()
+                        }
+                        is SaveResumeDataAlert -> {
+                            try {
+                                val raw = libtorrent.write_resume_data_buf_ex(alert.params().swig())
+                                resumeSnapshot.set(Vectors.byte_vector2bytes(raw))
+                            } catch (ex: Throwable) {
+                                android.util.Log.w("S25Torrent", "Failed to serialize resume state", ex)
+                            }
+                        }
                     }
                 }
             })
             session.start()
-            session.download(info, dest)
+            session.download(info, dest, resumeFile?.takeIf { it.isFile },
+                null, null, torrent_flags_t())
             var lastProgress = -1
             var startupChecks = 0
             while (!stopped) {
                 Thread.sleep(1300L)
+                resumeSnapshot.getAndSet(null)?.let { data ->
+                    resumeFile?.let { persistResumeSnapshot(it, data) }
+                }
                 val th = handle ?: session.find(info.infoHashV1())
                 if (th == null) {
                     startupChecks++
@@ -123,6 +150,13 @@ class S25TorrentDownloadService : Service() {
                 val torrentStatus = th.status()
                 val nativeError = torrentStatus.errorCode()
                 if (nativeError.value() != 0) error(nativeError.message())
+                val now = System.currentTimeMillis()
+                if (now - lastResumeSavedAt > 60_000L) {
+                    runCatching { th.saveResumeData() }.onFailure {
+                        android.util.Log.w("S25Torrent", "Resume checkpoint request failed", it)
+                    }
+                    lastResumeSavedAt = now
+                }
                 val progress = (torrentStatus.progress() * 100f).toInt().coerceIn(0, 100)
                 resultProgress = progress
                 val kib = torrentStatus.downloadRate() / 1024
@@ -152,6 +186,27 @@ class S25TorrentDownloadService : Service() {
             resultState = if (stopped) "stopped" else "failed"
             resultMessage = (ex.message ?: ex.javaClass.simpleName).take(200)
         } finally {
+            // Request a final checkpoint while the native alert loop is still active.
+            if (resultState != "completed") {
+                runCatching { handle?.takeIf { it.isValid }?.saveResumeData() }
+                for (attempt in 0 until 15) {
+                    val bytes = resumeSnapshot.getAndSet(null)
+                    if (bytes != null) {
+                        resumeFile?.let { file ->
+                            runCatching { persistResumeSnapshot(file, bytes) }
+                                .onFailure { android.util.Log.w("S25Torrent", "Resume write failed", it) }
+                        }
+                        break
+                    }
+                    if (session == null) break
+                    try {
+                        Thread.sleep(120L)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        break
+                    }
+                }
+            }
             // Keep UI in 'stopping' until native torrent resources are released.
             runCatching { session?.stop() }.onFailure {
                 android.util.Log.w("S25Torrent", "Native session cleanup failed", it)
@@ -166,6 +221,28 @@ class S25TorrentDownloadService : Service() {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
+    }
+
+    private fun persistResumeSnapshot(file: File, bytes: ByteArray) {
+        require(bytes.isNotEmpty() && bytes.size <= 5 * 1024 * 1024) {
+            "Resume checkpoint exceeds size limit"
+        }
+        val atomicFile = AtomicFile(file)
+        val output = atomicFile.startWrite()
+        try {
+            output.write(bytes)
+            atomicFile.finishWrite(output)
+        } catch (ex: Throwable) {
+            atomicFile.failWrite(output)
+            throw ex
+        }
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        android.util.Log.w("S25Torrent", "Android dataSync foreground time limit reached")
+        stopped = true
+        // Android 15+ requires the foreground service to stop at its time limit.
+        stopSelf(startId)
     }
 
     private fun save(
