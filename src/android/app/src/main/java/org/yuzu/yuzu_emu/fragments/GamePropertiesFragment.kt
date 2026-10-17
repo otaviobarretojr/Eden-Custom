@@ -286,7 +286,7 @@ class GamePropertiesFragment : Fragment() {
             if (S25UltraProfile.isSupportedDevice()) {
                 add(
                     SubmenuProperty(
-                        R.string.s25_game_title,
+                        R.string.s25_game_menu_title,
                         R.string.s25_game_description,
                         R.drawable.ic_graphics,
                         action = { S25UltraGameTuning.showDialog(requireContext(), args.game) }
