@@ -49,6 +49,8 @@ import org.yuzu.yuzu_emu.utils.DirectoryInitialization
 import org.yuzu.yuzu_emu.utils.FileUtil
 import org.yuzu.yuzu_emu.utils.GameHelper
 import org.yuzu.yuzu_emu.utils.GameIconUtils
+import org.yuzu.yuzu_emu.utils.S25UltraProfile
+import org.yuzu.yuzu_emu.utils.S25UltraGameTuning
 import org.yuzu.yuzu_emu.utils.GpuDriverHelper
 import org.yuzu.yuzu_emu.utils.MemoryUtil
 import org.yuzu.yuzu_emu.utils.ViewUtils.marquee
@@ -279,6 +281,18 @@ class GamePropertiesFragment : Fragment() {
                     }
                 )
             )
+            // Per-title experiments protect all other games and keep an
+            // on-disk backup of pre-existing INI settings for restoration.
+            if (S25UltraProfile.isSupportedDevice()) {
+                add(
+                    SubmenuProperty(
+                        R.string.s25_game_title,
+                        R.string.s25_game_description,
+                        R.drawable.ic_graphics,
+                        action = { S25UltraGameTuning.showDialog(requireContext(), args.game) }
+                    )
+                )
+            }
             add(
                 SubmenuProperty(
                     R.string.preferences_settings,
