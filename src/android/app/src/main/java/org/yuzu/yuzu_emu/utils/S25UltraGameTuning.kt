@@ -54,7 +54,8 @@ object S25UltraGameTuning {
 
         MaterialAlertDialogBuilder(context)
             .setTitle(context.getString(R.string.s25_game_title, game.title))
-            .setMessage(R.string.s25_game_warning)
+            // A dialog message competes with the list in Android's AlertController;
+            // keep the options visible and describe tradeoffs in each label.
             .setSingleChoiceItems(labels, selected) { _, index -> selected = index }
             .setPositiveButton(R.string.s25_apply_profile) { _, _ ->
                 if (NativeConfig.isPerGameConfigLoaded()) {
