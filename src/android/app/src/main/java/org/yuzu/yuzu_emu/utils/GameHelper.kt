@@ -161,32 +161,32 @@ object GameHelper {
                     val extension = it.filename.substringAfterLast('.', "").lowercase()
                     val filePath = it.uri.toString()
 
-                val mountedContainer = externalContentExtensions.contains(extension) &&
-                    mountedContainerUris.add(filePath)
-                if (mountedContainer) {
-                    NativeLibrary.addGameFolderFileToFilesystemProvider(filePath)
-                }
+                    val mountedContainer = externalContentExtensions.contains(extension) &&
+                        mountedContainerUris.add(filePath)
+                    if (mountedContainer) {
+                        NativeLibrary.addGameFolderFileToFilesystemProvider(filePath)
+                    }
 
-                if (Game.extensions.contains(extension)) {
-                    val game = getGame(it.uri, true, false)
-                    if (game != null) {
-                        games.add(game)
-                        if (game.programId != "0") {
-                            gamesByProgramId[game.programId] = game
-                        }
-                    } else if (mountedContainer) {
-                        GameMetadata.getProgramId(filePath).toLongOrNull()?.let { programId ->
-                            gamesByProgramId[(programId and 0x800L.inv()).toString()]
-                        }?.let { existingGame ->
-                            NativeLibrary.getPatchesForFile(existingGame.path, existingGame.programId)
-                            existingGame.version = GameMetadata.getVersion(
-                                existingGame.path,
-                                true
-                            )
-                            GameIconUtils.refreshGameIcon(existingGame)
+                    if (Game.extensions.contains(extension)) {
+                        val game = getGame(it.uri, true, false)
+                        if (game != null) {
+                            games.add(game)
+                            if (game.programId != "0") {
+                                gamesByProgramId[game.programId] = game
+                            }
+                        } else if (mountedContainer) {
+                            GameMetadata.getProgramId(filePath).toLongOrNull()?.let { programId ->
+                                gamesByProgramId[(programId and 0x800L.inv()).toString()]
+                            }?.let { existingGame ->
+                                NativeLibrary.getPatchesForFile(existingGame.path, existingGame.programId)
+                                existingGame.version = GameMetadata.getVersion(
+                                    existingGame.path,
+                                    true
+                                )
+                                GameIconUtils.refreshGameIcon(existingGame)
+                            }
                         }
                     }
-                }
                 }
             } catch (error: Exception) {
                 // One inaccessible or malformed entry must not hide every other game.
