@@ -673,10 +673,18 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
         }
         Log.info("[EmulationFragment] Starting view setup for game: ${game?.title}")
 
-        gpuModel = GpuDriverHelper.hookLibPath?.let { GpuDriverHelper.getGpuModel(hookLibPath = it).toString() } ?: "Unknown"
-        fwVersion = NativeLibrary.firmwareVersion()
+        // Hardware/firmware labels are optional overlay data. A failed
+        // probe must never abort the actual game-loading sequence.
+        gpuModel = runCatching {
+            GpuDriverHelper.hookLibPath?.let {
+                GpuDriverHelper.getGpuModel(hookLibPath = it)
+            } ?: "Unknown"
+        }.getOrDefault("Unavailable").toString()
+        fwVersion = runCatching { NativeLibrary.firmwareVersion() }
+            .getOrDefault("Unavailable")
 
-        val buildVersion = NativeLibrary.getBuildVersion()
+        val buildVersion = runCatching { NativeLibrary.getBuildVersion() }
+            .getOrDefault("")
         buildId = buildVersion.split("-").getOrNull(0) ?: ""
         driverInUse = driverViewModel.selectedDriverVersion.value
 
