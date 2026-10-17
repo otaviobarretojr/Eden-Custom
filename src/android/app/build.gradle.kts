@@ -345,8 +345,8 @@ play {
 
 dependencies {
     // Only the S25 Ultra flavor ships the BitTorrent engine (Android ARM64).
-    add("s25UltraImplementation", "com.frostwire:jlibtorrent:2.0.13.6")
-    add("s25UltraImplementation", "com.frostwire:jlibtorrent-android-arm64:2.0.13.6")
+    // Release-pinned, checksum-verified JNI and Java binaries installed by CI.
+    add("s25UltraImplementation", files("libs/jlibtorrent-2.0.12.9.jar"))
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
