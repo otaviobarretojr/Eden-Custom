@@ -191,7 +191,7 @@ internal object S25ModInstaller {
                 if (!source.renameTo(destination)) error("Não foi possível instalar '${destination.name}'.")
                 installed.add(destination)
             }
-            recorded.addAll(S25ModRegistry.record(userPath, titleId, installed))
+            recorded.addAll(S25ModRegistry.record(File(userPath), titleId, installed))
             progress("Instalação concluída: ${installed.size} mod(s). Reinicie o jogo.")
             return installed.map { it.name }
         } catch (ex: Exception) {
