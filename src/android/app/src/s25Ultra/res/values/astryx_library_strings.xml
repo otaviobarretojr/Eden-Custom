@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="astryx_library_subtitle">PRECISION EMULATION</string>
+    <string name="astryx_library_heading">BIBLIOTECA DE JOGOS</string>
+    <string name="astryx_add_folder">Adicionar pasta</string>
+    <string name="astryx_library_change_view">Alternar visualização da biblioteca</string>
+    <string name="astryx_library_filter">Filtrar jogos</string>
+    <string name="astryx_library_settings">Abrir configurações</string>
+</resources>
