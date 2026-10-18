@@ -1,15 +1,15 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX S25 Ultra (test APK)
+name: ASTRYX Library V2 (test APK)
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - brand/astryx-s25-v1
+      - ui/astryx-library-v2
 
 concurrency:
-  group: astryx-s25-ultra-build-${{ github.ref }}
+  group: astryx-library-v2-build-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -98,6 +98,11 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump resources "$APK" | grep -q 'astryx_launcher_foreground' || {
             echo "ASTRYX icon resources missing"; exit 1;
           }
+          # Library v2 must use ASTRYX-specific layouts and labels.
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump resources "$APK" > /tmp/astryx-library-resources.txt
+          grep -q 'astryx_library_heading' /tmp/astryx-library-resources.txt
+          grep -q 'astryx_library_panel' /tmp/astryx-library-resources.txt
+          grep -q 'astryx_library_card_press' /tmp/astryx-library-resources.txt
           unzip -Z1 "$APK" > /tmp/s25-apk-files.txt
           grep -q 'lib/arm64-v8a/libAndroNSZ.so' /tmp/s25-apk-files.txt
           if grep -E 'libjlibtorrent|S25TorrentDownloadService' /tmp/s25-apk-files.txt; then
@@ -110,7 +115,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-S25-Ultra-test-APK
+          name: ASTRYX-Library-V2-test-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
