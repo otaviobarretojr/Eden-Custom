@@ -10,6 +10,11 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.widget.LinearLayout
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
 import android.os.Environment
 import android.provider.Settings as AndroidSettings
 import android.view.LayoutInflater
@@ -178,9 +183,63 @@ class SettingsFragment : Fragment() {
         }
 
         presenter.onViewCreated()
+        setupAstryxSettingsLevel()
         setInsets()
     }
-private fun getPlayerIndex(): Int =
+    private fun setupAstryxSettingsLevel() {
+        if (!requireContext().packageName.startsWith("dev.eden.eden_emulator.s25ultra")) {
+            return
+        }
+        if (args.menuTag != Settings.MenuTag.SECTION_RENDERER &&
+            args.menuTag != Settings.MenuTag.SECTION_SYSTEM
+        ) {
+            return
+        }
+        val group = MaterialButtonToggleGroup(requireContext()).apply {
+            isSingleSelection = true
+            isSelectionRequired = true
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(18, 8, 18, 12)
+        }
+        val labels = listOf(
+            getString(R.string.astryx_settings_essential),
+            getString(R.string.astryx_settings_complete)
+        )
+        val buttons = labels.map { label ->
+            MaterialButton(
+                requireContext(), null,
+                com.google.android.material.R.attr.materialButtonOutlinedStyle
+            ).apply {
+                id = View.generateViewId()
+                text = label
+                isAllCaps = false
+                textSize = 13f
+                isCheckable = true
+            }.also { button ->
+                group.addView(
+                    button,
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                )
+            }
+        }
+        binding.appbarSettings.addView(group)
+        group.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val concise = checkedId == buttons[0].id
+            buttons.forEachIndexed { index, button ->
+                val isActive = if (concise) index == 0 else index == 1
+                button.backgroundTintList = ColorStateList.valueOf(
+                    if (isActive) 0xFF33CAEF.toInt() else 0xFF111B2B.toInt()
+                )
+                button.setTextColor(if (isActive) Color.BLACK else Color.WHITE)
+            }
+            presenter.setAstryxConciseMode(concise)
+        }
+        // No values changed; the full settings list remains accessible.
+        group.check(buttons[0].id)
+    }
+
+    private fun getPlayerIndex(): Int =
         when (args.menuTag) {
             Settings.MenuTag.SECTION_INPUT_PLAYER_ONE -> 0
             Settings.MenuTag.SECTION_INPUT_PLAYER_TWO -> 1
