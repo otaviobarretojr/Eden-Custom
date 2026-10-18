@@ -7,9 +7,10 @@ on:
   push:
     branches:
       - android/s25-ultra-profile-v1
+      - feature/astryx-mod-safety-v1
 
 concurrency:
-  group: eden-s25-ultra-build
+  group: eden-s25-ultra-build-${{ github.ref_name }}
   cancel-in-progress: true
 
 permissions:
