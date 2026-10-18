@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="astryx_background">#0B0F14</color>
+    <color name="astryx_icon_background">#111A2B</color>
+    <color name="astryx_cyan">#33CAEF</color>
+    <color name="astryx_ice">#C2FAFF</color>
+    <color name="astryx_blue">#477EFF</color>
+    <color name="astryx_violet">#8F63FC</color>
+</resources>
