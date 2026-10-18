@@ -90,6 +90,23 @@ jobs:
             echo "Unexpected server download in offline installer"; exit 1
           fi
 
+      - name: Verify install button routes mod imports to ZIP-RAR picker
+        run: |
+          set -euo pipefail
+          DIALOG="src/android/app/src/main/java/org/yuzu/yuzu_emu/fragments/ContentTypeSelectionDialogFragment.kt"
+          ADDONS="src/android/app/src/main/java/org/yuzu/yuzu_emu/fragments/AddonsFragment.kt"
+          IMPORTER="src/android/app/src/s25Ultra/java/org/yuzu/yuzu_emu/activities/S25UltraModBrowserActivity.kt"
+          grep -Fq 'REQUEST_INSTALL_MOD_ARCHIVE' "$DIALOG"
+          grep -Fq 'REQUEST_INSTALL_MOD_ARCHIVE' "$ADDONS"
+          grep -Fq 'importModArchive.launch(importer)' "$ADDONS"
+          grep -Fq 'EXTRA_OPEN_PICKER' "$IMPORTER"
+          grep -Fq 'chooseLocalArchive.launch(arrayOf("*/*"))' "$IMPORTER"
+          grep -Fq 'setResult(Activity.RESULT_OK)' "$IMPORTER"
+          grep -Fq 'installGameUpdate.launch(arrayOf("*/*"))' "$ADDONS"
+          if grep -Fq 'menu.add("Importar ZIP/RAR")' "$ADDONS"; then
+            echo "Redundant import menu still present"; exit 1
+          fi
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |

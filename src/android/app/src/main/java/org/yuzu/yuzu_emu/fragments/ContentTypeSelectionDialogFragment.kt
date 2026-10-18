@@ -16,6 +16,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.yuzu.yuzu_emu.R
 import org.yuzu.yuzu_emu.YuzuApplication
 import org.yuzu.yuzu_emu.model.AddonViewModel
+import org.yuzu.yuzu_emu.utils.S25UltraProfile
 
 class ContentTypeSelectionDialogFragment : DialogFragment() {
     private val addonViewModel: AddonViewModel by activityViewModels()
@@ -42,6 +43,16 @@ class ContentTypeSelectionDialogFragment : DialogFragment() {
                         Bundle()
                     )
                     else -> {
+                        // For ASTRYX S25 Ultra, the standard Instalar dialog opens
+                        // local ZIP/RAR import instead of the legacy folder picker.
+                        if (S25UltraProfile.isSupportedDevice() && runCatching {
+                                Class.forName("org.yuzu.yuzu_emu.activities.S25UltraModBrowserActivity")
+                            }.isSuccess) {
+                            parentFragmentManager.setFragmentResult(
+                                REQUEST_INSTALL_MOD_ARCHIVE, Bundle()
+                            )
+                            return@setPositiveButton
+                        }
                         if (!preferences.getBoolean(MOD_NOTICE_SEEN, false)) {
                             preferences.edit().putBoolean(MOD_NOTICE_SEEN, true).apply()
                             addonViewModel.showModNoticeDialog(true)
@@ -66,6 +77,7 @@ class ContentTypeSelectionDialogFragment : DialogFragment() {
     companion object {
         const val TAG = "ContentTypeSelectionDialogFragment"
         const val REQUEST_INSTALL_GAME_UPDATE = "RequestInstallGameUpdate"
+        const val REQUEST_INSTALL_MOD_ARCHIVE = "RequestInstallModArchive"
 
         private const val SELECTED_ITEM = "SelectedItem"
         private const val MOD_NOTICE_SEEN = "ModNoticeSeen"

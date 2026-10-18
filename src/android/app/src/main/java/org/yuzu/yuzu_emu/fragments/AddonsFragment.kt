@@ -3,12 +3,12 @@
 
 package org.yuzu.yuzu_emu.fragments
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.MenuItem
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -25,7 +25,6 @@ import org.yuzu.yuzu_emu.databinding.FragmentAddonsBinding
 import org.yuzu.yuzu_emu.model.AddonViewModel
 import org.yuzu.yuzu_emu.model.HomeViewModel
 import org.yuzu.yuzu_emu.utils.AddonUtil
-import org.yuzu.yuzu_emu.utils.S25UltraProfile
 import org.yuzu.yuzu_emu.utils.FileUtil.copyFilesTo
 import org.yuzu.yuzu_emu.utils.InstallableActions
 import org.yuzu.yuzu_emu.utils.ViewUtils.updateMargins
@@ -67,25 +66,6 @@ class AddonsFragment : Fragment() {
         }
 
         binding.toolbarAddons.title = getString(R.string.addons_game, args.game.title)
-
-        // Offline ZIP/RAR import is available only for the S25 Ultra flavor.
-        if (S25UltraProfile.isSupportedDevice() && runCatching {
-                Class.forName("org.yuzu.yuzu_emu.activities.S25UltraModBrowserActivity")
-            }.isSuccess) {
-            binding.toolbarAddons.menu.add("Importar ZIP/RAR").apply {
-                setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
-                setOnMenuItemClickListener {
-                    val browser = Intent().setClassName(
-                        requireContext(),
-                        "org.yuzu.yuzu_emu.activities.S25UltraModBrowserActivity"
-                    )
-                    browser.putExtra("s25_mod_title_id", args.game.programIdHex)
-                    browser.putExtra("s25_mod_game_title", args.game.title)
-                    startActivity(browser)
-                    true
-                }
-            }
-        }
 
         binding.listAddons.apply {
             layoutManager = LinearLayoutManager(requireContext())
@@ -135,6 +115,20 @@ class AddonsFragment : Fragment() {
         ) { _, _ ->
             installGameUpdate.launch(arrayOf("*/*"))
         }
+        parentFragmentManager.setFragmentResultListener(
+            ContentTypeSelectionDialogFragment.REQUEST_INSTALL_MOD_ARCHIVE,
+            viewLifecycleOwner
+        ) { _, _ ->
+            val importer = Intent().setClassName(
+                requireContext(),
+                "org.yuzu.yuzu_emu.activities.S25UltraModBrowserActivity"
+            ).apply {
+                putExtra("s25_mod_title_id", args.game.programIdHex)
+                putExtra("s25_mod_game_title", args.game.title)
+                putExtra("s25_mod_open_picker", true)
+            }
+            importModArchive.launch(importer)
+        }
 
         binding.buttonInstall.setOnClickListener {
             ContentTypeSelectionDialogFragment().show(
@@ -157,6 +151,13 @@ class AddonsFragment : Fragment() {
         }
         super.onDestroy()
     }
+
+    private val importModArchive =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                addonViewModel.refreshAddons(force = true)
+            }
+        }
 
     private val installAddon =
         registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { result ->

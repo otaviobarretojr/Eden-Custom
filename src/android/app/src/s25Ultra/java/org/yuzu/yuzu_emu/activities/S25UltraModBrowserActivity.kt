@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package org.yuzu.yuzu_emu.activities
 
+import android.app.Activity
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -27,10 +28,16 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
     private lateinit var gameId: String
     private lateinit var gameTitle: String
     private var busy = false
+    private val launchedFromInstall get() =
+        intent.getBooleanExtra(EXTRA_OPEN_PICKER, false)
 
     private val chooseLocalArchive =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null && !busy) confirmLocalArchive(uri)
+            if (uri != null && !busy) {
+                confirmLocalArchive(uri)
+            } else if (uri == null && launchedFromInstall && !busy) {
+                finish()
+            }
         }
 
 
@@ -66,6 +73,15 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
         status = caption("Nenhum arquivo selecionado.", 14f)
         body.addView(status)
         setContentView(ScrollView(this).apply { addView(body) })
+        if (savedInstanceState == null && launchedFromInstall) {
+            // Reuse the native content-type dialog. Go directly to Android's
+            // document picker; do not require another import-button tap.
+            body.post {
+                if (!isFinishing && !isDestroyed && !busy) {
+                    chooseLocalArchive.launch(arrayOf("*/*"))
+                }
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -119,7 +135,7 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
             var repacked: java.io.File? = null
             val result = runCatching {
                 val file = java.io.File.createTempFile(
-                    "eden-ptbr-", if (isRar) ".rar" else ".zip", cacheDir
+                    "astryx-archive-", if (isRar) ".rar" else ".zip", cacheDir
                 )
                 temp = file
                 val expectedSize = runCatching {
@@ -182,8 +198,13 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                     status.text = "Arquivo importado: ${names.joinToString(", ")}. Reinicie o jogo."
                     MaterialAlertDialogBuilder(this).setTitle("Mod ou tradução instalado")
                         .setMessage("Pasta(s): ${names.joinToString(", ")}. " +
-                            "O idioma só mudará se o patch for compatível com a versão do jogo.")
-                        .setPositiveButton("OK", null).show()
+                            "O efeito do mod ou tradução depende da versão do jogo.")
+                        .setPositiveButton("OK") { _, _ ->
+                            if (launchedFromInstall) {
+                                setResult(Activity.RESULT_OK)
+                                finish()
+                            }
+                        }.show()
                 }.onFailure { problem ->
                     status.text = "Falha ao importar: ${problem.message}"
                     MaterialAlertDialogBuilder(this).setTitle("Arquivo não instalado")
@@ -197,5 +218,6 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_TITLE_ID = "s25_mod_title_id"
         const val EXTRA_GAME_TITLE = "s25_mod_game_title"
+        const val EXTRA_OPEN_PICKER = "s25_mod_open_picker"
     }
 }

@@ -17,3 +17,12 @@ Biblioteca 2.0, novas configurações, drivers, saves, dados existentes dos jogo
 
 ## Validação
 O workflow exige ausência do catálogo remoto e do download de mods, confirma a opção local de importar e mantém verificações de assinatura, identidade e recursos do APK. Ainda são necessários testes no dispositivo com um ZIP e um RAR válidos.
+
+## Fluxo de instalação unificado (complementos)
+- O botão **Instalar** da tela de complementos continua abrindo a escolha de **Atualizações e DLC** ou **Mods e cheats**.
+- **Atualizações e DLC** chama o seletor original e instala NSP/arquivos compatíveis pelo fluxo nativo existente, sem alterações.
+- **Mods e cheats** no ASTRYX S25 Ultra envia um evento ao `AddonsFragment`, que inicia o importador local do jogo com `s25_mod_open_picker=true`.
+- Ao entrar no importador pelo botão **Instalar**, o seletor de documentos é aberto automaticamente, sem botão intermediário.
+- Cancelar a seleção volta à tela de complementos. Após a confirmação e importação bem-sucedida, o importador retorna `RESULT_OK`; a lista de complementos do jogo é atualizada.
+- Nos outros sabores/dispositivos, o seletor de pastas legado para mods permanece disponível.
+- O botão de importação duplicado na barra superior foi removido.
