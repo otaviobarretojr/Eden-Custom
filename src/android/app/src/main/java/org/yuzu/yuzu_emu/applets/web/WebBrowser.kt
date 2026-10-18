@@ -7,6 +7,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.webkit.ConsoleMessage
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -105,6 +107,8 @@ object WebBrowser {
                 browser.settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
+                    // Offline game HTML may need to autoplay an embedded introduction.
+                    mediaPlaybackRequiresUserGesture = false
                     allowFileAccess = true
                     allowContentAccess = false
                     blockNetworkLoads = true
@@ -122,6 +126,21 @@ object WebBrowser {
                     Log.info("[ASTRYX WebView] window.nx bootstrap registered at document start")
                 } else {
                     Log.error("[ASTRYX WebView] document-start JS not supported; using late shim")
+                }
+                // Log script failures: a page load alone does not mean HTML completion.
+                browser.webChromeClient = object : WebChromeClient() {
+                    override fun onConsoleMessage(message: ConsoleMessage?): Boolean {
+                        if (message != null &&
+                            (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR ||
+                             message.messageLevel() == ConsoleMessage.MessageLevel.WARNING)) {
+                            val source = message.sourceId().substringAfterLast('/')
+                            Log.warning(
+                                "[ASTRYX WebView] JS ${message.messageLevel()} " +
+                                    "${message.message().take(240)} at $source:${message.lineNumber()}"
+                            )
+                        }
+                        return false
+                    }
                 }
                 val dialog = MaterialAlertDialogBuilder(activity)
                     .setTitle("ASTRYX · Ni no Kuni")
@@ -152,10 +171,18 @@ object WebBrowser {
                     }
                 }
 
+                var loggedResourceErrors = 0
                 browser.webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, finishedUrl: String?) {
                         Log.info("[ASTRYX WebView] HTML main page loaded")
                         if (!hasDocumentStart) view?.evaluateJavascript(nxBootstrap, null)
+                        view?.evaluateJavascript(
+                            "(function(){return JSON.stringify({nx:!!window.nx, " +
+                                "end:!!window.end_applet, ready:document.readyState, " +
+                                "scripts:document.scripts.length});})()"
+                        ) { state ->
+                            Log.info("[ASTRYX WebView] HTML script state: ${state?.take(200)}")
+                        }
                     }
 
                     override fun onReceivedError(
@@ -163,8 +190,13 @@ object WebBrowser {
                         request: WebResourceRequest?,
                         error: WebResourceError?
                     ) {
-                        if (request?.isForMainFrame == true) {
-                            Log.error("[ASTRYX WebView] Main frame load failure: ${error?.errorCode}")
+                        if (loggedResourceErrors++ < 12) {
+                            val frame = if (request?.isForMainFrame == true) "main" else "subresource"
+                            val resource = request?.url?.lastPathSegment.orEmpty().take(100)
+                            Log.error(
+                                "[ASTRYX WebView] $frame load failure: " +
+                                    "code=${error?.errorCode}, resource=$resource"
+                            )
                         }
                     }
 
