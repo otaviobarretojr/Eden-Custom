@@ -170,8 +170,12 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                 action("Baixar e instalar · ${offer.title.take(28)}") { confirmInstall(offer) }
             }
             action(
-                if (offer.translation && offer.downloadUrl == null && offer.gameBananaId == 0L)
-                    "Abrir página da tradução" else "Ver página do autor"
+                when {
+                    offer.source.startsWith("CNX histórico") -> "Ver referência histórica CNX"
+                    offer.translation && offer.downloadUrl == null &&
+                        offer.gameBananaId == 0L -> "Abrir página da tradução"
+                    else -> "Ver página do autor"
+                }
             ) { openWeb(offer.sourceUrl) }
         }
         action("Pesquisar manualmente no GameBanana") {
@@ -186,6 +190,9 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
         if (translations) {
             action("Ver catálogo JumpmanClub Brasil") {
                 openWeb("https://www.jumpmanclubbrasil.com.br/category/nintendo-switch")
+            }
+            action("Ver índice histórico CNX (downloads não verificados)") {
+                openWeb("https://github.com/gamemoddesignbr/nx-links/blob/main/nx-links-v220.json")
             }
             action("Ver projetos de tradução PT-BR") { openWeb("https://patcheados.org/") }
         }
