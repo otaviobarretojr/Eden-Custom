@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- UI display name only. Keep existing notification channel IDs intact
+         to preserve channel preferences after installing an update. -->
+    <string name="app_notification_channel_name">ASTRYX</string>
+    <string name="app_notification_channel_description">Notificações e informações do ASTRYX</string>
+    <string name="app_notification_running">ASTRYX em execução</string>
+</resources>
