@@ -1,15 +1,15 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Settings V1 (test APK)
+name: ASTRYX Translations Sources V2 (test APK)
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - ui/astryx-settings-v1
+      - fix/astryx-translations-sources-v2
 
 concurrency:
-  group: astryx-settings-v1-build-${{ github.ref }}
+  group: astryx-translation-sources-v2-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -118,7 +118,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-Settings-V1-test-APK
+          name: ASTRYX-Translations-V2-test-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
