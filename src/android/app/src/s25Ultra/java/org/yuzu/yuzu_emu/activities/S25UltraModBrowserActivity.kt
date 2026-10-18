@@ -120,6 +120,12 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                 runCatching { S25ModCatalog.githubReleaseTranslations(gameId) }
                     .onSuccess { offers.addAll(0, it) }
                     .onFailure { warnings.add("GitHub Releases: ${it.message}") }
+                // The CNX 2022 catalog is available on GitHub/main but its
+                // archived download endpoints have been removed. Discover
+                // exact-ID historical references without pretending to install.
+                runCatching { S25ModCatalog.cnxArchiveReferences(gameId) }
+                    .onSuccess { offers.addAll(it) }
+                    .onFailure { warnings.add("CNX histórico: ${it.message}") }
             } else {
                 runCatching { S25ModCatalog.githubPacks(gameId) }
                     .onSuccess { offers.addAll(it) }
@@ -138,14 +144,23 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
 
     private fun renderOffers(offers: List<S25ModOffer>, warnings: List<String>, translations: Boolean) {
         clearResults()
-        status.text = "Resultados para $gameTitle: ${offers.size}"
+        val archiveCount = offers.count { it.source.startsWith("CNX histórico") }
+        val activeSources = offers.size - archiveCount
+        status.text = if (translations) {
+            "Traduções para $gameTitle: $activeSources fonte(s) atual(is) encontrada(s)" +
+                (if (archiveCount > 0) " · $archiveCount registro(s) histórico(s)" else "")
+        } else {
+            "Resultados para $gameTitle: ${offers.size}"
+        }
         if (translations) label(
-            "Fontes PT-BR: publicações dos tradutores e GitHub Releases. " +
-                "O catálogo CNX antigo, com links removidos, não é mais usado para download. " +
-                "A versão exigida por cada patch deve ser conferida antes da instalação.")
+            "Fontes: JumpmanClub Brasil (site ativo), GitHub Releases de autores " +
+                "e GameBanana. Os registros CNX são apenas referências históricas: " +
+                "os arquivos antigos podem ter sido excluídos. " +
+                "Só baixe patches com versão do jogo e autoria conferidas.")
         if (offers.isEmpty()) label(
-            if (translations) "Nenhuma tradução conhecida encontrada para este Title ID nas fontes consultadas. " +
-                "Você também pode baixar um patch do autor e usar 'Instalar tradução baixada (ZIP/RAR)'."
+            if (translations) "Nenhuma tradução verificada encontrada para este Title ID. " +
+                "A ausência de resultados não significa que a tradução não exista. " +
+                "Use as páginas dos tradutores abaixo ou importe um ZIP/RAR autorizado."
             else "Nenhum pacote confirmado para este Title ID nesta busca. " +
                 "Isso não significa que não existam mods para o jogo.")
         if (warnings.isNotEmpty()) label("Avisos de rede: " + warnings.joinToString(" | "), 12f)
@@ -161,6 +176,12 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
         }
         action("Pesquisar manualmente no GameBanana") {
             openWeb("https://gamebanana.com/search?_sSearchString=" + Uri.encode(gameTitle))
+        }
+        if (translations) {
+            action("Pesquisar traduções PT-BR no GitHub") {
+                openWeb("https://github.com/search?q=" +
+                    Uri.encode(gameTitle + " tradução PT-BR Switch") + "&type=repositories")
+            }
         }
         if (translations) {
             action("Ver catálogo JumpmanClub Brasil") {
