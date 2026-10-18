@@ -80,6 +80,7 @@ internal object S25ModInstaller {
         val stagedDirs = linkedSetOf<String>()
         val installed = mutableListOf<File>()
         try {
+            S25ArchiveLimits.ensureAvailableSpace(staging)
             var total = 0L
             var lastSpaceCheck = 0L
             var entries = 0
