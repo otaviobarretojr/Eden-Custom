@@ -505,6 +505,13 @@ object NativeLibrary {
         WebBrowser.openExternal(url)
     }
 
+    /** Display a title-owned local HTML document for the offline web applet. */
+    @Keep
+    @JvmStatic
+    fun openLocalWebPage(url: String): String {
+        return WebBrowser.openLocal(url)
+    }
+
     /**
      * Sets the cabinet mode for launching the cabinet applet.
      *
