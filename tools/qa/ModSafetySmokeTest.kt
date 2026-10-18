@@ -107,7 +107,24 @@ fun main() {
                 S25ModDiagnostics.inspect(home, "0100000000010000")
             }.isFailure)
         }
-        println("PASS: mod diagnostics, conflicts, Build ID references, download integrity, version checks")
+
+        // Only main NSO header identities are accepted. Never infer a runtime ID
+        // from cheat filenames; stored observations are marked historical.
+        val title = "0100F43008C44000"
+        val fullId = "ABCDEFAA01234567" + "01".repeat(24)
+        check(S25BuildIdStore.capture(home.absolutePath, "$title:$fullId"))
+        val observed = S25BuildIdStore.read(home.absolutePath, title)
+        check(observed != null && observed.fullBuildId == fullId)
+        check(observed!!.cheatBuildId == "ABCDEFAA01234567")
+        check(observed.capturedAtEpochMs > 0)
+        check(!S25BuildIdStore.capture(home.absolutePath, "$title:0000000000000000000000000000000000000000000000000000000000000000"))
+        check(!S25BuildIdStore.capture(home.absolutePath, "WRONG:FF"))
+        check(S25BuildIdStore.read(home.absolutePath, "garbage") == null)
+        check(S25BuildIdStore.read(home.absolutePath, "0100000000010000") == null)
+        val newId = "FEDCBA9876543210" + "AA".repeat(24)
+        check(S25BuildIdStore.capture(home.absolutePath, "$title:$newId"))
+        check(S25BuildIdStore.read(home.absolutePath, title)?.cheatBuildId == "FEDCBA9876543210")
+        println("PASS: mod diagnostics, build ID storage, conflicts, integrity and version checks")
     } finally {
         home.deleteRecursively()
     }
