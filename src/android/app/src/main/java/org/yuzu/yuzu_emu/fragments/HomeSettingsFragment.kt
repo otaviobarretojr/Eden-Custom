@@ -6,6 +6,9 @@ package org.yuzu.yuzu_emu.fragments
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.DocumentsContract
@@ -13,6 +16,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import android.widget.TextView
+import android.widget.LinearLayout
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -405,19 +412,123 @@ class HomeSettingsFragment : Fragment() {
             )
         }
 
+        val optionsAdapter = HomeSettingAdapter(
+            requireActivity() as AppCompatActivity,
+            viewLifecycleOwner,
+            optionsList
+        )
         binding.homeSettingsList.apply {
             layoutManager =
                 GridLayoutManager(requireContext(), resources.getInteger(R.integer.grid_columns))
-            adapter = HomeSettingAdapter(
-                requireActivity() as AppCompatActivity,
-                viewLifecycleOwner,
-                optionsList
-            )
+            adapter = optionsAdapter
             val spacing = resources.getDimensionPixelSize(R.dimen.spacing_small)
             addItemDecoration(SpacingItemDecoration(spacing))
         }
 
+        // ASTRYX navigation-only grouping. This never modifies emulation state.
+        // Every original HomeSetting is in exactly one category, preserving actions.
+        if (requireContext().packageName.startsWith("dev.eden.eden_emulator.s25ultra")) {
+            setupAstryxNavigation(optionsList, optionsAdapter)
+        }
+
         setInsets()
+    }
+
+    private fun setupAstryxNavigation(
+        options: List<HomeSetting>,
+        adapter: HomeSettingAdapter
+    ) {
+        val mainIds = setOf(
+            R.string.advanced_settings,
+            R.string.app_settings,
+            R.string.preferences_controls,
+            R.string.s25_profile_title,
+            R.string.gpu_driver_manager,
+            R.string.manage_game_folders
+        )
+        val toolIds = setOf(
+            R.string.s25_converter_title,
+            R.string.s25_library_scan_title,
+            R.string.s25_online_library_title,
+            R.string.profile_manager,
+            R.string.multiplayer,
+            R.string.applets,
+            R.string.manage_yuzu_data,
+            R.string.verify_installed_content,
+            R.string.open_user_folder
+        )
+        val tabs = listOf(
+            getString(R.string.astryx_settings_tab_main),
+            getString(R.string.astryx_settings_tab_tools),
+            getString(R.string.astryx_settings_tab_advanced)
+        )
+        val palette = listOf(0xFF33CAEF.toInt(), 0xFF111B2B.toInt())
+        val preferences =
+            requireContext().getSharedPreferences("astryx_settings_navigation", Context.MODE_PRIVATE)
+        val group = MaterialButtonToggleGroup(requireContext()).apply {
+            isSingleSelection = true
+            isSelectionRequired = true
+            orientation = LinearLayout.HORIZONTAL
+        }
+        val buttons = tabs.map { label ->
+            MaterialButton(
+                requireContext(), null,
+                com.google.android.material.R.attr.materialButtonOutlinedStyle
+            ).apply {
+                id = View.generateViewId()
+                text = label
+                isAllCaps = false
+                textSize = 12f
+                minHeight = 0
+                minimumHeight = 0
+                isCheckable = true
+                setPadding(2, 8, 2, 8)
+            }.also { button ->
+                group.addView(
+                    button,
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                )
+            }
+        }
+        val header = TextView(requireContext()).apply {
+            textSize = 12f
+            letterSpacing = 0.06f
+            setTextColor(0xFFA6B9CE.toInt())
+            setPadding(8, 14, 8, 14)
+        }
+        binding.linearLayoutSettings.addView(group, 0)
+        binding.linearLayoutSettings.addView(header, 1)
+
+        fun refresh(index: Int) {
+            val selected = index.coerceIn(0, 2)
+            val visible = options.filter { item ->
+                when (selected) {
+                    0 -> item.titleId in mainIds
+                    1 -> item.titleId in toolIds
+                    else -> item.titleId !in mainIds && item.titleId !in toolIds
+                }
+            }
+            // No deletion and no configuration writes; only view filtering.
+            adapter.replaceList(visible)
+            header.text = when (selected) {
+                0 -> getString(R.string.astryx_settings_main_description)
+                1 -> getString(R.string.astryx_settings_tools_description)
+                else -> getString(R.string.astryx_settings_advanced_description)
+            }
+            buttons.forEachIndexed { i, button ->
+                val selectedButton = i == selected
+                button.backgroundTintList = ColorStateList.valueOf(
+                    palette[if (selectedButton) 0 else 1]
+                )
+                button.setTextColor(if (selectedButton) Color.BLACK else Color.WHITE)
+            }
+            preferences.edit().putInt("tab", selected).apply()
+        }
+        group.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) refresh(buttons.indexOfFirst { it.id == checkedId })
+        }
+        val selected = preferences.getInt("tab", 0).coerceIn(0, 2)
+        group.check(buttons[selected].id)
     }
 
     override fun onStart() {
