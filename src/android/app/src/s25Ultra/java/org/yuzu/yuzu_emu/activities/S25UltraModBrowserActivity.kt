@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.util.Locale
+import org.yuzu.yuzu_emu.utils.DirectoryInitialization
 import java.util.concurrent.Executors
 
 /**
@@ -28,6 +29,7 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
     private lateinit var gameId: String
     private lateinit var gameTitle: String
     private var gameLibraryVersion = ""
+    private var activeUpdateDescription = ""
     private var busy = false
 
     private val chooseTranslationArchive =
@@ -41,6 +43,7 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
         gameId = intent.getStringExtra(EXTRA_TITLE_ID).orEmpty().uppercase(Locale.ROOT)
         gameTitle = intent.getStringExtra(EXTRA_GAME_TITLE).orEmpty()
         gameLibraryVersion = intent.getStringExtra(EXTRA_GAME_VERSION).orEmpty()
+        activeUpdateDescription = intent.getStringExtra(EXTRA_ACTIVE_UPDATE).orEmpty()
         if (!Regex("^[A-F0-9]{16}$").matches(gameId)) {
             MaterialAlertDialogBuilder(this).setTitle("Mods e traduções")
                 .setMessage("O jogo não possui um Title ID válido. Abra um jogo instalado e tente novamente.")
@@ -65,12 +68,17 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
             "Versão na biblioteca: " + gameLibraryVersion.ifBlank { "não informada" } +
                 " (pode diferir da atualização efetivamente ativa).", 12f))
         body.addView(caption(
+            "Atualização habilitada (gerenciador): " +
+                activeUpdateDescription.ifBlank { "não identificada" } +
+                ". Build ID do executável: não confirmado.", 12f))
+        body.addView(caption(
             "Downloads de patches da comunidade. Não inclui jogos, DLCs, firmware ou chaves. " +
                 "Sempre confira a versão do jogo e a autoria do mod.", 14f))
         action("Pesquisar mods") { load(false) }
         action("Pesquisar traduções PT-BR") { load(true) }
         action("Instalar tradução baixada (ZIP/RAR)") { chooseTranslationArchive.launch(arrayOf("*/*")) }
         action("Gerenciar mods instalados") { showInstalled() }
+        action("Diagnosticar mods e Build IDs") { diagnoseMods() }
         status = caption("Escolha uma categoria para pesquisar.", 14f)
         body.addView(status)
         setContentView(ScrollView(this).apply { addView(body) })
@@ -350,6 +358,41 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
         }
     }
 
+    private fun diagnoseMods() {
+        if (busy) return
+        busy = true
+        clearResults()
+        status.text = "Verificando arquivos dos mods ativos…"
+        executor.execute {
+            val result = runCatching {
+                val root = DirectoryInitialization.userDirectory
+                    ?: error("Pasta de dados do emulador indisponível.")
+                S25ModDiagnostics.inspect(root, gameId)
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                busy = false
+                clearResults()
+                result.onSuccess { report ->
+                    status.text = "Diagnóstico concluído: ${report.activeMods} mods ativos, " +
+                        "${report.disabledMods} desativados, ${report.activeFiles} arquivos."
+                    if (report.conflicts.isEmpty()) label("Nenhuma colisão entre caminhos LayeredFS ativos detectada.")
+                    report.conflicts.take(12).forEach {
+                        label("Conflito: ${it.relativePath} · ${it.installedMod} / ${it.incomingMod}")
+                    }
+                    report.buildIdReferences.take(15).forEach {
+                        label("Build ID indicado por cheat: ${it.buildId} · ${it.modName}")
+                    }
+                    report.issues.take(15).forEach { label("Aviso: ${it.detail}") }
+                    label("Atenção: Build IDs encontrados em nomes de cheats NÃO são uma " +
+                        "leitura do executável ativo. A compatibilidade precisa ser validada com o jogo e o patch.", 12f)
+                }.onFailure { problem ->
+                    status.text = "Falha na auditoria: ${problem.message}"
+                }
+            }
+        }
+    }
+
     private fun showInstalled() {
         if (busy) return
         clearResults()
@@ -396,5 +439,6 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
         const val EXTRA_TITLE_ID = "s25_mod_title_id"
         const val EXTRA_GAME_TITLE = "s25_mod_game_title"
         const val EXTRA_GAME_VERSION = "s25_mod_game_version"
+        const val EXTRA_ACTIVE_UPDATE = "s25_mod_active_update"
     }
 }
