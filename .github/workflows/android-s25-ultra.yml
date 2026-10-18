@@ -1,15 +1,16 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Offline ZIP-RAR Import (test APK)
+name: ASTRYX Ni no Kuni Offline Applet Test APK
 
 on:
   workflow_dispatch:
   push:
     branches:
       - fix/astryx-translations-sources-v2
+      - fix/astryx-ni-no-kuni-offline-applet-v1
 
 concurrency:
-  group: astryx-offline-zip-rar-${{ github.ref }}
+  group: astryx-ni-no-kuni-applet-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -107,6 +108,18 @@ jobs:
             echo "Redundant import menu still present"; exit 1
           fi
 
+      - name: Verify Ni no Kuni applet bypass is title-scoped
+        run: |
+          set -euo pipefail
+          CPP="src/core/hle/service/am/frontend/applet_web_browser.cpp"
+          grep -Fq '0x0100E5600D446000ULL' "$CPP"
+          grep -Fq 'shim_kind == ShimKind::Offline' "$CPP"
+          grep -Fq '!AllowNiNoKuniOfflineApplet(system, web_arg_header.shim_kind)' "$CPP"
+          grep -Fq 'global disable_web_applet remains unchanged' "$CPP"
+          if grep -Rq 'disable_web_applet.set' src/android/app/src/s25Ultra; then
+            echo "Unexpected global web applet setting mutation"; exit 1
+          fi
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -149,7 +162,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-Offline-ZIP-RAR-test-APK
+          name: ASTRYX-NiNoKuni-Applet-test-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14

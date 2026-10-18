@@ -72,6 +72,17 @@ std::string ResolveURL(const std::string& url) {
     return url.substr(0, index) + "lp1" + url.substr(index + 1);
 }
 
+// Ni no Kuni invokes the offline web applet while initializing its title screen.
+// In current Android builds the generic disable_web_applet default is true.
+// Only let this specific game reach the normal applet code so we can diagnose
+// whether a valid LLE applet/HTML document is available; never change the
+// global setting or behavior of other titles.
+bool AllowNiNoKuniOfflineApplet(const Core::System& system, ShimKind shim_kind) {
+    constexpr u64 NiNoKuniTitleId = 0x0100E5600D446000ULL;
+    return shim_kind == ShimKind::Offline &&
+           system.GetApplicationProcessProgramID() == NiNoKuniTitleId;
+}
+
 WebArgInputTLVMap ReadWebArgs(std::span<const u8> web_arg, WebArgHeader& web_arg_header) {
     std::memcpy(&web_arg_header, web_arg.data(), sizeof(WebArgHeader));
 
@@ -260,10 +271,19 @@ void WebBrowser::Initialize() {
     LOG_DEBUG(Service_AM, "WebArgHeader: total_tlv_entries={}, shim_kind={}",
               web_arg_header.total_tlv_entries, web_arg_header.shim_kind);
 
-    if (Settings::values.disable_web_applet &&
+    const bool allow_ni_no_kuni_offline =
+        AllowNiNoKuniOfflineApplet(system, web_arg_header.shim_kind);
+    if (Settings::values.disable_web_applet && !allow_ni_no_kuni_offline &&
         web_arg_header.shim_kind != ShimKind::Web &&
         web_arg_header.shim_kind != ShimKind::Lhub) {
         return;
+    }
+
+    if (Settings::values.disable_web_applet && allow_ni_no_kuni_offline) {
+        LOG_WARNING(Service_AM,
+                    "ASTRYX Ni no Kuni diagnostic: allowing offline web applet initialization "
+                    "for title_id={:016X} (global disable_web_applet remains unchanged)",
+                    system.GetApplicationProcessProgramID());
     }
 
     ExtractSharedFonts(system);
@@ -318,7 +338,8 @@ void WebBrowser::Execute() {
         return;
     }
 
-    if (Settings::values.disable_web_applet) {
+    if (Settings::values.disable_web_applet &&
+        !AllowNiNoKuniOfflineApplet(system, web_arg_header.shim_kind)) {
         LOG_WARNING(Service_AM, "(STUBBED) called, Web Browser Applet is disabled. shim_kind={}",
                     web_arg_header.shim_kind);
         WebBrowserExit(WebExitReason::EndButtonPressed);
