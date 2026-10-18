@@ -5,9 +5,11 @@ package org.yuzu.yuzu_emu.adapters
 
 import android.content.DialogInterface
 import android.text.Html
+import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -49,6 +51,19 @@ class GameAdapter(private val activity: AppCompatActivity) :
         const val VIEW_TYPE_GRID_COMPACT = 1
         const val VIEW_TYPE_LIST = 2
         const val VIEW_TYPE_CAROUSEL = 3
+    }
+
+    // Keep the upstream marquee for Eden flavors, but ASTRYX uses fixed,
+    // accessible two-line titles. No text changes or per-game data mutations.
+    private fun configureGameTitle(title: TextView) {
+        if (activity.packageName.startsWith("dev.eden.eden_emulator.s25ultra")) {
+            title.isSelected = false
+            title.isSingleLine = false
+            title.maxLines = 2
+            title.ellipsize = TextUtils.TruncateAt.END
+        } else {
+            title.marquee()
+        }
     }
 
     private var viewType = 0
@@ -166,7 +181,7 @@ class GameAdapter(private val activity: AppCompatActivity) :
             listBinding.textGameTitle.text = model.title.replace("[\\t\\n\\r]+".toRegex(), " ")
             listBinding.textGameDeveloper.text = model.developer
 
-            listBinding.textGameTitle.marquee()
+            configureGameTitle(listBinding.textGameTitle)
             listBinding.cardGameList.setOnClickListener { onClick(model) }
             listBinding.cardGameList.setOnLongClickListener { onLongClick(model) }
 
@@ -183,7 +198,7 @@ class GameAdapter(private val activity: AppCompatActivity) :
 
             gridBinding.textGameTitle.text = model.title.replace("[\\t\\n\\r]+".toRegex(), " ")
 
-            gridBinding.textGameTitle.marquee()
+            configureGameTitle(gridBinding.textGameTitle)
             gridBinding.cardGameGrid.setOnClickListener { onClick(model) }
             gridBinding.cardGameGrid.setOnLongClickListener { onLongClick(model) }
 
@@ -200,7 +215,7 @@ class GameAdapter(private val activity: AppCompatActivity) :
 
             gridCompactBinding.textGameTitleCompact.text = model.title.replace("[\\t\\n\\r]+".toRegex(), " ")
 
-            gridCompactBinding.textGameTitleCompact.marquee()
+            configureGameTitle(gridCompactBinding.textGameTitleCompact)
             gridCompactBinding.cardGameGridCompact.setOnClickListener { onClick(model) }
             gridCompactBinding.cardGameGridCompact.setOnLongClickListener { onLongClick(model) }
 
@@ -216,7 +231,7 @@ class GameAdapter(private val activity: AppCompatActivity) :
             GameIconUtils.loadGameIcon(model, carouselBinding.imageGameScreen)
 
             carouselBinding.textGameTitle.text = model.title.replace("[\\t\\n\\r]+".toRegex(), " ")
-            carouselBinding.textGameTitle.marquee()
+            configureGameTitle(carouselBinding.textGameTitle)
             carouselBinding.cardGameCarousel.setOnClickListener { onClick(model) }
             carouselBinding.cardGameCarousel.setOnLongClickListener { onLongClick(model) }
 
