@@ -116,7 +116,7 @@ internal object S25ModCatalog {
                 val download = asset.optString("browser_download_url")
                 val size = asset.optLong("size")
                 if (!name.endsWith(".zip", true) || size <= 0 ||
-                    size > 150L * 1024 * 1024 ||
+                    size > S25ArchiveLimits.MAX_ARCHIVE_BYTES ||
                     !download.startsWith("https://github.com/" + author.repo + "/releases/download/") ||
                     !isApprovedUrl(download)) continue
                 val page = release.optString("html_url")
