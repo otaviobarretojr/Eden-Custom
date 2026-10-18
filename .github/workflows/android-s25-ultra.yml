@@ -1,15 +1,15 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Library V2 (test APK)
+name: ASTRYX Settings V1 (test APK)
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - ui/astryx-library-v2
+      - ui/astryx-settings-v1
 
 concurrency:
-  group: astryx-library-v2-build-${{ github.ref }}
+  group: astryx-settings-v1-build-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -103,6 +103,9 @@ jobs:
           grep -q 'astryx_library_heading' /tmp/astryx-library-resources.txt
           grep -q 'astryx_library_panel' /tmp/astryx-library-resources.txt
           grep -q 'astryx_library_card_press' /tmp/astryx-library-resources.txt
+          # Added settings resources are present, while app ID and signing stay untouched.
+          grep -q 'astryx_settings_tab_main' /tmp/astryx-library-resources.txt
+          grep -q 'astryx_setting_item_background' /tmp/astryx-library-resources.txt
           unzip -Z1 "$APK" > /tmp/s25-apk-files.txt
           grep -q 'lib/arm64-v8a/libAndroNSZ.so' /tmp/s25-apk-files.txt
           if grep -E 'libjlibtorrent|S25TorrentDownloadService' /tmp/s25-apk-files.txt; then
@@ -115,7 +118,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-Library-V2-test-APK
+          name: ASTRYX-Settings-V1-test-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
