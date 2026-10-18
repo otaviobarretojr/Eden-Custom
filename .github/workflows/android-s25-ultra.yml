@@ -86,7 +86,7 @@ jobs:
           if grep -Eq 'S25ModCatalog|S25ModOffer|Pesquisar mods|Pesquisar traduções|Baixar e instalar|https://|GameBanana|CNX histórico' "$UI"; then
             echo "Unexpected server search UI"; exit 1
           fi
-          if grep -Eq 'S25ModCatalog|fun download\\(' "$INSTALLER"; then
+          if grep -Fq 'S25ModCatalog' "$INSTALLER" || grep -Fq 'fun download(' "$INSTALLER"; then
             echo "Unexpected server download in offline installer"; exit 1
           fi
 
