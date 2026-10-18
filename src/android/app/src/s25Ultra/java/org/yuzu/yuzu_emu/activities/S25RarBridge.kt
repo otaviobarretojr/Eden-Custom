@@ -6,6 +6,7 @@ import android.content.Context
 import com.github.junrar.Archive
 import java.io.File
 import java.io.FileInputStream
+import java.util.Locale
 import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
