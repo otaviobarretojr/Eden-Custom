@@ -81,6 +81,7 @@ class AddonsFragment : Fragment() {
                     )
                     browser.putExtra("s25_mod_title_id", args.game.programIdHex)
                     browser.putExtra("s25_mod_game_title", args.game.title)
+                    browser.putExtra("s25_mod_game_version", args.game.version)
                     startActivity(browser)
                     true
                 }
