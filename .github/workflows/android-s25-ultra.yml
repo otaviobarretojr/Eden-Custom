@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni Local WebView V2
+name: ASTRYX Ni no Kuni WebView JS Bridge V3
 
 on:
   workflow_dispatch:
@@ -9,6 +9,7 @@ on:
       - fix/astryx-translations-sources-v2
       - fix/astryx-ni-no-kuni-offline-applet-v1
       - fix/astryx-ni-no-kuni-webview-v2
+      - fix/astryx-ni-no-kuni-webview-v3
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -135,6 +136,20 @@ jobs:
           grep -Fq 'allowUniversalAccessFromFileURLs = false' "$KOTLIN"
           grep -Fq 'fun openLocalWebPage(url: String): String?' "$NATIVE"
 
+      - name: Verify Ni no Kuni web applet JS completion and diagnostics
+        run: |
+          set -euo pipefail
+          WEB="src/android/app/src/main/java/org/yuzu/yuzu_emu/applets/web/WebBrowser.kt"
+          CPP="src/common/android/applets/web_browser.cpp"
+          GRADLE="src/android/app/build.gradle.kts"
+          grep -Fq 'window.nx = {' "$WEB"
+          grep -Fq 'WebViewCompat.addDocumentStartJavaScript' "$WEB"
+          grep -Fq 'window.nx.endApplet completed' "$WEB"
+          grep -Fq 'HTML main page loaded' "$WEB"
+          grep -Fq 'Main frame load failure' "$WEB"
+          grep -Fq 'EndButtonPressed' "$CPP"
+          grep -Fq 'webkit:1.12.1' "$GRADLE"
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -177,7 +192,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-NiNoKuni-WebView-v2-test-APK
+          name: ASTRYX-NiNoKuni-WebView-v3-test-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14

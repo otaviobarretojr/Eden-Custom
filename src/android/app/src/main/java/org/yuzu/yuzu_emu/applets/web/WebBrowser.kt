@@ -5,6 +5,11 @@ package org.yuzu.yuzu_emu.applets.web
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.webkit.WebResourceError
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -24,6 +29,42 @@ import org.yuzu.yuzu_emu.NativeLibrary
 
 @Keep
 object WebBrowser {
+    // Adapted from Eden's Qt WINDOW_NX_SCRIPT: provides the Switch-side
+    // JavaScript API before inline page scripts execute. No Java/Kotlin
+    // JavascriptInterface is exposed to untrusted HTML.
+    private val nxBootstrap = """
+        (function () {
+            if (window.nx) return;
+            window.end_applet = false;
+            window.yuzu_key_callbacks = [];
+            var codes = {A:0, B:1, X:2, Y:3, L:6, R:7};
+            window.nx = {
+                endApplet: function () { window.end_applet = true; },
+                addEventListener: function (t, f, o) { window.addEventListener(t, f, o); },
+                playSystemSe: function () {},
+                sendMessage: function () {},
+                footer: {
+                    setAssign: function (key, label, action) {
+                        var n = codes[key];
+                        if (n !== undefined && typeof action === 'function') {
+                            window.yuzu_key_callbacks[n] = action;
+                        }
+                    },
+                    unsetAssign: function (key) {
+                        var n = codes[key];
+                        if (n !== undefined) window.yuzu_key_callbacks[n] = function () {};
+                    },
+                    setFixed: function () {}
+                },
+                playReport: {
+                    incrementCounter: function () {},
+                    setCounterSetIdentifier: function () {}
+                }
+            };
+            window.yuzu_key_callbacks[1] = function () { window.history.back(); };
+            window.yuzu_key_callbacks[2] = function () { window.nx.endApplet(); };
+        })();
+    """.trimIndent()
 
     /**
      * Local HTML applet for Ni no Kuni only. Runs on a JNI worker thread and
@@ -73,17 +114,60 @@ object WebBrowser {
                     allowUniversalAccessFromFileURLs = false
                 }
 
+                val hasDocumentStart = WebViewFeature.isFeatureSupported(
+                    WebViewFeature.DOCUMENT_START_SCRIPT
+                )
+                if (hasDocumentStart) {
+                    WebViewCompat.addDocumentStartJavaScript(browser, nxBootstrap, setOf("*"))
+                    Log.info("[ASTRYX WebView] window.nx bootstrap registered at document start")
+                } else {
+                    Log.error("[ASTRYX WebView] document-start JS not supported; using late shim")
+                }
                 val dialog = MaterialAlertDialogBuilder(activity)
                     .setTitle("ASTRYX · Ni no Kuni")
                     .setView(wrapper)
                     .setPositiveButton("Voltar ao jogo") { _, _ ->
-                        outcome.set(url)
+                        outcome.set("end")
+                        Log.info("[ASTRYX WebView] User pressed return-to-game button")
                     }
                     .setNegativeButton("Cancelar", null)
                     .create()
                 dialogRef.set(dialog)
+                val pollHandler = Handler(Looper.getMainLooper())
+                val pollEnd = object : Runnable {
+                    override fun run() {
+                        if (!dialog.isShowing) return
+                        browser.evaluateJavascript(
+                            "(function(){return !!window.end_applet;})()"
+                        ) { result ->
+                            if (!dialog.isShowing) return@evaluateJavascript
+                            if (result == "true") {
+                                Log.info("[ASTRYX WebView] window.nx.endApplet completed")
+                                outcome.set("end")
+                                dialog.dismiss()
+                            } else {
+                                pollHandler.postDelayed(this, 250)
+                            }
+                        }
+                    }
+                }
 
                 browser.webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, finishedUrl: String?) {
+                        Log.info("[ASTRYX WebView] HTML main page loaded")
+                        if (!hasDocumentStart) view?.evaluateJavascript(nxBootstrap, null)
+                    }
+
+                    override fun onReceivedError(
+                        view: WebView?,
+                        request: WebResourceRequest?,
+                        error: WebResourceError?
+                    ) {
+                        if (request?.isForMainFrame == true) {
+                            Log.error("[ASTRYX WebView] Main frame load failure: ${error?.errorCode}")
+                        }
+                    }
+
                     override fun shouldOverrideUrlLoading(
                         view: WebView?, request: WebResourceRequest?
                     ): Boolean {
@@ -99,6 +183,7 @@ object WebBrowser {
                         if (target.scheme in listOf("applet", "nx") ||
                             (target.scheme in listOf("http", "https") &&
                                 target.host == "localhost")) {
+                            Log.info("[ASTRYX WebView] Callback URL requested")
                             outcome.set("callback:${target}")
                             dialog.dismiss()
                         }
@@ -107,11 +192,14 @@ object WebBrowser {
                     }
                 }
                 dialog.setOnDismissListener {
+                    pollHandler.removeCallbacks(pollEnd)
                     browser.stopLoading()
                     browser.destroy()
+                    if (outcome.get() == null) Log.info("[ASTRYX WebView] Page dismissed without completion")
                     completion.countDown()
                 }
                 dialog.show()
+                pollHandler.postDelayed(pollEnd, 500)
                 val suffix = url.substringAfter('?', "").let {
                     if (it.isEmpty()) "" else "?$it"
                 }

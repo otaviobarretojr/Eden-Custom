@@ -91,10 +91,14 @@ void AndroidWebBrowser::OpenLocalWebPage(const std::string& local_url, ExtractRO
     worker.join();
 
     if (result.starts_with("callback:")) {
+        LOG_INFO(Frontend, "Ni no Kuni applet response: CallbackURL");
         callback(WebExitReason::CallbackURL, result.substr(sizeof("callback:") - 1));
-    } else if (!result.empty()) {
-        callback(WebExitReason::ExitRequested, result);
+    } else if (result == "end") {
+        // Match Eden Qt's window.nx.endApplet() completion reason.
+        LOG_INFO(Frontend, "Ni no Kuni applet response: EndButtonPressed");
+        callback(WebExitReason::EndButtonPressed, "http://localhost/");
     } else {
+        LOG_WARNING(Frontend, "Ni no Kuni applet response: WindowClosed");
         callback(WebExitReason::WindowClosed, "");
     }
 }
