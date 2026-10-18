@@ -147,7 +147,10 @@ jobs:
           grep -Fq 'WebViewCompat.addDocumentStartJavaScript' "$WEB"
           grep -Fq 'window.nx.endApplet completed' "$WEB"
           grep -Fq 'HTML main page loaded' "$WEB"
-          grep -Fq 'Main frame load failure' "$WEB"
+          grep -Fq '$frame load failure:' "$WEB"
+          grep -Fq 'HTML script state:' "$WEB"
+          grep -Fq 'onConsoleMessage(message: ConsoleMessage?)' "$WEB"
+          grep -Fq 'mediaPlaybackRequiresUserGesture = false' "$WEB"
           grep -Fq 'EndButtonPressed' "$CPP"
           grep -Fq 'webkit:1.12.1' "$GRADLE"
 
