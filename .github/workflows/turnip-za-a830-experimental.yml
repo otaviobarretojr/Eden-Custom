@@ -96,7 +96,7 @@ jobs:
                   raise SystemExit("Unexpected ZIP members: "+str(names))
               meta=json.loads(z.read("meta.json"))
               binary=z.read("libvulkan_freedreno.so")
-          if not binary.startswith(b"\\x7fELF"): raise SystemExit("Not an ELF driver")
+          if not binary.startswith(b"\x7fELF"): raise SystemExit("Not an ELF driver")
           meta["name"]="ZA A830 Turnip Experimental (not validated on Z-A)"
           meta["description"]="Mesa Turnip A830 experimental driver: A8xx KGSL patches and A830 fragment texture-prefetch disabled. Not guaranteed to fix missing geometry or improve performance. No automatic overclock."
           meta["author"]="Mesa/Freedreno contributors; experimental build from Piperella-Turnip"
