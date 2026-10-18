@@ -80,6 +80,7 @@ internal object S25ModInstaller {
         require(staging.mkdirs()) { "Não foi possível preparar a extração." }
         val stagedDirs = linkedSetOf<String>()
         val installed = mutableListOf<File>()
+        val recorded = mutableListOf<File>()
         try {
             S25ArchiveLimits.ensureAvailableSpace(staging)
             // ZIP central-directory inspection does not decompress large files.
@@ -174,13 +175,17 @@ internal object S25ModInstaller {
             plans.forEach { (_, destination) ->
                 if (destination.exists()) error("Mod '${destination.name}' já existe; não sobrescrito.")
             }
+            progress("Verificando conflitos entre mods ativos e novos…")
+            S25ModConflictScanner.requireNoConflicts(installRoot, plans.map { it.first })
             for ((source, destination) in plans) {
                 if (!source.renameTo(destination)) error("Não foi possível instalar '${destination.name}'.")
                 installed.add(destination)
             }
+            recorded.addAll(S25ModRegistry.record(userPath, titleId, installed))
             progress("Instalação concluída: ${installed.size} mod(s). Reinicie o jogo.")
             return installed.map { it.name }
         } catch (ex: Exception) {
+            recorded.forEach { it.delete() }
             // Only newly placed mod folders are removed, never existing content.
             installed.forEach { it.deleteRecursively() }
             throw ex
@@ -209,6 +214,9 @@ internal object S25ModInstaller {
         val destination = File(root, (if (enable) "load/" else "disabled_mods/") + "$titleId/$name")
         if (!source.isDirectory || !hasAddonContent(source)) error("Mod não encontrado.")
         if (destination.exists()) error("Já existe um mod de mesmo nome no destino.")
+        if (enable) {
+            S25ModConflictScanner.requireNoConflicts(File(root, "load/$titleId"), listOf(source))
+        }
         require(destination.parentFile?.isDirectory == true || destination.parentFile?.mkdirs() == true)
         if (!source.renameTo(destination)) error("Não foi possível mover o mod.")
     }
