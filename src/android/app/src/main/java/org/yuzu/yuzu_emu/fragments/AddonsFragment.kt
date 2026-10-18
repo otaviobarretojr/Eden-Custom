@@ -21,6 +21,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.transition.MaterialSharedAxis
 import org.yuzu.yuzu_emu.R
 import org.yuzu.yuzu_emu.adapters.AddonAdapter
+import org.yuzu.yuzu_emu.model.PatchType
 import org.yuzu.yuzu_emu.databinding.FragmentAddonsBinding
 import org.yuzu.yuzu_emu.model.AddonViewModel
 import org.yuzu.yuzu_emu.model.HomeViewModel
@@ -82,6 +83,15 @@ class AddonsFragment : Fragment() {
                     browser.putExtra("s25_mod_title_id", args.game.programIdHex)
                     browser.putExtra("s25_mod_game_title", args.game.title)
                     browser.putExtra("s25_mod_game_version", args.game.version)
+                    // This reports the enabled update as seen by the patch manager,
+                    // not the game's actual executable Build ID.
+                    val activeUpdate = addonViewModel.addonList.value.firstOrNull {
+                        PatchType.from(it.type) == PatchType.Update && it.enabled
+                    }
+                    browser.putExtra("s25_mod_active_update",
+                        activeUpdate?.let {
+                            "${it.version} (código ${it.numericVersion})"
+                        }.orEmpty())
                     startActivity(browser)
                     true
                 }
