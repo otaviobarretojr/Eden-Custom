@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Rename the entry point only for ASTRYX: advanced technical submenus
+         still exist and remain reachable under "Completo". -->
+    <string name="advanced_settings">Configurações da emulação</string>
+    <string name="astryx_settings_tab_main">Principal</string>
+    <string name="astryx_settings_tab_tools">Ferramentas</string>
+    <string name="astryx_settings_tab_advanced">Avançado</string>
+    <string name="astryx_settings_main_description">Ajustes do dia a dia · sem alterar suas configurações</string>
+    <string name="astryx_settings_tools_description">Biblioteca, instalação de conteúdo e gerenciamento</string>
+    <string name="astryx_settings_advanced_description">Diagnóstico, renderização avançada e suporte técnico</string>
+    <string name="astryx_settings_essential">Essencial</string>
+    <string name="astryx_settings_complete">Completo</string>
+    <string name="astryx_settings_toolbar_title">CONFIGURAÇÕES</string>
+    <string name="astryx_settings_subtitle">PRECISION EMULATION · PAINEL DE CONTROLE</string>
+</resources>
