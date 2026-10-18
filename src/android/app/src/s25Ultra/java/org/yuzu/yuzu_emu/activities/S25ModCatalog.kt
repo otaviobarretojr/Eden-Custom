@@ -18,13 +18,14 @@ internal data class S25ModOffer(
     val downloadUrl: String?,
     val description: String,
     val translation: Boolean,
-    val gameBananaId: Long = 0L
+    val gameBananaId: Long = 0L,
+    val expectedSizeBytes: Long? = null,
+    val expectedSha256: String? = null,
+    val requiredGameVersion: String? = null
 )
 
 internal object S25ModCatalog {
     private const val MODS_REPO = "Fl4sh9174/Switch-Emulator-Ultrawide-FPS-Mods"
-    private const val LEGACY_TRANSLATIONS =
-        "https://raw.githubusercontent.com/gamemoddesignbr/nx-links/main/nx-links-v220.json"
     private const val MAX_CATALOG_BYTES = 3 * 1024 * 1024
 
     fun githubPacks(titleId: String): List<S25ModOffer> {
@@ -87,7 +88,10 @@ internal object S25ModCatalog {
      * copied from the unsupported 2023 CNX index).
      */
     fun githubReleaseTranslations(titleId: String): List<S25ModOffer> {
-        data class AuthorRepo(val repo: String, val label: String, val compatibility: String)
+        data class AuthorRepo(
+            val repo: String, val label: String, val compatibility: String,
+            val requiredVersion: String? = null
+        )
         val authorRepos = mapOf(
             "01001B700BA7C000" to AuthorRepo(
                 "JUNIORGBJ/The_Escapists_Complete_Edition_PT-BR",
@@ -96,7 +100,7 @@ internal object S25ModCatalog {
             "010031200E044000" to AuthorRepo(
                 "JUNIORGBJ/Two_Point_Hospital_PT-BR",
                 "Two Point Hospital · Tradução PT-BR",
-                "Traduções GBJ: exige atualização 1.0.3 (v196608)."),
+                "Traduções GBJ: exige atualização 1.0.3 (v196608).", "1.0.3"),
             "0100582010AE0000" to AuthorRepo(
                 "JUNIORGBJ/Crysis_2_Remastered_PT-BR",
                 "Crysis 2 Remastered · Tradução PT-BR",
@@ -128,8 +132,11 @@ internal object S25ModCatalog {
                     downloadUrl = download,
                     description = author.compatibility +
                         " Arquivo do autor publicado no GitHub (" + (size / 1024) +
-                        " KiB). A existência do ZIP não garante compatibilidade no Eden.",
-                    translation = true
+                        " KiB). A existência do ZIP não garante compatibilidade no ASTRYX.",
+                    translation = true,
+                    expectedSizeBytes = size,
+                    expectedSha256 = S25ModCompatibility.parseGitHubDigest(asset.optString("digest")),
+                    requiredGameVersion = author.requiredVersion
                 ))
             }
             // Most recent compatible ZIP release only; avoid stale alternatives.
