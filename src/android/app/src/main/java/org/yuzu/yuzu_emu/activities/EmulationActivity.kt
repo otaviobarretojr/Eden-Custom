@@ -61,6 +61,7 @@ import org.yuzu.yuzu_emu.utils.InputHandler
 import org.yuzu.yuzu_emu.utils.Log
 import org.yuzu.yuzu_emu.utils.MemoryUtil
 import org.yuzu.yuzu_emu.utils.NativeConfig
+import org.yuzu.yuzu_emu.utils.DirectoryInitialization
 import org.yuzu.yuzu_emu.utils.NfcReader
 import org.yuzu.yuzu_emu.utils.ParamPackage
 import org.yuzu.yuzu_emu.utils.ThemeHelper
@@ -809,6 +810,19 @@ class EmulationActivity : AppCompatActivity(), SensorEventListener, InputManager
         emulationViewModel.setEmulationStopped(false)
         NativeLibrary.playTimeManagerStart()
 
+        // Experimental ASTRYX flavor only: capture the real, loaded main NSO
+        // Build ID. Reflective lookup keeps the common/official flavor independent.
+        if (S25UltraProfile.isSupportedDevice()) {
+            runCatching {
+                val identity = NativeLibrary.getActiveProgramBuildId()
+                val directory = DirectoryInitialization.userDirectory
+                if (identity.isNotBlank() && directory != null) {
+                    Class.forName("org.yuzu.yuzu_emu.activities.S25BuildIdStore")
+                        .getMethod("capture", String::class.java, String::class.java)
+                        .invoke(null, directory, identity)
+                }
+            }.onFailure { Log.warning("[ASTRYX] Build ID observation unavailable: ${it.message}") }
+        }
     }
 
     fun onEmulationStopped(status: Int) {
