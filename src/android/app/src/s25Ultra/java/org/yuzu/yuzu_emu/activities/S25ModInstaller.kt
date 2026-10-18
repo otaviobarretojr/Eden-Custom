@@ -9,64 +9,13 @@ import java.util.Locale
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
-/** Download ZIP only; stage/validate before moving into the game's mod folder. */
+/** Offline ZIP install; stage and validate before moving into the game's mod folder. */
 internal object S25ModInstaller {
-    private const val MAX_DOWNLOAD = S25ArchiveLimits.MAX_ARCHIVE_BYTES
     private const val MAX_UNPACKED = S25ArchiveLimits.MAX_EXPANDED_BYTES
     private const val MAX_ENTRIES = S25ArchiveLimits.MAX_ENTRIES
     private val MOD_ROOTS = setOf("romfs", "exefs", "cheats", "romfslite", "romfs_ext")
     private val FORBIDDEN_EXT = Regex("(?i)\\.(apk|exe|dll|so|dex|nsp|nsz|xci|xcz|nca|nro|bat|cmd|ps1|sh)$")
     private val TITLE_ID = Regex("(?i)^[a-f0-9]{16}$")
-
-    fun download(context: Context, url: String, progress: (String) -> Unit): File {
-        require(S25ModCatalog.isApprovedUrl(url)) { "Host de download não autorizado." }
-        val target = File.createTempFile("eden-mod-", ".zip", context.cacheDir)
-        val connection = S25ModCatalog.connect(url)
-        try {
-            if (connection.contentLengthLong > MAX_DOWNLOAD) error(S25ArchiveLimits.archiveSizeError())
-            S25ArchiveLimits.ensureAvailableSpace(
-                context.cacheDir, connection.contentLengthLong.coerceAtLeast(0L)
-            )
-            connection.inputStream.use { input ->
-                target.outputStream().buffered().use { output ->
-                    var total = 0L
-                    var milestone = 0L
-                    var lastSpaceCheck = 0L
-                    val buffer = ByteArray(32768)
-                    while (true) {
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        total += n
-                        if (total > MAX_DOWNLOAD) error(S25ArchiveLimits.archiveSizeError())
-                        if (S25ArchiveLimits.shouldCheckSpace(total, lastSpaceCheck)) {
-                            S25ArchiveLimits.ensureAvailableSpace(context.cacheDir, n.toLong())
-                            lastSpaceCheck = total
-                        }
-                        output.write(buffer, 0, n)
-                        if (total - milestone >= 2L * 1024 * 1024) {
-                            progress("Baixando: ${total / (1024 * 1024)} MiB")
-                            milestone = total
-                        }
-                    }
-                    if (total < 22) error("Arquivo ZIP vazio ou incompleto.")
-                }
-            }
-            target.inputStream().use { input ->
-                val magic = ByteArray(4)
-                if (input.read(magic) != 4 ||
-                    magic[0] != 0x50.toByte() || magic[1] != 0x4b.toByte() ||
-                    magic[2] != 0x03.toByte() || magic[3] != 0x04.toByte()) {
-                    error("O servidor não enviou um ZIP válido.")
-                }
-            }
-            return target
-        } catch (ex: Exception) {
-            target.delete()
-            throw ex
-        } finally {
-            connection.disconnect()
-        }
-    }
 
     fun install(
         context: Context, archive: File, titleId: String, offerName: String,

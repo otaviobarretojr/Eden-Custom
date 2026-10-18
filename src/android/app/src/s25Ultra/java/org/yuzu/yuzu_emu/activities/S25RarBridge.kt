@@ -12,7 +12,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * Safely repack RAR4/RAR5 translation archives to a temporary ZIP accepted by
+ * Safely repack RAR4/RAR5 mod or translation archives to a temporary ZIP accepted by
  * the existing mod installer. This is decompression ONLY: no RAR creation.
  *
  * Junrar / UnRAR licensing: RAR decompression code must not be used to develop
@@ -130,7 +130,7 @@ internal object S25RarBridge {
                         "ou arc/, audio/, ik_message/ e ui/ dentro de uma única variante."
                 )
             }
-            progress("RAR extraído com segurança: $selectedFiles arquivos. Validando mods…")
+            progress("RAR extraído com segurança: $selectedFiles arquivos. Validando conteúdo…")
             return converted
         } catch (ex: Exception) {
             converted.delete()
@@ -149,7 +149,7 @@ internal object S25RarBridge {
             error("RAR contém caminho inseguro.")
         }
         if (components.any { TITLE_ID.matches(it) && !it.equals(titleId, true) }) {
-            error("A tradução RAR pertence a outro jogo (Title ID divergente).")
+            error("O arquivo RAR pertence a outro jogo (Title ID divergente).")
         }
     }
 

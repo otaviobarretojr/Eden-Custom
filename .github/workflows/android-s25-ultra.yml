@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Translations Sources V2 (test APK)
+name: ASTRYX Offline ZIP-RAR Import (test APK)
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
       - fix/astryx-translations-sources-v2
 
 concurrency:
-  group: astryx-translation-sources-v2-${{ github.ref }}
+  group: astryx-offline-zip-rar-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -76,6 +76,20 @@ jobs:
           "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" -D "$BUILD/libAndroNSZ.so" > /tmp/s25-nsz-symbols.txt
           grep -q Java_com_androNSZ_NszConverter_nativeConvert /tmp/s25-nsz-symbols.txt
 
+      - name: Verify offline-only mod and translation import
+        run: |
+          set -euo pipefail
+          UI="src/android/app/src/s25Ultra/java/org/yuzu/yuzu_emu/activities/S25UltraModBrowserActivity.kt"
+          INSTALLER="src/android/app/src/s25Ultra/java/org/yuzu/yuzu_emu/activities/S25ModInstaller.kt"
+          test ! -f src/android/app/src/s25Ultra/java/org/yuzu/yuzu_emu/activities/S25ModCatalog.kt
+          grep -Fq 'Importar arquivo ZIP ou RAR' "$UI"
+          if grep -Eq 'S25ModCatalog|S25ModOffer|Pesquisar mods|Pesquisar traduções|Baixar e instalar|https://|GameBanana|CNX histórico' "$UI"; then
+            echo "Unexpected server search UI"; exit 1
+          fi
+          if grep -Eq 'S25ModCatalog|fun download\\(' "$INSTALLER"; then
+            echo "Unexpected server download in offline installer"; exit 1
+          fi
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -118,7 +132,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-Translations-V2-test-APK
+          name: ASTRYX-Offline-ZIP-RAR-test-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14

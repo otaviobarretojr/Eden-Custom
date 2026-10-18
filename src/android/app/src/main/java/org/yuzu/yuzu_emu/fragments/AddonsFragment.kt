@@ -68,11 +68,11 @@ class AddonsFragment : Fragment() {
 
         binding.toolbarAddons.title = getString(R.string.addons_game, args.game.title)
 
-        // The catalog is opt-in and specific to S25 Ultra build flavor.
+        // Offline ZIP/RAR import is available only for the S25 Ultra flavor.
         if (S25UltraProfile.isSupportedDevice() && runCatching {
                 Class.forName("org.yuzu.yuzu_emu.activities.S25UltraModBrowserActivity")
             }.isSuccess) {
-            binding.toolbarAddons.menu.add("Mods e traduções").apply {
+            binding.toolbarAddons.menu.add("Importar ZIP/RAR").apply {
                 setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
                 setOnMenuItemClickListener {
                     val browser = Intent().setClassName(
