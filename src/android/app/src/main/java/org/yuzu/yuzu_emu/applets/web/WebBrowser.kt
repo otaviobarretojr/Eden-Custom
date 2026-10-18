@@ -15,9 +15,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import org.yuzu.yuzu_emu.utils.Log
-import android.net.Uri
 import androidx.annotation.Keep
 import org.yuzu.yuzu_emu.NativeLibrary
+
 /**
     Should run WebBrowser as a new intent.
 */
