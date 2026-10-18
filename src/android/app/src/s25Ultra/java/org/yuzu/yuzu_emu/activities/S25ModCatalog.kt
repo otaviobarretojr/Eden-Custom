@@ -76,7 +76,7 @@ internal object S25ModCatalog {
             "0100C1F0051B6000" to ("Donkey Kong Country: Tropical Freeze · PT-BR" to "donkey-kong-freeze"),
             "01000A10041EA000" to ("The Elder Scrolls V: Skyrim · PT-BR" to "elder-scrolls-skyrim-switch"),
             "010095300B6A4800" to ("South Park: The Stick of Truth · PT-BR" to "south-park-stick-of-truth"),
-            "010028C003FD6000" to ("Ultra Street Fighter II · PT-BR" to "street-fighter-ii")
+            "010028C003FD6000" to ("Ultra Street Fighter II · PT-BR" to "ultra-street-fighter-switch")
         )
         val page = originalPages[titleId.uppercase(Locale.ROOT)] ?: return emptyList()
         return listOf(S25ModOffer(
