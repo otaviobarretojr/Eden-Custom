@@ -202,17 +202,24 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                     "eden-ptbr-", if (isRar) ".rar" else ".zip", cacheDir
                 )
                 temp = file
+                S25ArchiveLimits.ensureAvailableSpace(cacheDir)
                 val stream = contentResolver.openInputStream(uri) ?: error("Arquivo não acessível.")
                 stream.use { input ->
                     file.outputStream().buffered().use { output ->
                         var total = 0L
+                        var lastSpaceCheck = 0L
                         val buffer = ByteArray(32768)
                         while (true) {
                             val read = input.read(buffer)
                             if (read < 0) break
                             total += read
-                            if (total > 150L * 1024 * 1024) {
-                                error("Arquivo acima de 150 MiB. Use instalação manual para pacotes maiores.")
+                            if (total > S25ArchiveLimits.MAX_ARCHIVE_BYTES) {
+                                error(S25ArchiveLimits.archiveSizeError())
+                            }
+                            if (S25ArchiveLimits.shouldCheckSpace(total, lastSpaceCheck)) {
+                                S25ArchiveLimits.ensureAvailableSpace(cacheDir, read.toLong())
+                                lastSpaceCheck = total
+                                inform("Importando arquivo: ${total / (1024 * 1024)} MiB…")
                             }
                             output.write(buffer, 0, read)
                         }
@@ -260,7 +267,7 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                 "${offer.source}\n\n${offer.description}\n\n" +
                     "A versão do jogo e a licença do patch precisam ser verificadas por você. " +
                     "Arquivos serão validados antes de instalar e mods existentes não serão substituídos. " +
-                    "ZIPs acima de 150 MiB não são aceitos."
+                    "ZIP/RAR de até 2 GiB são aceitos, com validação de conteúdo e espaço livre."
             )
             .setPositiveButton("Baixar e instalar") { _, _ -> install(offer) }
             .setNeutralButton("Fonte") { _, _ -> openWeb(offer.sourceUrl) }
