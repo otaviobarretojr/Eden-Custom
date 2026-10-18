@@ -23,9 +23,9 @@ import java.util.zip.ZipOutputStream
  * atomic staging, extension rules and collision/rollback protections.
  */
 internal object S25RarBridge {
-    private const val MAX_COMPRESSED_BYTES = 150L * 1024 * 1024
-    private const val MAX_EXPANDED_BYTES = 350L * 1024 * 1024
-    private const val MAX_ENTRIES = 6000
+    private const val MAX_COMPRESSED_BYTES = S25ArchiveLimits.MAX_ARCHIVE_BYTES
+    private const val MAX_EXPANDED_BYTES = S25ArchiveLimits.MAX_EXPANDED_BYTES
+    private const val MAX_ENTRIES = S25ArchiveLimits.MAX_ENTRIES
     private val MOD_ROOTS = setOf("romfs", "exefs", "cheats", "romfslite", "romfs_ext")
     private val TITLE_ID = Regex("(?i)^[0-9a-f]{16}$")
     private val SIGNATURE_RAR4 = byteArrayOf(
@@ -49,14 +49,16 @@ internal object S25RarBridge {
     ): File {
         require(TITLE_ID.matches(titleId)) { "Title ID do jogo inválido." }
         require(rarFile.length() in 8..MAX_COMPRESSED_BYTES) {
-            "RAR inválido ou acima de 150 MiB."
+            "RAR inválido ou acima do limite de 2 GiB."
         }
+        S25ArchiveLimits.ensureAvailableSpace(context.cacheDir)
         verifySignature(rarFile)
         val converted = File.createTempFile("eden-rar-to-zip-", ".zip", context.cacheDir)
         try {
             var entryCount = 0
             var selectedFiles = 0
             var uncompressedTotal = 0L
+            var lastSpaceCheck = 0L
             val names = hashSetOf<String>()
             Archive(rarFile).use { archive ->
                 ZipOutputStream(converted.outputStream().buffered()).use { zip ->
@@ -64,7 +66,7 @@ internal object S25RarBridge {
                     for (header in archive.fileHeaders) {
                         entryCount++
                         if (entryCount > MAX_ENTRIES) {
-                            error("RAR contém entradas demais (máximo 6000).")
+                            error("RAR contém entradas demais (máximo $MAX_ENTRIES).")
                         }
                         val raw = header.fileName.replace('\\', '/')
                         validateEntryName(raw, titleId)
@@ -89,7 +91,7 @@ internal object S25RarBridge {
                         val claimed = header.fullUnpackSize
                         if (claimed < 0 || claimed > MAX_EXPANDED_BYTES ||
                             uncompressedTotal > MAX_EXPANDED_BYTES - claimed) {
-                            error("RAR excede o limite de 350 MiB descompactados.")
+                            error(S25ArchiveLimits.extractedSizeError())
                         }
                         if (!names.add(raw.lowercase(Locale.ROOT))) {
                             error("RAR contém caminhos duplicados.")
@@ -103,7 +105,11 @@ internal object S25RarBridge {
                                 if (read < 0) break
                                 uncompressedTotal += read
                                 if (uncompressedTotal > MAX_EXPANDED_BYTES) {
-                                    error("RAR excede o limite de 350 MiB descompactados.")
+                                    error(S25ArchiveLimits.extractedSizeError())
+                                }
+                                if (S25ArchiveLimits.shouldCheckSpace(uncompressedTotal, lastSpaceCheck)) {
+                                    S25ArchiveLimits.ensureAvailableSpace(context.cacheDir, read.toLong())
+                                    lastSpaceCheck = uncompressedTotal
                                 }
                                 zip.write(buffer, 0, read)
                             }
