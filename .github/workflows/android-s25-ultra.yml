@@ -1,15 +1,15 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: Android S25 Ultra (test APK)
+name: ASTRYX S25 Ultra (test APK)
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - android/s25-ultra-profile-v1
+      - brand/astryx-s25-v1
 
 concurrency:
-  group: eden-s25-ultra-build
+  group: astryx-s25-ultra-build-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -84,7 +84,7 @@ jobs:
           export ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/28.2.13676358"
           ./gradlew :app:assembleS25UltraRelWithDebInfo --no-daemon --stacktrace
 
-      - name: Verify upgrade identity and APK signature
+      - name: Verify upgrade identity, ASTRYX brand and APK signature
         run: |
           APK="src/android/app/build/outputs/apk/s25Ultra/relWithDebInfo/app-s25Ultra-relWithDebInfo.apk"
           test -f "$APK"
@@ -93,6 +93,11 @@ jobs:
           grep -qi "9d09b2001be0dde93ea0444c536b72270fab3eb1a2fccfd56e1a3c46cc0d7af1" /tmp/s25-apk-signature.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | head -n 5 | tee /tmp/s25-apk-identity.txt
           grep -q "name='dev.eden.eden_emulator.s25ultra.relWithDebInfo'" /tmp/s25-apk-identity.txt
+          # Identity MUST stay unchanged: an app name alone must not change installed app data.
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -E "^application-label:'ASTRYX'$"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump resources "$APK" | grep -q 'astryx_launcher_foreground' || {
+            echo "ASTRYX icon resources missing"; exit 1;
+          }
           unzip -Z1 "$APK" > /tmp/s25-apk-files.txt
           grep -q 'lib/arm64-v8a/libAndroNSZ.so' /tmp/s25-apk-files.txt
           if grep -E 'libjlibtorrent|S25TorrentDownloadService' /tmp/s25-apk-files.txt; then
@@ -105,7 +110,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Eden-S25-Ultra-test-APK
+          name: ASTRYX-S25-Ultra-test-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
