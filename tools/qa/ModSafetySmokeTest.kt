@@ -43,11 +43,11 @@ fun main() {
 
         // Catalog version metadata is advisory, never proof of runtime compatibility.
         val compat = S25ModCompatibility
-        check(compat.assess("v1.0.3", "1.0.3").status == compat.Status.VERSION_MATCHES)
-        check(compat.assess("1.0.2", "1.0.3").status == compat.Status.VERSION_MISMATCH)
-        check(compat.assess("", "1.0.3").status == compat.Status.UNKNOWN_VERSION)
-        check(compat.assess("1.0.3", null).status == compat.Status.NO_REQUIREMENT)
-        check(compat.assess("v196608", "1.0.3").status == compat.Status.VERSION_MISMATCH)
+        check(compat.assess("v1.0.3", "1.0.3").status == S25ModCompatibility.Status.VERSION_MATCHES)
+        check(compat.assess("1.0.2", "1.0.3").status == S25ModCompatibility.Status.VERSION_MISMATCH)
+        check(compat.assess("", "1.0.3").status == S25ModCompatibility.Status.UNKNOWN_VERSION)
+        check(compat.assess("1.0.3", null).status == S25ModCompatibility.Status.NO_REQUIREMENT)
+        check(compat.assess("v196608", "1.0.3").status == S25ModCompatibility.Status.VERSION_MISMATCH)
         val expectedDigest = "sha256:" + "ab".repeat(32)
         check(compat.parseGitHubDigest(expectedDigest) == "ab".repeat(32))
         check(compat.parseGitHubDigest("sha1:" + "ab".repeat(20)) == null)
