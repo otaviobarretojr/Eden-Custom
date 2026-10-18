@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni Offline Applet Test APK
+name: ASTRYX Ni no Kuni Local WebView V2
 
 on:
   workflow_dispatch:
@@ -8,6 +8,7 @@ on:
     branches:
       - fix/astryx-translations-sources-v2
       - fix/astryx-ni-no-kuni-offline-applet-v1
+      - fix/astryx-ni-no-kuni-webview-v2
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -120,6 +121,20 @@ jobs:
             echo "Unexpected global web applet setting mutation"; exit 1
           fi
 
+      - name: Verify Ni no Kuni WebView bridge and local sandbox
+        run: |
+          set -euo pipefail
+          CPP="src/common/android/applets/web_browser.cpp"
+          KOTLIN="src/android/app/src/main/java/org/yuzu/yuzu_emu/applets/web/WebBrowser.kt"
+          NATIVE="src/android/app/src/main/java/org/yuzu/yuzu_emu/NativeLibrary.kt"
+          grep -Fq 'extract_romfs_callback();' "$CPP"
+          grep -Fq '0100E5600D446000' "$CPP"
+          grep -Fq 'openLocalWebPage' "$CPP"
+          grep -Fq 'fun openLocal(url: String): String?' "$KOTLIN"
+          grep -Fq 'blockNetworkLoads = true' "$KOTLIN"
+          grep -Fq 'allowUniversalAccessFromFileURLs = false' "$KOTLIN"
+          grep -Fq 'fun openLocalWebPage(url: String): String?' "$NATIVE"
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -162,7 +177,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-NiNoKuni-Applet-test-APK
+          name: ASTRYX-NiNoKuni-WebView-v2-test-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14

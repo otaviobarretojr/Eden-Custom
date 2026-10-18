@@ -505,6 +505,11 @@ object NativeLibrary {
         WebBrowser.openExternal(url)
     }
 
+    /** Synchronous Ni no Kuni offline applet UI (called from native worker). */
+    @Keep
+    @JvmStatic
+    fun openLocalWebPage(url: String): String? = WebBrowser.openLocal(url)
+
     /**
      * Sets the cabinet mode for launching the cabinet applet.
      *
