@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-    <application>
+    <application android:label="@string/app_name_suffixed" tools:replace="android:label">
         <activity android:name="org.yuzu.yuzu_emu.activities.S25UltraModBrowserActivity"
             android:exported="false" android:theme="@style/Theme.Yuzu.Main"/>
         <activity android:name="org.yuzu.yuzu_emu.activities.S25OnlineLibraryActivity"
