@@ -6,7 +6,6 @@ import android.content.Context
 import com.github.junrar.Archive
 import java.io.File
 import java.io.FileInputStream
-import java.util.Locale
 import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -26,7 +25,6 @@ internal object S25RarBridge {
     private const val MAX_COMPRESSED_BYTES = S25ArchiveLimits.MAX_ARCHIVE_BYTES
     private const val MAX_EXPANDED_BYTES = S25ArchiveLimits.MAX_EXPANDED_BYTES
     private const val MAX_ENTRIES = S25ArchiveLimits.MAX_ENTRIES
-    private val MOD_ROOTS = setOf("romfs", "exefs", "cheats", "romfslite", "romfs_ext")
     private val TITLE_ID = Regex("(?i)^[0-9a-f]{16}$")
     private val SIGNATURE_RAR4 = byteArrayOf(
         0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x00
@@ -61,6 +59,11 @@ internal object S25RarBridge {
             var lastSpaceCheck = 0L
             val names = hashSetOf<String>()
             Archive(rarFile).use { archive ->
+                // Detect the archive layout from headers without decompressing
+                // irrelevant readmes/other package variants into memory.
+                val layout = S25ModLayout.detect(
+                    titleId, archive.fileHeaders.map { it.fileName }
+                )
                 ZipOutputStream(converted.outputStream().buffered()).use { zip ->
                     zip.setLevel(Deflater.BEST_SPEED)
                     for (header in archive.fileHeaders) {
@@ -81,12 +84,10 @@ internal object S25RarBridge {
                         }
                         if (header.isDirectory) continue
 
-                        val parts = raw.split('/').filter { it.isNotBlank() }
-                        val pivot = parts.indexOfFirst {
-                            it.lowercase(Locale.ROOT) in MOD_ROOTS
-                        }
-                        // Ignore documentation/readme outside valid mod folders.
-                        if (pivot < 0 || pivot >= parts.lastIndex) continue
+                        // Preserve only payload files from a conventional
+                        // LayeredFS package or the recognized Pokémon Z-A
+                        // arc/audio/ik_message/ui layout.
+                        if (layout.relativePath(raw) == null) continue
 
                         val claimed = header.fullUnpackSize
                         if (claimed < 0 || claimed > MAX_EXPANDED_BYTES ||
@@ -123,7 +124,10 @@ internal object S25RarBridge {
                 }
             }
             if (selectedFiles == 0) {
-                error("RAR não contém pastas romfs, exefs ou cheats para este jogo.")
+                error(
+                    "RAR sem estrutura LayeredFS reconhecida. Pokémon Z-A aceita romfs/ " +
+                        "ou arc/, audio/, ik_message/ e ui/ dentro de uma única variante."
+                )
             }
             progress("RAR extraído com segurança: $selectedFiles arquivos. Validando mods…")
             return converted
