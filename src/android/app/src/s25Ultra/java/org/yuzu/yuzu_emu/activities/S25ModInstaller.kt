@@ -10,9 +10,9 @@ import java.util.zip.ZipInputStream
 
 /** Download ZIP only; stage/validate before moving into the game's mod folder. */
 internal object S25ModInstaller {
-    private const val MAX_DOWNLOAD = 150L * 1024 * 1024
-    private const val MAX_UNPACKED = 350L * 1024 * 1024
-    private const val MAX_ENTRIES = 6000
+    private const val MAX_DOWNLOAD = S25ArchiveLimits.MAX_ARCHIVE_BYTES
+    private const val MAX_UNPACKED = S25ArchiveLimits.MAX_EXPANDED_BYTES
+    private const val MAX_ENTRIES = S25ArchiveLimits.MAX_ENTRIES
     private val MOD_ROOTS = setOf("romfs", "exefs", "cheats", "romfslite", "romfs_ext")
     private val FORBIDDEN_EXT = Regex("(?i)\\.(apk|exe|dll|so|dex|nsp|nsz|xci|xcz|nca|nro|bat|cmd|ps1|sh)$")
     private val TITLE_ID = Regex("(?i)^[a-f0-9]{16}$")
@@ -22,17 +22,25 @@ internal object S25ModInstaller {
         val target = File.createTempFile("eden-mod-", ".zip", context.cacheDir)
         val connection = S25ModCatalog.connect(url)
         try {
-            if (connection.contentLengthLong > MAX_DOWNLOAD) error("Download acima de 150 MiB.")
+            if (connection.contentLengthLong > MAX_DOWNLOAD) error(S25ArchiveLimits.archiveSizeError())
+            S25ArchiveLimits.ensureAvailableSpace(
+                context.cacheDir, connection.contentLengthLong.coerceAtLeast(0L)
+            )
             connection.inputStream.use { input ->
                 target.outputStream().buffered().use { output ->
                     var total = 0L
                     var milestone = 0L
+                    var lastSpaceCheck = 0L
                     val buffer = ByteArray(32768)
                     while (true) {
                         val n = input.read(buffer)
                         if (n < 0) break
                         total += n
-                        if (total > MAX_DOWNLOAD) error("Download excedeu 150 MiB.")
+                        if (total > MAX_DOWNLOAD) error(S25ArchiveLimits.archiveSizeError())
+                        if (S25ArchiveLimits.shouldCheckSpace(total, lastSpaceCheck)) {
+                            S25ArchiveLimits.ensureAvailableSpace(context.cacheDir, n.toLong())
+                            lastSpaceCheck = total
+                        }
                         output.write(buffer, 0, n)
                         if (total - milestone >= 2L * 1024 * 1024) {
                             progress("Baixando: ${total / (1024 * 1024)} MiB")
@@ -73,6 +81,7 @@ internal object S25ModInstaller {
         val installed = mutableListOf<File>()
         try {
             var total = 0L
+            var lastSpaceCheck = 0L
             var entries = 0
             var files = 0
             ZipInputStream(archive.inputStream().buffered()).use { zip ->
@@ -98,7 +107,7 @@ internal object S25ModInstaller {
                         val rootCanonical = staging.canonicalPath + File.separator
                         if (!out.canonicalPath.startsWith(rootCanonical)) error("Caminho fora da pasta temporária.")
                         if (FORBIDDEN_EXT.containsMatchIn(out.name)) error("Arquivo não permitido em mods: ${out.name}")
-                        if (entry.size > MAX_UNPACKED) error("Arquivo extraído muito grande.")
+                        if (entry.size > MAX_UNPACKED) error(S25ArchiveLimits.extractedSizeError())
                         if (stagedDirs.size >= 30 && modName !in stagedDirs) error("Pacote com mods demais.")
                         stagedDirs.add(modName)
                         require(out.parentFile?.isDirectory == true || out.parentFile?.mkdirs() == true)
@@ -109,7 +118,11 @@ internal object S25ModInstaller {
                                 val n = zip.read(buffer)
                                 if (n < 0) break
                                 total += n
-                                if (total > MAX_UNPACKED) error("ZIP excedeu 350 MiB extraídos.")
+                                if (total > MAX_UNPACKED) error(S25ArchiveLimits.extractedSizeError())
+                                if (S25ArchiveLimits.shouldCheckSpace(total, lastSpaceCheck)) {
+                                    S25ArchiveLimits.ensureAvailableSpace(staging, n.toLong())
+                                    lastSpaceCheck = total
+                                }
                                 output.write(buffer, 0, n)
                             }
                         }
