@@ -23,8 +23,13 @@ internal data class S25ModOffer(
 
 internal object S25ModCatalog {
     private const val MODS_REPO = "Fl4sh9174/Switch-Emulator-Ultrawide-FPS-Mods"
-    private const val LEGACY_TRANSLATIONS =
+    // CNX-Updater upstream still references /master/nx-links-v204.json; that
+    // branch no longer exists. The index below is readable under /main but its
+    // 2022 download links must NEVER be considered live downloads.
+    private const val CNX_ARCHIVE_INDEX =
         "https://raw.githubusercontent.com/gamemoddesignbr/nx-links/main/nx-links-v220.json"
+    private const val CNX_ARCHIVE_PAGE =
+        "https://github.com/gamemoddesignbr/nx-links/blob/main/nx-links-v220.json"
     private const val MAX_CATALOG_BYTES = 3 * 1024 * 1024
 
     fun githubPacks(titleId: String): List<S25ModOffer> {
@@ -66,7 +71,12 @@ internal object S25ModCatalog {
             "010012101468C000" to ("Metroid Prime Remastered · PT-BR v1.0" to "metroid-prime"),
             "010093801237C000" to ("Metroid Dread · PT-BR v2.1" to "metroid-dread"),
             "0100DCA0064A6800" to ("Luigi's Mansion 3 · PT-BR v1.0" to "luigi-mansions-3"),
-            "010028600EBDA000" to ("Super Mario 3D World + Bowser's Fury · PT-BR v1.1" to "mario-3d-bowser")
+            "010028600EBDA000" to ("Super Mario 3D World + Bowser's Fury · PT-BR v1.1" to "mario-3d-bowser"),
+            "01009BF0072D4000" to ("Captain Toad: Treasure Tracker · PT-BR" to "captain-toad-switch"),
+            "0100C1F0051B6000" to ("Donkey Kong Country: Tropical Freeze · PT-BR" to "donkey-kong-freeze"),
+            "01000A10041EA000" to ("The Elder Scrolls V: Skyrim · PT-BR" to "elder-scrolls-skyrim-switch"),
+            "010095300B6A4800" to ("South Park: The Stick of Truth · PT-BR" to "south-park-stick-of-truth"),
+            "010028C003FD6000" to ("Ultra Street Fighter II · PT-BR" to "street-fighter-ii")
         )
         val page = originalPages[titleId.uppercase(Locale.ROOT)] ?: return emptyList()
         return listOf(S25ModOffer(
@@ -139,10 +149,45 @@ internal object S25ModCatalog {
     }
 
     /**
-     * Deliberately not a download source: this retired index contains links
-     * into removed repositories, so never advertise its ZIPs as online.
+     * Discovery-only lookup in the archived CNX index, *not* a download server.
+     * The entries may point to deleted repos, outdated builds, wrong regions or
+     * unlicensed redistributed files. Never follow them or offer auto-install.
+     * Match the complete game's exact Title ID to prevent wrong-game installs.
      */
-    fun historicalTranslationsDisabled(): Boolean = true
+    fun cnxArchiveReferences(titleId: String): List<S25ModOffer> {
+        val expected = titleId.uppercase(Locale.ROOT)
+        if (!Regex("^[0-9A-F]{16}$").matches(expected)) return emptyList()
+        val root = JSONObject(readText(CNX_ARCHIVE_INDEX, MAX_CATALOG_BYTES))
+        val translations = root.optJSONObject("translations") ?: return emptyList()
+        val offers = mutableListOf<S25ModOffer>()
+        val idPattern = Regex("(?i)(?<![a-f0-9])([a-f0-9]{16})(?![a-f0-9])")
+        val keys = translations.keys()
+        var scanned = 0
+        while (keys.hasNext() && scanned++ < 500) {
+            val name = keys.next()
+            val entry = translations.optJSONObject(name) ?: continue
+            if (!entry.optBoolean("enabled", false)) continue
+            val installedPath = entry.optJSONObject("installed")?.optString("hash_file").orEmpty()
+            val archiveLink = entry.optString("link")
+            // Some old archives have ZIP names unrelated to Title IDs. The
+            // installed path is an additional exact-ID reference, not a URL.
+            val indexedId = idPattern.find(installedPath)?.groupValues?.get(1)
+                ?: idPattern.find(archiveLink)?.groupValues?.get(1)
+                ?: continue
+            if (!indexedId.equals(expected, ignoreCase = true)) continue
+            offers.add(S25ModOffer(
+                title = name.take(110) + " · referência CNX antiga",
+                source = "CNX histórico · catálogo 2022 (somente pesquisa)",
+                sourceUrl = CNX_ARCHIVE_PAGE,
+                downloadUrl = null,
+                description = "Tradução listada num índice antigo do CNX. " +
+                    "O download original NÃO foi validado e pode estar removido. " +
+                    "Use a busca dos autores ou a importação manual de ZIP/RAR autorizado.",
+                translation = true
+            ))
+        }
+        return offers.take(3)
+    }
 
     /** GameBanana public game-name lookup, then mod listing scoped to its game ID. */
     fun gameBanana(gameName: String, translationsOnly: Boolean): List<S25ModOffer> {
