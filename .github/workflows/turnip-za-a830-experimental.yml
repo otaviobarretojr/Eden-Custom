@@ -1,0 +1,124 @@
+name: Experimental Turnip A830 for Pokemon ZA
+
+on:
+  push:
+    branches:
+      - experiment/za-a830-turnip
+    paths:
+      - .github/workflows/turnip-za-a830-experimental.yml
+      - docs/POKEMON_ZA_A830_DRIVER.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: za-a830-turnip-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-turnip-a830:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - name: Checkout Eden experiment
+        uses: actions/checkout@v4
+
+      - name: Install Mesa Turnip build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build patchelf unzip flex bison git perl \
+            python3-pip glslang-tools curl zip patch ccache \
+            pkg-config clang libelf-dev
+          pip3 install --break-system-packages meson mako
+
+      - name: Checkout reviewed Turnip build tools at a pinned revision
+        env:
+          BUILDER_SHA: 5d8ffa7b0b88f44a2b26207663955e12ccbfdb09
+        run: |
+          git clone https://github.com/Piperella/Piperella-Turnip.git driver-builder
+          cd driver-builder
+          git checkout --detach "$BUILDER_SHA"
+          test "$(git rev-parse HEAD)" = "$BUILDER_SHA"
+          test -f patches/tu8_kgsl_26.patch
+          test -f patches/tune_a830.py
+          test -f build_turnip.sh
+
+      - name: Build genuine Mesa Turnip Vulkan driver for Adreno 830
+        working-directory: driver-builder
+        env:
+          BUILD_VERSION: ${{ github.run_number }}
+          BUILD_SUFFIX: ZA-A830-Experimental
+          META_NAME: ZA A830 Turnip Experimental - Pokemon Legends ZA
+          META_DESC: "Experimental Adreno 830 Vulkan driver for testing missing city geometry in Pokemon Legends ZA. No game-specific fix proven; test against system Vulkan. Derived from Mesa and the Piperella Turnip A8xx build."
+          EXTRA_PATCH: patches/tu8_kgsl_26.patch
+          EXTRA_SCRIPT: patches/fix_a8xx_dev_info.py:patches/apply_a8xx_gpus.py:patches/tune_a830.py
+        run: |
+          chmod +x build_turnip.sh
+          ./build_turnip.sh
+
+      - name: Inspect GPU-specific patch and Vulkan ELF
+        working-directory: driver-builder
+        run: |
+          set -eu
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("turnip_workdir/mesa/src/freedreno/common/freedreno_devices.py").read_text()
+          anchor='GPUId(chip_id=0xffff44050000, name="Adreno (TM) 830")'
+          i=source.find(anchor)
+          if i<0: raise SystemExit("A830 chip ID not found; do not distribute")
+          left=source.rfind("add_gpus([",0,i)
+          right=source.find("))",i)
+          block=source[left:right]
+          if "has_fs_tex_prefetch = False" not in block:
+              raise SystemExit("A830 texture-prefetch override missing; do not distribute")
+          print("A830 texture-prefetch override verified")
+          PY
+          test -f /tmp/turnip-main/lib/libvulkan_freedreno.so
+          readelf -h /tmp/turnip-main/lib/libvulkan_freedreno.so | grep -q AArch64
+
+      - name: Produce AdrenoTools-compatible driver ZIP with provenance
+        working-directory: driver-builder
+        env:
+          ORIGINAL_BUILDER_SHA: 5d8ffa7b0b88f44a2b26207663955e12ccbfdb09
+        run: |
+          set -eu
+          mkdir -p ../driver-output
+          python3 - <<'PY'
+          import json,os,hashlib,zipfile,glob,subprocess
+          from pathlib import Path
+          archive=sorted(glob.glob("turnip_workdir/mesa-turnip-*.zip"))
+          if len(archive)!=1: raise SystemExit("Expected exactly one driver ZIP: "+str(archive))
+          out=Path("../driver-output/ZA-A830-Turnip-Experimental.adpkg.zip")
+          with zipfile.ZipFile(archive[0]) as z:
+              names=set(z.namelist())
+              if names!={"meta.json","libvulkan_freedreno.so"}:
+                  raise SystemExit("Unexpected ZIP members: "+str(names))
+              meta=json.loads(z.read("meta.json"))
+              binary=z.read("libvulkan_freedreno.so")
+          if not binary.startswith(b"\\x7fELF"): raise SystemExit("Not an ELF driver")
+          meta["name"]="ZA A830 Turnip Experimental (not validated on Z-A)"
+          meta["description"]="Mesa Turnip A830 experimental driver: A8xx KGSL patches and A830 fragment texture-prefetch disabled. Not guaranteed to fix missing geometry or improve performance. No automatic overclock."
+          meta["author"]="Mesa/Freedreno contributors; experimental build from Piperella-Turnip"
+          meta["libraryName"]="libvulkan_freedreno.so"
+          with zipfile.ZipFile(out,"w",zipfile.ZIP_DEFLATED) as dst:
+              dst.writestr("meta.json",json.dumps(meta,ensure_ascii=False,indent=2))
+              dst.writestr("libvulkan_freedreno.so",binary)
+          source_sha=subprocess.check_output(["git","-C","turnip_workdir/mesa","rev-parse","HEAD"],text=True).strip()
+          info={"experimental":True,"target_game":"Pokemon Legends Z-A","title_id":"0100F43008C44000",
+                "gpu":"Adreno 830","builder_repo":"Piperella/Piperella-Turnip",
+                "builder_sha":os.environ["ORIGINAL_BUILDER_SHA"],"mesa_sha":source_sha,
+                "driver_file":out.name,"driver_sha256":hashlib.sha256(out.read_bytes()).hexdigest(),
+                "shader_prefetch_override":"has_fs_tex_prefetch=False",
+                "real_gameplay_tested":False}
+          Path("../driver-output/BUILD-PROVENANCE.json").write_text(json.dumps(info,indent=2)+"\\n")
+          print(json.dumps(info,indent=2))
+          PY
+
+      - name: Upload experimental driver and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZA-A830-Turnip-Experimental
+          path: driver-output/
+          if-no-files-found: error
+          retention-days: 14
