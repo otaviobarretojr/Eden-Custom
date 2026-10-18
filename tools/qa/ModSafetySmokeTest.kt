@@ -40,7 +40,40 @@ fun main() {
         val symlink = newOne.resolve("romfs/traversal")
         val linkSupported = runCatching { Files.createSymbolicLink(symlink.toPath(), home.toPath()) }.isSuccess
         if (linkSupported) check(runCatching { S25ModConflictScanner.inventory(newOne) }.isFailure)
-        println("PASS: 7 ASTRYX mod safety checks")
+
+        // Catalog version metadata is advisory, never proof of runtime compatibility.
+        val compat = S25ModCompatibility
+        check(compat.assess("v1.0.3", "1.0.3").status == compat.Status.VERSION_MATCHES)
+        check(compat.assess("1.0.2", "1.0.3").status == compat.Status.VERSION_MISMATCH)
+        check(compat.assess("", "1.0.3").status == compat.Status.UNKNOWN_VERSION)
+        check(compat.assess("1.0.3", null).status == compat.Status.NO_REQUIREMENT)
+        check(compat.assess("v196608", "1.0.3").status == compat.Status.VERSION_MISMATCH)
+        val expectedDigest = "sha256:" + "ab".repeat(32)
+        check(compat.parseGitHubDigest(expectedDigest) == "ab".repeat(32))
+        check(compat.parseGitHubDigest("sha1:" + "ab".repeat(20)) == null)
+
+        val download = "This is an intentionally small ZIP-like download payload.".toByteArray()
+        val sha = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(download).joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+        val valid = S25DownloadVerifier(download.size.toLong(), sha.uppercase())
+        valid.accept(download, download.size)
+        check(valid.totalBytes == download.size.toLong() && valid.verify())
+
+        val unknownHash = S25DownloadVerifier(download.size.toLong(), null)
+        unknownHash.accept(download, download.size)
+        check(!unknownHash.verify())
+
+        val wrongSize = S25DownloadVerifier(download.size.toLong() + 1L, sha)
+        wrongSize.accept(download, download.size)
+        check(runCatching { wrongSize.verify() }.isFailure)
+
+        val wrongHash = S25DownloadVerifier(download.size.toLong(), "0".repeat(64))
+        wrongHash.accept(download, download.size)
+        check(runCatching { wrongHash.verify() }.isFailure)
+
+        check(runCatching { S25DownloadVerifier(-1L, null) }.isFailure)
+        check(runCatching { S25DownloadVerifier(null, "not a sha") }.isFailure)
+        println("PASS: mod safety, version requirements, release digest and streaming integrity")
     } finally {
         home.deleteRecursively()
     }
