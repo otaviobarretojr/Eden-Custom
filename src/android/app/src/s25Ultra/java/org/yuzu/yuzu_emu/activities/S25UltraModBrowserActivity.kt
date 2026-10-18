@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.util.Locale
+import org.yuzu.yuzu_emu.utils.DirectoryInitialization
 import java.util.concurrent.Executors
 
 /**
@@ -27,6 +28,8 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var gameId: String
     private lateinit var gameTitle: String
+    private var gameLibraryVersion = ""
+    private var activeUpdateDescription = ""
     private var busy = false
 
     private val chooseTranslationArchive =
@@ -39,6 +42,8 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         gameId = intent.getStringExtra(EXTRA_TITLE_ID).orEmpty().uppercase(Locale.ROOT)
         gameTitle = intent.getStringExtra(EXTRA_GAME_TITLE).orEmpty()
+        gameLibraryVersion = intent.getStringExtra(EXTRA_GAME_VERSION).orEmpty()
+        activeUpdateDescription = intent.getStringExtra(EXTRA_ACTIVE_UPDATE).orEmpty()
         if (!Regex("^[A-F0-9]{16}$").matches(gameId)) {
             MaterialAlertDialogBuilder(this).setTitle("Mods e traduções")
                 .setMessage("O jogo não possui um Title ID válido. Abra um jogo instalado e tente novamente.")
@@ -60,12 +65,34 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
         body.addView(caption(gameTitle, 22f))
         body.addView(caption("Title ID: $gameId", 13f))
         body.addView(caption(
+            "Versão na biblioteca: " + gameLibraryVersion.ifBlank { "não informada" } +
+                " (pode diferir da atualização efetivamente ativa).", 12f))
+        body.addView(caption(
+            "Atualização habilitada (gerenciador): " +
+                activeUpdateDescription.ifBlank { "não identificada" } +
+                ". Build ID do executável: não confirmado.", 12f))
+        val priorBuildId = runCatching {
+            DirectoryInitialization.userDirectory?.let { S25BuildIdStore.read(it, gameId) }
+        }.getOrNull()
+        body.addView(caption(
+            if (priorBuildId != null) {
+                "Último Build ID real do NSO: " + priorBuildId.cheatBuildId +
+                    " (capturado em " +
+                    java.text.DateFormat.getDateTimeInstance().format(
+                        java.util.Date(priorBuildId.capturedAtEpochMs)) +
+                    "). Registro histórico; abra o jogo novamente para atualizar."
+            } else {
+                "Build ID real do NSO ainda não capturado. Abra o jogo ao menos uma vez " +
+                    "nesta versão para registrar o executável carregado."
+            }, 12f))
+        body.addView(caption(
             "Downloads de patches da comunidade. Não inclui jogos, DLCs, firmware ou chaves. " +
                 "Sempre confira a versão do jogo e a autoria do mod.", 14f))
         action("Pesquisar mods") { load(false) }
         action("Pesquisar traduções PT-BR") { load(true) }
         action("Instalar tradução baixada (ZIP/RAR)") { chooseTranslationArchive.launch(arrayOf("*/*")) }
         action("Gerenciar mods instalados") { showInstalled() }
+        action("Diagnosticar mods e Build IDs") { diagnoseMods() }
         status = caption("Escolha uma categoria para pesquisar.", 14f)
         body.addView(status)
         setContentView(ScrollView(this).apply { addView(body) })
@@ -150,7 +177,14 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                 "Isso não significa que não existam mods para o jogo.")
         if (warnings.isNotEmpty()) label("Avisos de rede: " + warnings.joinToString(" | "), 12f)
         offers.take(40).forEach { offer ->
-            label("• ${offer.title}\n${offer.source}\n${offer.description}")
+            val compatibility = S25ModCompatibility.assess(gameLibraryVersion, offer.requiredGameVersion)
+            val integrity = when {
+                offer.expectedSha256 != null -> "SHA-256 do autor disponível; será verificado no download."
+                offer.expectedSizeBytes != null -> "Tamanho declarado disponível; SHA-256 não publicado."
+                else -> "Sem checksum oficial disponível; não é possível autenticar o arquivo por hash."
+            }
+            label("• ${offer.title}\n${offer.source}\n${offer.description}\n" +
+                compatibility.description + "\n" + integrity)
             if (offer.downloadUrl != null || offer.gameBananaId > 0) {
                 action("Baixar e instalar · ${offer.title.take(28)}") { confirmInstall(offer) }
             }
@@ -276,10 +310,21 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
     }
 
     private fun confirmInstall(offer: S25ModOffer) {
+        val assessment = S25ModCompatibility.assess(gameLibraryVersion, offer.requiredGameVersion)
+        if (assessment.status == S25ModCompatibility.Status.VERSION_MISMATCH) {
+            MaterialAlertDialogBuilder(this).setTitle("Possível incompatibilidade de versão")
+                .setMessage(assessment.description + "\n\nNão haverá instalação automática. " +
+                    "Confira a atualização realmente ativa e as instruções do autor. " +
+                    "Se a biblioteca estiver desatualizada, você poderá instalar o ZIP manualmente.")
+                .setPositiveButton("Ver fonte") { _, _ -> openWeb(offer.sourceUrl) }
+                .setNegativeButton("Cancelar", null).show()
+            return
+        }
         MaterialAlertDialogBuilder(this).setTitle("Instalar: ${offer.title}?")
             .setMessage(
                 "${offer.source}\n\n${offer.description}\n\n" +
-                    "A versão do jogo e a licença do patch precisam ser verificadas por você. " +
+                    assessment.description + "\n\n" +
+                    "A versão efetiva do jogo e a licença do patch precisam ser verificadas por você. " +
                     "Arquivos serão validados antes de instalar e mods existentes não serão substituídos. " +
                     "ZIP/RAR de até 2 GiB são aceitos, com validação de conteúdo e espaço livre."
             )
@@ -299,7 +344,10 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                 val url = offer.downloadUrl ?: S25ModCatalog.gameBananaArchive(offer.gameBananaId)
                     ?: error("Sem ZIP direto válido. Abra a página do autor para instalar manualmente.")
                 inform("Conectando à fonte…")
-                zip = S25ModInstaller.download(applicationContext, url, ::inform)
+                zip = S25ModInstaller.download(
+                    applicationContext, url, ::inform,
+                    offer.expectedSizeBytes, offer.expectedSha256
+                )
                 inform("Validando estrutura do pacote…")
                 S25ModInstaller.install(applicationContext, zip!!, gameId, offer.title, ::inform)
             }
@@ -319,6 +367,53 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                     MaterialAlertDialogBuilder(this).setTitle("Download ou instalação não concluída")
                         .setMessage(ex.message ?: "Erro desconhecido.")
                         .setPositiveButton("OK", null).show()
+                }
+            }
+        }
+    }
+
+    private fun diagnoseMods() {
+        if (busy) return
+        busy = true
+        clearResults()
+        status.text = "Verificando arquivos dos mods ativos…"
+        executor.execute {
+            val result = runCatching {
+                val root = DirectoryInitialization.userDirectory
+                    ?: error("Pasta de dados do emulador indisponível.")
+                S25ModDiagnostics.inspect(java.io.File(root), gameId)
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                busy = false
+                clearResults()
+                result.onSuccess { report ->
+                    val lastObserved = DirectoryInitialization.userDirectory?.let {
+                        S25BuildIdStore.read(it, gameId)
+                    }
+                    status.text = "Diagnóstico concluído: ${report.activeMods} mods ativos, " +
+                        "${report.disabledMods} desativados, ${report.activeFiles} arquivos."
+                    if (report.conflicts.isEmpty()) label("Nenhuma colisão entre caminhos LayeredFS ativos detectada.")
+                    report.conflicts.take(12).forEach {
+                        label("Conflito: ${it.relativePath} · ${it.installedMod} / ${it.incomingMod}")
+                    }
+                    report.buildIdReferences.take(15).forEach {
+                        val historicalMatch = when {
+                            lastObserved == null -> "Build ID do NSO não capturado"
+                            lastObserved.cheatBuildId == it.buildId -> "igual ao último NSO registrado"
+                            else -> "DIFERENTE do último NSO registrado"
+                        }
+                        label("Build ID indicado por cheat: ${it.buildId} · ${it.modName} · $historicalMatch")
+                    }
+                    lastObserved?.let {
+                        label("Último NSO registrado: ${it.cheatBuildId}. " +
+                            "Essa observação pode estar desatualizada se o jogo foi atualizado.")
+                    }
+                    report.issues.take(15).forEach { label("Aviso: ${it.detail}") }
+                    label("Atenção: Build IDs encontrados em nomes de cheats NÃO são uma " +
+                        "leitura do executável ativo. A compatibilidade precisa ser validada com o jogo e o patch.", 12f)
+                }.onFailure { problem ->
+                    status.text = "Falha na auditoria: ${problem.message}"
                 }
             }
         }
@@ -369,5 +464,7 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_TITLE_ID = "s25_mod_title_id"
         const val EXTRA_GAME_TITLE = "s25_mod_game_title"
+        const val EXTRA_GAME_VERSION = "s25_mod_game_version"
+        const val EXTRA_ACTIVE_UPDATE = "s25_mod_active_update"
     }
 }

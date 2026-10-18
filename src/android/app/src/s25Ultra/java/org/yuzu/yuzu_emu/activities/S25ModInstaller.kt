@@ -18,12 +18,20 @@ internal object S25ModInstaller {
     private val FORBIDDEN_EXT = Regex("(?i)\\.(apk|exe|dll|so|dex|nsp|nsz|xci|xcz|nca|nro|bat|cmd|ps1|sh)$")
     private val TITLE_ID = Regex("(?i)^[a-f0-9]{16}$")
 
-    fun download(context: Context, url: String, progress: (String) -> Unit): File {
+    fun download(
+        context: Context, url: String, progress: (String) -> Unit,
+        expectedSizeBytes: Long? = null, expectedSha256: String? = null
+    ): File {
         require(S25ModCatalog.isApprovedUrl(url)) { "Host de download não autorizado." }
+        val verifier = S25DownloadVerifier(expectedSizeBytes, expectedSha256)
         val target = File.createTempFile("eden-mod-", ".zip", context.cacheDir)
         val connection = S25ModCatalog.connect(url)
         try {
             if (connection.contentLengthLong > MAX_DOWNLOAD) error(S25ArchiveLimits.archiveSizeError())
+            if (expectedSizeBytes != null && connection.contentLengthLong >= 0 &&
+                connection.contentLengthLong != expectedSizeBytes) {
+                error("Tamanho informado pelo servidor não corresponde ao release do autor.")
+            }
             S25ArchiveLimits.ensureAvailableSpace(
                 context.cacheDir, connection.contentLengthLong.coerceAtLeast(0L)
             )
@@ -36,8 +44,8 @@ internal object S25ModInstaller {
                     while (true) {
                         val n = input.read(buffer)
                         if (n < 0) break
+                        verifier.accept(buffer, n)
                         total += n
-                        if (total > MAX_DOWNLOAD) error(S25ArchiveLimits.archiveSizeError())
                         if (S25ArchiveLimits.shouldCheckSpace(total, lastSpaceCheck)) {
                             S25ArchiveLimits.ensureAvailableSpace(context.cacheDir, n.toLong())
                             lastSpaceCheck = total
@@ -48,7 +56,9 @@ internal object S25ModInstaller {
                             milestone = total
                         }
                     }
-                    if (total < 22) error("Arquivo ZIP vazio ou incompleto.")
+                    if (verifier.verify()) {
+                        progress("SHA-256 conferido com o release do autor.")
+                    }
                 }
             }
             target.inputStream().use { input ->
@@ -80,6 +90,7 @@ internal object S25ModInstaller {
         require(staging.mkdirs()) { "Não foi possível preparar a extração." }
         val stagedDirs = linkedSetOf<String>()
         val installed = mutableListOf<File>()
+        val recorded = mutableListOf<File>()
         try {
             S25ArchiveLimits.ensureAvailableSpace(staging)
             // ZIP central-directory inspection does not decompress large files.
@@ -174,13 +185,17 @@ internal object S25ModInstaller {
             plans.forEach { (_, destination) ->
                 if (destination.exists()) error("Mod '${destination.name}' já existe; não sobrescrito.")
             }
+            progress("Verificando conflitos entre mods ativos e novos…")
+            S25ModConflictScanner.requireNoConflicts(installRoot, plans.map { it.first })
             for ((source, destination) in plans) {
                 if (!source.renameTo(destination)) error("Não foi possível instalar '${destination.name}'.")
                 installed.add(destination)
             }
+            recorded.addAll(S25ModRegistry.record(File(userPath), titleId, installed))
             progress("Instalação concluída: ${installed.size} mod(s). Reinicie o jogo.")
             return installed.map { it.name }
         } catch (ex: Exception) {
+            recorded.forEach { it.delete() }
             // Only newly placed mod folders are removed, never existing content.
             installed.forEach { it.deleteRecursively() }
             throw ex
@@ -209,6 +224,9 @@ internal object S25ModInstaller {
         val destination = File(root, (if (enable) "load/" else "disabled_mods/") + "$titleId/$name")
         if (!source.isDirectory || !hasAddonContent(source)) error("Mod não encontrado.")
         if (destination.exists()) error("Já existe um mod de mesmo nome no destino.")
+        if (enable) {
+            S25ModConflictScanner.requireNoConflicts(File(root, "load/$titleId"), listOf(source))
+        }
         require(destination.parentFile?.isDirectory == true || destination.parentFile?.mkdirs() == true)
         if (!source.renameTo(destination)) error("Não foi possível mover o mod.")
     }

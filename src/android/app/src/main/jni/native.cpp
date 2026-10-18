@@ -331,6 +331,8 @@ Core::SystemResultStatus EmulationSession::InitializeEmulation(const std::string
                 : -1,
     };
 
+    // Never carry a previous title's NSO Build ID into a new game session.
+    m_system.SetApplicationProcessBuildID(Core::System::CurrentBuildProcessID{});
     m_load_result = m_system.Load(EmulationSession::GetInstance().Window(), filepath, params);
     if (m_load_result != Core::SystemResultStatus::Success) {
         return m_load_result;
@@ -1943,6 +1945,43 @@ JNIEXPORT jobject JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_checkForUpdate(
 }
 
 #endif
+
+/**
+ * Report the main NSO build ID stored by the loader for the running title.
+ * This is not an APK build version, and never derives from cheat filenames.
+ * Empty means unavailable or not initialized; callers must not guess.
+ */
+JNIEXPORT jstring JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getActiveProgramBuildId(
+        JNIEnv* env, [[maybe_unused]] jobject obj) {
+    const auto& system = EmulationSession::GetInstance().System();
+    const auto program_id = system.GetApplicationProcessProgramID();
+    if (program_id == 0) {
+        return env->NewStringUTF("");
+    }
+    const auto& build_id = system.GetApplicationProcessBuildID();
+    bool any_nonzero = false;
+    for (const auto byte : build_id) {
+        if (byte != 0) {
+            any_nonzero = true;
+            break;
+        }
+    }
+    if (!any_nonzero) {
+        return env->NewStringUTF("");
+    }
+    constexpr char hex[] = "0123456789ABCDEF";
+    std::string encoded;
+    encoded.reserve(16 + 1 + build_id.size() * 2);
+    for (int shift = 60; shift >= 0; shift -= 4) {
+        encoded.push_back(hex[(program_id >> shift) & 0xF]);
+    }
+    encoded.push_back(':');
+    for (const auto byte : build_id) {
+        encoded.push_back(hex[(byte >> 4) & 0xF]);
+        encoded.push_back(hex[byte & 0xF]);
+    }
+    return env->NewStringUTF(encoded.c_str());
+}
 
 JNIEXPORT jstring JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getBuildVersion(
         JNIEnv* env,

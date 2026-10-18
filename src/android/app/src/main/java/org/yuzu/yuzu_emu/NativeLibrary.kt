@@ -586,6 +586,11 @@ object NativeLibrary {
      */
     external fun getPatchesForFile(path: String, programId: String): Array<Patch>?
 
+    /** Read the running application's main NSO Build ID (not cheat filenames).
+     * Returns <TitleID>:<64-hex-byte-NSO-ID>, or an empty string when unavailable.
+     */
+    external fun getActiveProgramBuildId(): String
+
     /**
      * Removes an update for a given [programId]
      * @param programId String representation of a game's program ID
