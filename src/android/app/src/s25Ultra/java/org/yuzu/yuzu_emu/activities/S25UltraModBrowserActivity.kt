@@ -367,7 +367,7 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
             val result = runCatching {
                 val root = DirectoryInitialization.userDirectory
                     ?: error("Pasta de dados do emulador indisponível.")
-                S25ModDiagnostics.inspect(root, gameId)
+                S25ModDiagnostics.inspect(java.io.File(root), gameId)
             }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
