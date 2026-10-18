@@ -203,8 +203,8 @@ android {
             dimension = "version"
             minSdk = 35
             applicationId = "dev.eden.eden_emulator.s25ultra"
-            manifestPlaceholders += mapOf("appNameBase" to "Eden S25 Ultra")
-            resValue("string", "app_name_suffixed", "Eden S25 Ultra")
+            manifestPlaceholders += mapOf("appNameBase" to "ASTRYX")
+            resValue("string", "app_name_suffixed", "ASTRYX")
 
             ndk {
                 abiFilters += listOf("arm64-v8a")
@@ -283,7 +283,7 @@ android {
 
         // apply nightly suffix I/A
         resValue("string", "app_name_suffixed", "$currentName$suffix")
-        resValue("string", "app_name", "Eden$suffix")
+        resValue("string", "app_name", if (name == "s25Ultra") "ASTRYX$suffix" else "Eden$suffix")
     }
 
     sourceSets {
