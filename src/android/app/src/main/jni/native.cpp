@@ -331,6 +331,8 @@ Core::SystemResultStatus EmulationSession::InitializeEmulation(const std::string
                 : -1,
     };
 
+    // Never carry a previous title's NSO Build ID into a new game session.
+    m_system.SetApplicationProcessBuildID(Core::System::CurrentBuildProcessID{});
     m_load_result = m_system.Load(EmulationSession::GetInstance().Window(), filepath, params);
     if (m_load_result != Core::SystemResultStatus::Success) {
         return m_load_result;
