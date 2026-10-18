@@ -137,7 +137,14 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 busy = false
-                renderOffers(offers.distinctBy { it.sourceUrl }, warnings, translations)
+                // All CNX historical records share one catalog URL; preserve distinct
+                // entries for the same Title ID instead of dropping all but the first.
+                val uniqueOffers = offers.distinctBy { offer ->
+                    if (offer.source.startsWith("CNX histórico"))
+                        "${offer.sourceUrl}|${offer.title}"
+                    else offer.sourceUrl
+                }
+                renderOffers(uniqueOffers, warnings, translations)
             }
         }
     }
@@ -145,9 +152,11 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
     private fun renderOffers(offers: List<S25ModOffer>, warnings: List<String>, translations: Boolean) {
         clearResults()
         val archiveCount = offers.count { it.source.startsWith("CNX histórico") }
-        val activeSources = offers.size - archiveCount
+        val currentListings = offers.size - archiveCount
+        val directDownloads = offers.count { it.downloadUrl != null }
         status.text = if (translations) {
-            "Traduções para $gameTitle: $activeSources fonte(s) atual(is) encontrada(s)" +
+            "Traduções para $gameTitle: $currentListings publicação(ões) consultável(is)" +
+                " · $directDownloads link(s) de arquivo listado(s)" +
                 (if (archiveCount > 0) " · $archiveCount registro(s) histórico(s)" else "")
         } else {
             "Resultados para $gameTitle: ${offers.size}"
