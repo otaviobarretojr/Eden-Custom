@@ -6,6 +6,7 @@ import android.content.Context
 import org.yuzu.yuzu_emu.utils.DirectoryInitialization
 import java.io.File
 import java.util.Locale
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
 /** Download ZIP only; stage/validate before moving into the game's mod folder. */
@@ -81,6 +82,33 @@ internal object S25ModInstaller {
         val installed = mutableListOf<File>()
         try {
             S25ArchiveLimits.ensureAvailableSpace(staging)
+            // ZIP central-directory inspection does not decompress large files.
+            // It lets us detect nested/bare RomFS once, before extraction.
+            val layout = ZipFile(archive).use { zipFile ->
+                val names = mutableListOf<String>()
+                val items = zipFile.entries()
+                while (items.hasMoreElements()) {
+                    val item = items.nextElement()
+                    if (names.size >= MAX_ENTRIES) error("ZIP contém arquivos demais.")
+                    val raw = item.name.replace('\\', '/')
+                    if (raw.startsWith('/') || raw.contains('\u0000') ||
+                        raw.any { it.code in 1..31 }) {
+                        error("Caminho ZIP inválido.")
+                    }
+                    val parts = S25ModLayout.parts(raw)
+                    if (parts.any { it == "." || it == ".." || it.contains(':') }) {
+                        error("Caminho ZIP inseguro.")
+                    }
+                    if (parts.any { TITLE_ID.matches(it) && !it.equals(titleId, true) }) {
+                        error("O pacote contém um Title ID diferente do jogo.")
+                    }
+                    names.add(raw)
+                }
+                S25ModLayout.detect(titleId, names)
+            }
+            if (layout.isBareRomfs) {
+                progress("Estrutura RomFS do Pokémon Z-A detectada. Preparando pastas…")
+            }
             var total = 0L
             var lastSpaceCheck = 0L
             var entries = 0
@@ -97,13 +125,14 @@ internal object S25ModInstaller {
                     if (pieces.any { TITLE_ID.matches(it) && !it.equals(titleId, true) }) {
                         error("O pacote contém um Title ID diferente do jogo.")
                     }
-                    val pivot = pieces.indexOfFirst { it.lowercase(Locale.ROOT) in MOD_ROOTS }
-                    if (!entry.isDirectory && pivot >= 0 && pivot < pieces.lastIndex) {
+                    val suffix = layout.relativePath(raw)
+                    if (!entry.isDirectory && suffix != null) {
+                        val pivot = S25ModLayout.explicitPivot(pieces)
                         val parent = pieces.getOrNull(pivot - 1).orEmpty()
-                        val candidate = if (pivot == 0 || TITLE_ID.matches(parent) ||
-                            parent in setOf("mods", "contents", "load")) offerName else parent
+                        val candidate = if (layout.isBareRomfs || pivot == 0 ||
+                            TITLE_ID.matches(parent) || parent in setOf("mods", "contents", "load")
+                        ) offerName else parent
                         val modName = safeName(candidate)
-                        val suffix = pieces.drop(pivot).joinToString("/")
                         val out = File(staging, "$modName/$suffix")
                         val rootCanonical = staging.canonicalPath + File.separator
                         if (!out.canonicalPath.startsWith(rootCanonical)) error("Caminho fora da pasta temporária.")
@@ -134,7 +163,11 @@ internal object S25ModInstaller {
                 }
             }
             if (stagedDirs.isEmpty() || files == 0) {
-                error("ZIP não contém romfs/exefs/cheats apropriados para instalação.")
+                error(
+                    "ZIP sem estrutura LayeredFS reconhecida. Pokémon Z-A aceita romfs/ " +
+                        "ou as pastas arc/, audio/, ik_message/ e ui/ juntas em uma variante. " +
+                        "Confira se compactou a pasta correta."
+                )
             }
             if (!installRoot.isDirectory && !installRoot.mkdirs()) error("Pasta de mods inacessível.")
             val plans = stagedDirs.map { name -> File(staging, name) to File(installRoot, name) }
