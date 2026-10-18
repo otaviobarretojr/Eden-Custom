@@ -6,7 +6,6 @@ import android.content.Context
 import org.yuzu.yuzu_emu.utils.DirectoryInitialization
 import java.io.File
 import java.util.Locale
-import java.security.MessageDigest
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
@@ -24,12 +23,7 @@ internal object S25ModInstaller {
         expectedSizeBytes: Long? = null, expectedSha256: String? = null
     ): File {
         require(S25ModCatalog.isApprovedUrl(url)) { "Host de download não autorizado." }
-        require(expectedSizeBytes == null || expectedSizeBytes in 1..MAX_DOWNLOAD) {
-            "Tamanho esperado do download inválido."
-        }
-        require(expectedSha256 == null || Regex("^[a-fA-F0-9]{64}$").matches(expectedSha256)) {
-            "SHA-256 esperado inválido."
-        }
+        val verifier = S25DownloadVerifier(expectedSizeBytes, expectedSha256)
         val target = File.createTempFile("eden-mod-", ".zip", context.cacheDir)
         val connection = S25ModCatalog.connect(url)
         try {
@@ -38,7 +32,6 @@ internal object S25ModInstaller {
                 connection.contentLengthLong != expectedSizeBytes) {
                 error("Tamanho informado pelo servidor não corresponde ao release do autor.")
             }
-            val digest = if (expectedSha256 != null) MessageDigest.getInstance("SHA-256") else null
             S25ArchiveLimits.ensureAvailableSpace(
                 context.cacheDir, connection.contentLengthLong.coerceAtLeast(0L)
             )
@@ -51,30 +44,19 @@ internal object S25ModInstaller {
                     while (true) {
                         val n = input.read(buffer)
                         if (n < 0) break
+                        verifier.accept(buffer, n)
                         total += n
-                        if (total > MAX_DOWNLOAD) error(S25ArchiveLimits.archiveSizeError())
                         if (S25ArchiveLimits.shouldCheckSpace(total, lastSpaceCheck)) {
                             S25ArchiveLimits.ensureAvailableSpace(context.cacheDir, n.toLong())
                             lastSpaceCheck = total
                         }
                         output.write(buffer, 0, n)
-                        digest?.update(buffer, 0, n)
                         if (total - milestone >= 2L * 1024 * 1024) {
                             progress("Baixando: ${total / (1024 * 1024)} MiB")
                             milestone = total
                         }
                     }
-                    if (total < 22) error("Arquivo ZIP vazio ou incompleto.")
-                    if (expectedSizeBytes != null && total != expectedSizeBytes) {
-                        error("Download incompleto: recebido $total bytes; esperado $expectedSizeBytes.")
-                    }
-                    if (digest != null) {
-                        val actual = digest.digest().joinToString("") {
-                            (it.toInt() and 0xff).toString(16).padStart(2, '0')
-                        }
-                        if (!actual.equals(expectedSha256, ignoreCase = true)) {
-                            error("SHA-256 divergente: o arquivo baixado não corresponde ao release.")
-                        }
+                    if (verifier.verify()) {
                         progress("SHA-256 conferido com o release do autor.")
                     }
                 }
