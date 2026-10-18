@@ -202,7 +202,21 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                     "eden-ptbr-", if (isRar) ".rar" else ".zip", cacheDir
                 )
                 temp = file
-                S25ArchiveLimits.ensureAvailableSpace(cacheDir)
+                val expectedSize = runCatching {
+                    contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
+                        ?.use { cursor ->
+                            val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+                            if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) {
+                                cursor.getLong(index)
+                            } else {
+                                -1L
+                            }
+                        }
+                }.getOrNull() ?: -1L
+                if (expectedSize > S25ArchiveLimits.MAX_ARCHIVE_BYTES) {
+                    error(S25ArchiveLimits.archiveSizeError())
+                }
+                S25ArchiveLimits.ensureAvailableSpace(cacheDir, expectedSize.coerceAtLeast(0L))
                 val stream = contentResolver.openInputStream(uri) ?: error("Arquivo não acessível.")
                 stream.use { input ->
                     file.outputStream().buffered().use { output ->
