@@ -292,19 +292,18 @@
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/add_directory"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="18dp"
         android:layout_height="52dp"
+        android:layout_margin="18dp"
         android:textSize="14sp"
         android:contentDescription="@string/astryx_add_folder"
         android:text="@string/astryx_add_folder"
         app:icon="@drawable/ic_cartridge_outline"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:textColor="?attr/colorOnPrimary"
-        app:backgroundTint="?attr/colorPrimary"
-        app:iconTint="?attr/colorOnPrimary"
-        app:rippleColor="#99FFFFFF"
+        android:textColor="@color/astryx_library_text"
+        app:backgroundTint="@color/astryx_library_panel"
+        app:iconTint="@color/astryx_cyan"
+        app:rippleColor="@color/astryx_library_ripple"
         />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
