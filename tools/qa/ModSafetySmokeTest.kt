@@ -73,7 +73,41 @@ fun main() {
 
         check(runCatching { S25DownloadVerifier(-1L, null) }.isFailure)
         check(runCatching { S25DownloadVerifier(null, "not a sha") }.isFailure)
-        println("PASS: mod safety, version requirements, release digest and streaming integrity")
+
+        // Read-only diagnostics: detect pre-existing collisions, report cheat
+        // Build IDs only as unverified references, and count disabled mods.
+        old.resolve("cheats/ABCDEF0123456789.txt")
+            .apply { parentFile.mkdirs(); writeText("[test]\n00000000 00000001\n") }
+        val second = active.resolve("OtherActive").also { it.mkdirs() }
+        second.resolve("romfs/ui/phrase.txt").apply {
+            parentFile.mkdirs()
+            writeText("other")
+        }
+        second.resolve("cheats/0123456789ABCDEF.txt").apply {
+            parentFile.mkdirs()
+            writeText("[test]\n00000000 00000001\n")
+        }
+        val report = S25ModDiagnostics.inspect(home, "0100F43008C44000")
+        check(report.activeMods == 2)
+        check(report.disabledMods == 1)
+        check(report.activeFiles == 4)
+        check(report.conflicts.size == 1 && report.conflicts[0].relativePath == "romfs/ui/phrase.txt")
+        check(report.buildIdReferences.map { it.buildId }.toSet() ==
+            setOf("ABCDEF0123456789", "0123456789ABCDEF"))
+        check(report.issues.any { it.kind == "BUILD_ID_UNVERIFIED" })
+        check(report.issues.any { it.kind == "MULTIPLE_CHEAT_BUILD_IDS" })
+        check(report.issues.any { it.kind == "FILE_CONFLICT" })
+
+        val emptyGame = S25ModDiagnostics.inspect(home, "0100000000010000")
+        check(emptyGame.activeMods == 0 && emptyGame.conflicts.isEmpty())
+        val suspicious = home.resolve("load/0100000000010000").also { it.mkdirs() }
+        val link = suspicious.resolve("symlink")
+        if (runCatching { Files.createSymbolicLink(link.toPath(), home.toPath()) }.isSuccess) {
+            check(runCatching {
+                S25ModDiagnostics.inspect(home, "0100000000010000")
+            }.isFailure)
+        }
+        println("PASS: mod diagnostics, conflicts, Build ID references, download integrity, version checks")
     } finally {
         home.deleteRecursively()
     }
