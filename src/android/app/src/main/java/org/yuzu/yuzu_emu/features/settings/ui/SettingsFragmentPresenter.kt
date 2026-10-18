@@ -54,6 +54,45 @@ class SettingsFragmentPresenter(
 
     private var postProcessingSynced = false
 
+    // This is a display-only filter: native values, INI files, defaults,
+    // feature flags and per-game settings remain completely unchanged.
+    private var astryxConciseMode = false
+
+    fun setAstryxConciseMode(enabled: Boolean) {
+        if (astryxConciseMode != enabled) {
+            astryxConciseMode = enabled
+            loadSettingsList()
+        }
+    }
+
+    private fun filterAstryxEssential(items: List<SettingsItem>): List<SettingsItem> {
+        val essentials = when (menuTag) {
+            MenuTag.SECTION_RENDERER -> setOf(
+                IntSetting.RENDERER_RESOLUTION.key,
+                IntSetting.RENDERER_VSYNC.key,
+                IntSetting.RENDERER_SCALING_FILTER.key,
+                IntSetting.FSR_SHARPENING_SLIDER.key,
+                IntSetting.RENDERER_ANTI_ALIASING.key,
+                IntSetting.RENDERER_ACCURACY.key,
+                IntSetting.RENDERER_ASTC_DECODE_METHOD.key,
+                BooleanSetting.RENDERER_USE_DISK_SHADER_CACHE.key,
+                BooleanSetting.RENDERER_ASYNCHRONOUS_SHADERS.key,
+                BooleanSetting.RENDERER_ASYNCHRONOUS_GPU_EMULATION.key,
+                IntSetting.RENDERER_ASPECT_RATIO.key
+            )
+            MenuTag.SECTION_SYSTEM -> setOf(
+                StringSetting.DEVICE_NAME.key,
+                BooleanSetting.RENDERER_USE_SPEED_LIMIT.key,
+                ShortSetting.RENDERER_SPEED_LIMIT.key,
+                BooleanSetting.USE_DOCKED_MODE.key,
+                IntSetting.REGION_INDEX.key,
+                IntSetting.LANGUAGE_INDEX.key
+            )
+            else -> return items
+        }
+        return items.filter { it.type != SettingsItem.TYPE_HEADER && it.setting.key in essentials }
+    }
+
     private val context get() = YuzuApplication.appContext
 
     // Extension for altering settings list based on each setting's properties
@@ -192,7 +231,11 @@ class SettingsFragmentPresenter(
             MenuTag.SECTION_APPLETS -> addAppletSettings(sl)
             MenuTag.SECTION_CUSTOM_PATHS -> addCustomPathsSettings(sl)
         }
-        settingsList = sl
+        settingsList = if (astryxConciseMode) {
+            ArrayList(filterAstryxEssential(sl))
+        } else {
+            sl
+        }
         adapter.submitList(settingsList) {
             if (notifyDataSetChanged) {
                 adapter.notifyDataSetChanged()
