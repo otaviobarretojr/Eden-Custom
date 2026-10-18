@@ -71,6 +71,20 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
             "Atualização habilitada (gerenciador): " +
                 activeUpdateDescription.ifBlank { "não identificada" } +
                 ". Build ID do executável: não confirmado.", 12f))
+        val priorBuildId = runCatching {
+            DirectoryInitialization.userDirectory?.let { S25BuildIdStore.read(it, gameId) }
+        }.getOrNull()
+        body.addView(caption(
+            if (priorBuildId != null) {
+                "Último Build ID real do NSO: " + priorBuildId.cheatBuildId +
+                    " (capturado em " +
+                    java.text.DateFormat.getDateTimeInstance().format(
+                        java.util.Date(priorBuildId.capturedAtEpochMs)) +
+                    "). Registro histórico; abra o jogo novamente para atualizar."
+            } else {
+                "Build ID real do NSO ainda não capturado. Abra o jogo ao menos uma vez " +
+                    "nesta versão para registrar o executável carregado."
+            }, 12f))
         body.addView(caption(
             "Downloads de patches da comunidade. Não inclui jogos, DLCs, firmware ou chaves. " +
                 "Sempre confira a versão do jogo e a autoria do mod.", 14f))
@@ -374,6 +388,9 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                 busy = false
                 clearResults()
                 result.onSuccess { report ->
+                    val lastObserved = DirectoryInitialization.userDirectory?.let {
+                        S25BuildIdStore.read(it, gameId)
+                    }
                     status.text = "Diagnóstico concluído: ${report.activeMods} mods ativos, " +
                         "${report.disabledMods} desativados, ${report.activeFiles} arquivos."
                     if (report.conflicts.isEmpty()) label("Nenhuma colisão entre caminhos LayeredFS ativos detectada.")
@@ -381,7 +398,16 @@ class S25UltraModBrowserActivity : AppCompatActivity() {
                         label("Conflito: ${it.relativePath} · ${it.installedMod} / ${it.incomingMod}")
                     }
                     report.buildIdReferences.take(15).forEach {
-                        label("Build ID indicado por cheat: ${it.buildId} · ${it.modName}")
+                        val historicalMatch = when {
+                            lastObserved == null -> "Build ID do NSO não capturado"
+                            lastObserved.cheatBuildId == it.buildId -> "igual ao último NSO registrado"
+                            else -> "DIFERENTE do último NSO registrado"
+                        }
+                        label("Build ID indicado por cheat: ${it.buildId} · ${it.modName} · $historicalMatch")
+                    }
+                    lastObserved?.let {
+                        label("Último NSO registrado: ${it.cheatBuildId}. " +
+                            "Essa observação pode estar desatualizada se o jogo foi atualizado.")
                     }
                     report.issues.take(15).forEach { label("Aviso: ${it.detail}") }
                     label("Atenção: Build IDs encontrados em nomes de cheats NÃO são uma " +
