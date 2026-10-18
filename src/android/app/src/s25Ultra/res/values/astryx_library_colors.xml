@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Library-only colors: no global theme override or change to other Eden flavors. -->
+    <color name="astryx_library_panel">#111B2B</color>
+    <color name="astryx_library_border">#34445D</color>
+    <color name="astryx_library_subtle">#A6B9CE</color>
+    <color name="astryx_library_text">#F3F8FF</color>
+    <color name="astryx_library_ripple">#5533CAEF</color>
+</resources>
