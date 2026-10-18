@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni WebView JS Bridge V3
+name: ASTRYX Ni no Kuni WebView JS Diagnostics V4
 
 on:
   workflow_dispatch:
@@ -10,6 +10,7 @@ on:
       - fix/astryx-ni-no-kuni-offline-applet-v1
       - fix/astryx-ni-no-kuni-webview-v2
       - fix/astryx-ni-no-kuni-webview-v3
+      - fix/astryx-ni-no-kuni-webview-v4-diagnostics
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -192,7 +193,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-NiNoKuni-WebView-v3-test-APK
+          name: ASTRYX-NiNoKuni-WebView-v4-diagnostics-test-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
