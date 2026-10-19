@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni VFS3 Record Layout V11
+name: ASTRYX Ni no Kuni VFS3 V1 Layout V12
 
 on:
   workflow_dispatch:
@@ -18,6 +18,7 @@ on:
       - fix/astryx-ni-no-kuni-v9-vfs3-header-audit
       - fix/astryx-ni-no-kuni-v10-vfs3-index-probe
       - fix/astryx-ni-no-kuni-v11-vfs3-record-layout
+      - fix/astryx-ni-no-kuni-v12-vfs3-v1-correct-layout
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -264,35 +265,21 @@ jobs:
             echo "Unsafe archive write detected"; exit 1
           fi
 
-      - name: Verify VFS3 index metadata probe is bounded and read-only
+      - name: Verify documented VFS3 V1 folder and file layout
         run: |
           set -euo pipefail
           PATCH="src/core/file_sys/patch_manager.cpp"
-          grep -Fq 'candidateVersion == 1' "$PATCH"
-          grep -Fq 'candidateDirCount <= 100000' "$PATCH"
-          grep -Fq 'candidateFileCount <= 1000000' "$PATCH"
-          grep -Fq '(archiveSize - fileTablePos) / kFileEntrySize' "$PATCH"
-          grep -Fq '[ASTRYX VFS3 Index] file_count_candidate=' "$PATCH"
-          grep -Fq '[ASTRYX VFS3 Index] first_file rel_offset=' "$PATCH"
-          grep -Fq '[ASTRYX VFS3 Index] table_end=' "$PATCH"
+          grep -Fq 'constexpr u64 kFolderEntryBytes = 20;' "$PATCH"
+          grep -Fq 'constexpr u64 kFileEntryBytes = 24;' "$PATCH"
+          grep -Fq 'const u64 fileCountOffset =' "$PATCH"
+          grep -Fq 'const u64 namesPointerPos = fileTableStart + fileTableBytes;' "$PATCH"
+          grep -Fq 'archiveHas(fileTableStart, fileTableBytes)' "$PATCH"
+          grep -Fq 'validNamesPointer' "$PATCH"
+          grep -Fq '[ASTRYX VFS3 V1] file_names_count=' "$PATCH"
+          grep -Fq 'within_payload={}' "$PATCH"
           grep -Fq 'title_id == kNiNoKuniId' "$PATCH"
           if grep -E 'originalDataVfs->(Write|Resize|Rename|Delete)' "$PATCH"; then
-            echo "Unsafe data.vfs write detected"; exit 1
-          fi
-
-      - name: Verify VFS3 bounded multi-stride metadata probe
-        run: |
-          set -euo pipefail
-          PATCH="src/core/file_sys/patch_manager.cpp"
-          grep -Fq '24, 28, 32, 36, 40, 44, 48' "$PATCH"
-          grep -Fq 'candidateFileCount <= 1000000' "$PATCH"
-          grep -Fq '(archiveSize - fileTablePos) / candidateRecordSize' "$PATCH"
-          grep -Fq '[ASTRYX VFS3 Record] entry_size=' "$PATCH"
-          grep -Fq '[ASTRYX VFS3 Record] first_file' "$PATCH"
-          grep -Fq 'namesCandidate > chunksCandidate' "$PATCH"
-          grep -Fq 'title_id == kNiNoKuniId' "$PATCH"
-          if grep -E 'originalDataVfs->(Write|Resize|Rename|Delete)' "$PATCH"; then
-            echo "Unsafe data.vfs write detected"; exit 1
+            echo "Unsafe VFS3 archive write detected"; exit 1
           fi
 
       - name: Build S25 Ultra variant
@@ -337,7 +324,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-v11-NiNoKuni-VFS3-Record-Layout-APK
+          name: ASTRYX-v12-NiNoKuni-VFS3-V1-Layout-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
