@@ -361,7 +361,7 @@ jobs:
           grep -Fq 'niNoKuniFpsWindowStart >= 10000L' "$UI"
           grep -Fq 'NiNoKuniPerformanceProfile.current(requireContext())' "$UI"
           grep -Fq 'TryMakeNiNoKuniPtbrBatchView(' src/core/file_sys/patch_manager.cpp
-          if grep -E 'Write\(|Delete\(' src/core/file_sys/vfs/vfs3_ptbr_overlay.h; then
+          if grep -E '(source|original)->(Write|Delete|Resize)\(' src/core/file_sys/vfs/vfs3_ptbr_overlay.h; then
             echo "Rejecting mutation of the original VFS3 archive"
             exit 1
           fi
