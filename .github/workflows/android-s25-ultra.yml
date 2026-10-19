@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni WebView JS Diagnostics V4
+name: ASTRYX Ni no Kuni EULA and Log Download V5
 
 on:
   workflow_dispatch:
@@ -11,6 +11,7 @@ on:
       - fix/astryx-ni-no-kuni-webview-v2
       - fix/astryx-ni-no-kuni-webview-v3
       - fix/astryx-ni-no-kuni-webview-v4-diagnostics
+      - fix/astryx-ni-no-kuni-webview-v5-download-logs
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -154,6 +155,32 @@ jobs:
           grep -Fq 'EndButtonPressed' "$CPP"
           grep -Fq 'webkit:1.12.1' "$GRADLE"
 
+      - name: Verify offline EULA XHR compatibility and safe log downloads
+        run: |
+          set -euo pipefail
+          WEB="src/android/app/src/main/java/org/yuzu/yuzu_emu/applets/web/WebBrowser.kt"
+          SETTINGS="src/android/app/src/main/java/org/yuzu/yuzu_emu/fragments/HomeSettingsFragment.kt"
+          PT="src/android/app/src/main/res/values-pt-rBR/strings.xml"
+          grep -Fq 'WebViewAssetLoader.Builder()' "$WEB"
+          grep -Fq 'offlineLoader.shouldInterceptRequest(target)' "$WEB"
+          grep -Fq 'allowFileAccess = false' "$WEB"
+          grep -Fq 'allowFileAccessFromFileURLs = false' "$WEB"
+          grep -Fq 'allowUniversalAccessFromFileURLs = false' "$WEB"
+          grep -Fq 'blockNetworkLoads = true' "$WEB"
+          grep -Fq 'browser.loadUrl("https://$offlineHost$offlinePrefix$relativeUrl$suffix")' "$WEB"
+          if grep -Fq 'browser.loadUrl(Uri.fromFile(document)' "$WEB"; then
+            echo "Legacy file URL navigation remains"; exit 1
+          fi
+          grep -Fq 'MediaStore.Downloads.EXTERNAL_CONTENT_URI' "$SETTINGS"
+          grep -Fq 'MediaStore.MediaColumns.IS_PENDING' "$SETTINGS"
+          grep -Fq 'writeLogDocument(source, fileName)' "$SETTINGS"
+          grep -Fq 'R.string.log_download_success' "$SETTINGS"
+          grep -Fq 'Baixar log de depuração' "$PT"
+          if grep -Fq 'Intent.createChooser(intent, getText(R.string.share_log))' "$SETTINGS" ||
+             grep -Fq 'Intent.createChooser(intent, getText(R.string.share_gpu_log))' "$SETTINGS"; then
+            echo "Legacy Android sharesheet still used for logs"; exit 1
+          fi
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -196,7 +223,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-NiNoKuni-WebView-v4-diagnostics-test-APK
+          name: ASTRYX-v5-EULA-LogDownload-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
