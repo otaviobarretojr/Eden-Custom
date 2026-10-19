@@ -549,14 +549,55 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
     std::vector<VirtualDir> layers_ext;
     layers.reserve(patch_dirs.size() + 1);
     layers_ext.reserve(patch_dirs.size() + 1);
+    // Diagnostic only: Ni no Kuni (0100E5600D446000) official base + PKG PT-BR.
+    // Record whether its difficulty-menu resource exists in each source layer,
+    // in the original RomFS, and in the final merged view. Never dump game data.
+    constexpr u64 kNiNoKuniId = 0x0100E5600D446000ULL;
+    constexpr std::string_view kTitleMenuAsset =
+        "data/menu/gui/titleMenu02/titleMenu02_en.mnupak";
+    const bool auditNiNoKuni = title_id == kNiNoKuniId &&
+                              type == ContentRecordType::Program;
+    const auto auditTitleMenu = [&](std::string_view origin, const VirtualDir& directory) {
+        if (!auditNiNoKuni || !directory) {
+            return;
+        }
+        const auto file = directory->GetFileRelative(kTitleMenuAsset);
+        if (!file) {
+            LOG_INFO(Loader, "[ASTRYX PTBR Audit] {}: titleMenu02_en.mnupak missing", origin);
+            return;
+        }
+        const auto size = file->GetSize();
+        bool containsPtEasy = false;
+        bool containsEnEasy = false;
+        if (size > 0 && size <= 4 * 1024 * 1024) {
+            const auto bytes = file->ReadAllBytes();
+            constexpr std::array<u8, 6> portugueseEasy{
+                'F', 0xC3, 0xA1, 'c', 'i', 'l'};
+            constexpr std::array<u8, 4> englishEasy{'E', 'a', 's', 'y'};
+            containsPtEasy =
+                std::search(bytes.begin(), bytes.end(), portugueseEasy.begin(),
+                            portugueseEasy.end()) != bytes.end();
+            containsEnEasy =
+                std::search(bytes.begin(), bytes.end(), englishEasy.begin(),
+                            englishEasy.end()) != bytes.end();
+        }
+        LOG_INFO(Loader,
+                 "[ASTRYX PTBR Audit] {}: titleMenu02_en.mnupak size={} "
+                 "contains_pt_easy={} contains_en_easy={}",
+                 origin, size, containsPtEasy, containsEnEasy);
+    };
     for (const auto& subdir : patch_dirs) {
         if (std::find(disabled.cbegin(), disabled.cend(), subdir->GetName()) != disabled.cend()) {
             continue;
         }
 
         auto romfs_dir = FindSubdirectoryCaseless(subdir, "romfs");
-        if (romfs_dir != nullptr)
+        if (romfs_dir != nullptr) {
+            if (auditNiNoKuni) {
+                auditTitleMenu(subdir->GetName(), romfs_dir);
+            }
             layers.emplace_back(std::make_shared<CachedVfsDirectory>(std::move(romfs_dir)));
+        }
 
         // Support for romfslite introduced in Atmosphere 1.9.5
         auto romfslite_dir = FindSubdirectoryCaseless(subdir, "romfslite");
@@ -584,6 +625,9 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
         return;
     }
 
+    if (auditNiNoKuni) {
+        auditTitleMenu("original RomFS", extracted);
+    }
     layers.emplace_back(std::move(extracted));
 
     auto layered = LayeredVfsDirectory::MakeLayeredDirectory(std::move(layers));
@@ -592,6 +636,9 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
         return;
     }
 
+    if (auditNiNoKuni) {
+        auditTitleMenu("merged LayeredFS", layered);
+    }
     auto packed = CreateRomFS(std::move(layered), std::move(layered_ext));
     if (packed == nullptr) {
         return;
