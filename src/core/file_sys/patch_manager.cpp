@@ -8,6 +8,7 @@
 #include <array>
 #include <cstddef>
 #include <cstring>
+#include <vector>
 
 #include "common/assert.h"
 #include "common/hex_util.h"
@@ -722,6 +723,183 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
                                              nameCount, nameCount == fileCount);
                                 }
                             }
+                            // Targeted Ni no Kuni archive path resolution. The
+                            // QuickBMS VFS3 v1 names table uses an LE32 count
+                            // and LE32 byte-length-prefixed strings. Read at
+                            // most 4 MiB of metadata, never resource payloads.
+                            if (validNamesPointer) {
+                                constexpr u64 kMaxNameTableBytes = 4 * 1024 * 1024;
+                                const u64 nameTableLen = archiveSize - namesOffset;
+                                if (nameTableLen <= kMaxNameTableBytes) {
+                                    std::vector<u8> table(static_cast<std::size_t>(nameTableLen));
+                                    if (originalDataVfs->Read(table.data(), table.size(),
+                                                              namesOffset) == table.size()) {
+                                        std::size_t cursor = 0;
+                                        const auto readTableU32 = [&](u32& val) -> bool {
+                                            if (cursor > table.size() ||
+                                                table.size() - cursor < 4) {
+                                                return false;
+                                            }
+                                            val = static_cast<u32>(table[cursor]) |
+                                                  (static_cast<u32>(table[cursor + 1]) << 8) |
+                                                  (static_cast<u32>(table[cursor + 2]) << 16) |
+                                                  (static_cast<u32>(table[cursor + 3]) << 24);
+                                            cursor += 4;
+                                            return true;
+                                        };
+                                        const auto readTableName = [&](std::string& val) -> bool {
+                                            u32 nameLen = 0;
+                                            if (!readTableU32(nameLen) || nameLen > 4096 ||
+                                                cursor > table.size() ||
+                                                nameLen > table.size() - cursor) {
+                                                return false;
+                                            }
+                                            val.assign(reinterpret_cast<const char*>(
+                                                           table.data() + cursor), nameLen);
+                                            while (!val.empty() && val.back() == '\0') {
+                                                val.pop_back();
+                                            }
+                                            cursor += nameLen;
+                                            return true;
+                                        };
+                                        u32 tableFileCount = 0;
+                                        bool namesValid = readTableU32(tableFileCount) &&
+                                                          tableFileCount == fileCount;
+                                        std::vector<u32> targetFileIds;
+                                        if (namesValid) {
+                                            for (u32 id = 0; id < tableFileCount; ++id) {
+                                                std::string fileName;
+                                                if (!readTableName(fileName)) {
+                                                    namesValid = false;
+                                                    break;
+                                                }
+                                                if (fileName.find("titleMenu02_en.mnupak") !=
+                                                        std::string::npos &&
+                                                    targetFileIds.size() < 8) {
+                                                    targetFileIds.push_back(id);
+                                                }
+                                            }
+                                        }
+                                        u32 tableFolderCount = 0;
+                                        if (namesValid) {
+                                            namesValid = readTableU32(tableFolderCount) &&
+                                                         tableFolderCount <= 100000;
+                                        }
+                                        std::vector<std::string> folderNames;
+                                        if (namesValid) {
+                                            folderNames.reserve(tableFolderCount);
+                                            for (u32 id = 0; id < tableFolderCount; ++id) {
+                                                std::string name;
+                                                if (!readTableName(name)) {
+                                                    namesValid = false;
+                                                    break;
+                                                }
+                                                folderNames.emplace_back(std::move(name));
+                                            }
+                                        }
+                                        LOG_INFO(Loader,
+                                                 "[ASTRYX VFS3 Names] parsed={} files={} "
+                                                 "folders={} menu_name_matches={}",
+                                                 namesValid, tableFileCount, tableFolderCount,
+                                                 targetFileIds.size());
+                                        if (namesValid && !targetFileIds.empty()) {
+                                            constexpr std::size_t kBatchEntries = 256;
+                                            std::array<u8, kBatchEntries * 24> records{};
+                                            u32 matchesLogged = 0;
+                                            for (u32 start = 0; start < fileCount &&
+                                                              matchesLogged < targetFileIds.size();
+                                                 start += kBatchEntries) {
+                                                const std::size_t count =
+                                                    std::min<std::size_t>(kBatchEntries,
+                                                                          fileCount - start);
+                                                const u64 pos = fileTableStart +
+                                                                static_cast<u64>(start) * 24;
+                                                const std::size_t bytes = count * 24;
+                                                if (originalDataVfs->Read(records.data(), bytes,
+                                                                          pos) != bytes) {
+                                                    break;
+                                                }
+                                                const auto recordU32 = [&](std::size_t off) -> u32 {
+                                                    return static_cast<u32>(records[off]) |
+                                                           (static_cast<u32>(records[off + 1]) << 8) |
+                                                           (static_cast<u32>(records[off + 2]) << 16) |
+                                                           (static_cast<u32>(records[off + 3]) << 24);
+                                                };
+                                                for (std::size_t j = 0; j < count; ++j) {
+                                                    const std::size_t off = j * 24;
+                                                    const u32 entryFileId = recordU32(off + 4);
+                                                    if (std::find(targetFileIds.begin(),
+                                                                  targetFileIds.end(), entryFileId) ==
+                                                        targetFileIds.end()) {
+                                                        continue;
+                                                    }
+                                                    const u32 flags = recordU32(off + 8);
+                                                    const u32 folderId = recordU32(off + 12);
+                                                    const u32 offset = recordU32(off + 16);
+                                                    const u32 size = recordU32(off + 20);
+                                                    std::string folderPath;
+                                                    u32 current = folderId;
+                                                    u32 depth = 0;
+                                                    while (current != 0xffffffff &&
+                                                           current < folderCount && depth < 64) {
+                                                        std::array<u8, 20> folder{};
+                                                        const u64 folderPos =
+                                                            kFolderTableStart +
+                                                            static_cast<u64>(current) * 20;
+                                                        if (originalDataVfs->Read(folder.data(),
+                                                                                  folder.size(),
+                                                                                  folderPos) !=
+                                                            folder.size()) {
+                                                            break;
+                                                        }
+                                                        const auto folderU32 = [&](std::size_t o) {
+                                                            return static_cast<u32>(folder[o]) |
+                                                                (static_cast<u32>(folder[o + 1]) << 8) |
+                                                                (static_cast<u32>(folder[o + 2]) << 16) |
+                                                                (static_cast<u32>(folder[o + 3]) << 24);
+                                                        };
+                                                        const u32 folderNameId = folderU32(4);
+                                                        if (folderNameId >= folderNames.size()) {
+                                                            break;
+                                                        }
+                                                        const auto& folderName =
+                                                            folderNames[folderNameId];
+                                                        if (!folderName.empty()) {
+                                                            folderPath = folderName +
+                                                                         (folderPath.empty() ? "" : "/") +
+                                                                         folderPath;
+                                                        }
+                                                        current = folderU32(8);
+                                                        ++depth;
+                                                    }
+                                                    if (folderPath.size() > 256) {
+                                                        folderPath.resize(256);
+                                                    }
+                                                    const u64 absoluteOffset =
+                                                        dataBaseOffset + static_cast<u64>(offset);
+                                                    LOG_INFO(Loader,
+                                                             "[ASTRYX VFS3 Names] menu_file_id={} "
+                                                             "table_index={} dir={} flags={} "
+                                                             "rel_offset={} size={} data_valid={}",
+                                                             entryFileId, start + j, folderPath,
+                                                             flags, offset, size,
+                                                             archiveHas(absoluteOffset, size) &&
+                                                                 absoluteOffset + size <= namesOffset);
+                                                    ++matchesLogged;
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        LOG_WARNING(Loader,
+                                                    "[ASTRYX VFS3 Names] metadata read failed");
+                                    }
+                                } else {
+                                    LOG_INFO(Loader,
+                                             "[ASTRYX VFS3 Names] name table too large: {} bytes",
+                                             nameTableLen);
+                                }
+                            }
+
                             for (u32 idx = 0; idx < std::min<u32>(fileCount, 3); ++idx) {
                                 const u64 pos =
                                     fileTableStart + static_cast<u64>(idx) * kFileEntryBytes;
