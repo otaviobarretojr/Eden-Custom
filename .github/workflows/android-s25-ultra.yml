@@ -56,11 +56,31 @@ jobs:
 
       - name: Install Android build dependencies
         run: |
+          set -euo pipefail
           sdkmanager --install \
             "platforms;android-36" \
             "build-tools;36.0.0" \
-            "ndk;28.2.13676358" \
             "cmake;3.31.6"
+
+          # The hosted runner occasionally receives a truncated NDK ZIP.
+          # Retry only this pinned package, clearing partial installs between attempts.
+          NDK_VERSION="28.2.13676358"
+          NDK_DIR="$ANDROID_HOME/ndk/$NDK_VERSION"
+          for attempt in 1 2 3; do
+            echo "Installing Android NDK $NDK_VERSION (attempt $attempt/3)"
+            if sdkmanager --install "ndk;$NDK_VERSION" &&
+               test -s "$NDK_DIR/source.properties" &&
+               test -x "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"; then
+              echo "Verified pinned NDK $NDK_VERSION"
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Failed to install NDK $NDK_VERSION after three attempts"
+              exit 1
+            fi
+            rm -rf "$NDK_DIR"
+            sleep $((attempt * 10))
+          done
 
       - name: Build pinned MIT licensed NSZ converter for Android ARM64
         run: |
