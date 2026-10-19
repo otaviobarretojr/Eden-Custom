@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni EULA and Log Download V5
+name: ASTRYX Ni no Kuni EULA Interaction V6
 
 on:
   workflow_dispatch:
@@ -12,6 +12,7 @@ on:
       - fix/astryx-ni-no-kuni-webview-v3
       - fix/astryx-ni-no-kuni-webview-v4-diagnostics
       - fix/astryx-ni-no-kuni-webview-v5-download-logs
+      - fix/astryx-ni-no-kuni-v6-eula-interaction
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -181,6 +182,22 @@ jobs:
             echo "Legacy Android sharesheet still used for logs"; exit 1
           fi
 
+      - name: Verify Ni no Kuni explicit EULA input and completion
+        run: |
+          set -euo pipefail
+          WEB="src/android/app/src/main/java/org/yuzu/yuzu_emu/applets/web/WebBrowser.kt"
+          grep -Fq '.setPositiveButton("A · Selecionar", null)' "$WEB"
+          grep -Fq 'window.yuzu_key_callbacks[0]' "$WEB"
+          grep -Fq 'window.yuzu_footer_labels' "$WEB"
+          grep -Fq 'User invoked game' "$WEB"
+          grep -Fq 'KeyEvent.KEYCODE_ENTER' "$WEB"
+          grep -Fq 'aButton.isEnabled = false' "$WEB"
+          grep -Fq 'window.nx.endApplet completed' "$WEB"
+          grep -Fq 'outcome.set("end")' "$WEB"
+          if grep -Fq 'User pressed return-to-game button' "$WEB"; then
+            echo "Old premature applet dismissal is still enabled"; exit 1
+          fi
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -223,7 +240,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-v5-EULA-LogDownload-APK
+          name: ASTRYX-v6-NiNoKuni-EULA-Interaction-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
