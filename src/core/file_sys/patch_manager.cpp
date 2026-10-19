@@ -661,167 +661,114 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
                          headerWord32(16), headerWord32(20), headerWord32(24),
                          headerWord32(28), headerWord32(32));
 
-                // VFS3 version 1 appears to omit the extra field used by newer variants.
-                // Probe only index metadata at the predicted boundary; never extract
-                // archived file content or mutate data.vfs. Reject implausible lengths.
-                const auto candidateVersion = headerWord32(4);
-                const auto candidateDirCount = headerWord32(8);
-                if (candidateVersion == 1 && candidateDirCount > 0 &&
-                    candidateDirCount <= 100000) {
-                    constexpr std::size_t kDirEntrySize = 28;
-                    constexpr std::size_t kFileEntrySize = 40;
-                    constexpr std::size_t kDirTableStart = 12;
-                    const std::size_t fileCountPos =
-                        kDirTableStart + static_cast<std::size_t>(candidateDirCount) * kDirEntrySize;
-                    LOG_INFO(Loader, "[ASTRYX VFS3 Index] v1_candidate dirs={} "
-                             "file_count_offset={}",
-                             candidateDirCount, fileCountPos);
-                    if (fileCountPos <= archiveSize &&
-                        archiveSize - fileCountPos >= sizeof(u32)) {
-                        std::array<u8, 4> countBytes{};
-                        const auto countRead =
-                            originalDataVfs->Read(countBytes.data(), countBytes.size(), fileCountPos);
-                        if (countRead == countBytes.size()) {
-                            const auto candidateFileCount =
-                                static_cast<u32>(countBytes[0]) |
-                                (static_cast<u32>(countBytes[1]) << 8) |
-                                (static_cast<u32>(countBytes[2]) << 16) |
-                                (static_cast<u32>(countBytes[3]) << 24);
-                            LOG_INFO(Loader, "[ASTRYX VFS3 Index] file_count_candidate={}",
-                                     candidateFileCount);
-                            const std::size_t fileTablePos = fileCountPos + sizeof(u32);
-
-                            // Experimental VFS3 v1 record-layout test. Only inspect
-                            // seven small candidate metadata trailers, never file
-                            // payloads. A plausible trailer MUST point inside
-                            // data.vfs and beyond the guessed file table.
-                            if (candidateFileCount > 0 && candidateFileCount <= 1000000 &&
-                                fileTablePos < archiveSize) {
-                                constexpr std::array<std::size_t, 7> kCandidateRecordSizes{
-                                    24, 28, 32, 36, 40, 44, 48};
-                                for (const auto candidateRecordSize : kCandidateRecordSizes) {
-                                    if (static_cast<std::size_t>(candidateFileCount) >
-                                        (archiveSize - fileTablePos) / candidateRecordSize) {
-                                        continue;
-                                    }
-                                    const auto candidateEnd =
-                                        fileTablePos +
-                                        static_cast<std::size_t>(candidateFileCount) *
-                                            candidateRecordSize;
-                                    if (candidateEnd > archiveSize ||
-                                        archiveSize - candidateEnd < 20) {
-                                        continue;
-                                    }
-                                    std::array<u8, 20> candidateTrailer{};
-                                    if (originalDataVfs->Read(candidateTrailer.data(),
-                                                              candidateTrailer.size(),
-                                                              candidateEnd) !=
-                                        candidateTrailer.size()) {
-                                        continue;
-                                    }
-                                    const auto readCandidateU64 = [&](std::size_t pos) -> u64 {
-                                        u64 value = 0;
-                                        for (std::size_t k = 0; k < 8; ++k) {
-                                            value |= static_cast<u64>(candidateTrailer[pos + k])
-                                                     << (8 * k);
-                                        }
-                                        return value;
-                                    };
-                                    const auto chunksCandidate = readCandidateU64(0);
-                                    const auto namesCandidate = readCandidateU64(8);
-                                    const bool plausible =
-                                        chunksCandidate >= candidateEnd + 20 &&
-                                        chunksCandidate < archiveSize &&
-                                        namesCandidate > chunksCandidate &&
-                                        namesCandidate < archiveSize;
-                                    LOG_INFO(Loader,
-                                             "[ASTRYX VFS3 Record] entry_size={} "
-                                             "table_end={} chunks={} names={} "
-                                             "candidate_valid={}",
-                                             candidateRecordSize, candidateEnd,
-                                             chunksCandidate, namesCandidate, plausible);
-                                }
-
-                                // The version-1 first record's three u64 fields
-                                // yielded out-of-range sizes. Provide 32-bit words
-                                // for alignment analysis only (no file payload).
-                                if (archiveSize - fileTablePos >= 40) {
-                                    std::array<u8, 40> firstRecord{};
-                                    if (originalDataVfs->Read(firstRecord.data(),
-                                                              firstRecord.size(),
-                                                              fileTablePos) ==
-                                        firstRecord.size()) {
-                                        const auto readCandidateU32 = [&](std::size_t pos) -> u32 {
-                                            return static_cast<u32>(firstRecord[pos]) |
-                                                (static_cast<u32>(firstRecord[pos + 1]) << 8) |
-                                                (static_cast<u32>(firstRecord[pos + 2]) << 16) |
-                                                (static_cast<u32>(firstRecord[pos + 3]) << 24);
-                                        };
-                                        LOG_INFO(Loader,
-                                                 "[ASTRYX VFS3 Record] first_file "
-                                                 "u32_00={} u32_04={} u32_08={} u32_0c={} "
-                                                 "u32_10={} u32_14={} u32_18={} u32_1c={} "
-                                                 "u32_20={} u32_24={}",
-                                                 readCandidateU32(0), readCandidateU32(4),
-                                                 readCandidateU32(8), readCandidateU32(12),
-                                                 readCandidateU32(16), readCandidateU32(20),
-                                                 readCandidateU32(24), readCandidateU32(28),
-                                                 readCandidateU32(32), readCandidateU32(36));
-                                    }
-                                }
-                            }
-                            if (candidateFileCount > 0 && candidateFileCount <= 1000000 &&
-                                fileTablePos <= archiveSize &&
-                                static_cast<std::size_t>(candidateFileCount) <=
-                                    (archiveSize - fileTablePos) / kFileEntrySize) {
-                                std::array<u8, kFileEntrySize> firstFile{};
-                                const auto fileRead =
-                                    originalDataVfs->Read(firstFile.data(), firstFile.size(),
-                                                          fileTablePos);
-                                if (fileRead == firstFile.size()) {
-                                    const auto readLe64 = [&](std::size_t pos) -> u64 {
-                                        u64 result = 0;
-                                        for (std::size_t i = 0; i < 8; ++i) {
-                                            result |= static_cast<u64>(firstFile[pos + i]) << (i * 8);
-                                        }
-                                        return result;
-                                    };
-                                    LOG_INFO(Loader,
-                                             "[ASTRYX VFS3 Index] first_file rel_offset={} "
-                                             "compressed_size={} raw_size={}",
-                                             readLe64(0), readLe64(8), readLe64(16));
-                                }
-                                const auto tableEnd = fileTablePos +
-                                                      static_cast<std::size_t>(candidateFileCount) *
-                                                          kFileEntrySize;
-                                if (tableEnd <= archiveSize && archiveSize - tableEnd >= 24) {
-                                    std::array<u8, 24> trailer{};
-                                    if (originalDataVfs->Read(trailer.data(), trailer.size(), tableEnd) ==
-                                        trailer.size()) {
-                                        const auto trailerLe64 = [&](std::size_t pos) -> u64 {
-                                            u64 result = 0;
-                                            for (std::size_t i = 0; i < 8; ++i) {
-                                                result |= static_cast<u64>(trailer[pos + i])
-                                                          << (i * 8);
-                                            }
-                                            return result;
-                                        };
-                                        LOG_INFO(Loader,
-                                                 "[ASTRYX VFS3 Index] table_end={} "
-                                                 "chunks_offset_candidate={} "
-                                                 "names_offset_candidate={} "
-                                                 "data_start_candidate={}",
-                                                 tableEnd, trailerLe64(0), trailerLe64(8),
-                                                 tableEnd + trailer.size());
-                                    }
-                                }
-                            } else {
-                                LOG_INFO(Loader,
-                                         "[ASTRYX VFS3 Index] v1 candidate rejected "
-                                         "(implausible file count or bounds)");
-                            }
-                        }
+                // The VFS3 v1 format is documented by killer7_vfs.bms (QuickBMS
+                // script 0.2). Version 1 uses 20-byte folder entries,
+                // 24-byte file entries and a 32-bit names pointer, unlike
+                // version 16+ VFS3. Read metadata only and validate bounds.
+                const auto archiveHas = [&](u64 pos, u64 len) {
+                    return pos <= archiveSize && len <= archiveSize - pos;
+                };
+                const auto readVfsU32 = [&](u64 pos, u32& result) {
+                    if (!archiveHas(pos, 4)) {
+                        return false;
                     }
+                    std::array<u8, 4> bytes{};
+                    if (originalDataVfs->Read(bytes.data(), bytes.size(), pos) !=
+                        bytes.size()) {
+                        return false;
+                    }
+                    result = static_cast<u32>(bytes[0]) |
+                             (static_cast<u32>(bytes[1]) << 8) |
+                             (static_cast<u32>(bytes[2]) << 16) |
+                             (static_cast<u32>(bytes[3]) << 24);
+                    return true;
+                };
+
+                const u32 vfsVersion = headerWord32(4);
+                const u32 folderCount = headerWord32(8);
+                if (vfsVersion == 1 && folderCount > 0 && folderCount <= 100000) {
+                    constexpr u64 kFolderTableStart = 12;
+                    constexpr u64 kFolderEntryBytes = 20;
+                    constexpr u64 kFileEntryBytes = 24;
+                    const u64 fileCountOffset =
+                        kFolderTableStart + static_cast<u64>(folderCount) * kFolderEntryBytes;
+                    u32 fileCount = 0;
+                    if (readVfsU32(fileCountOffset, fileCount) &&
+                        fileCount > 0 && fileCount <= 1000000) {
+                        const u64 fileTableStart = fileCountOffset + 4;
+                        const u64 fileTableBytes = static_cast<u64>(fileCount) * kFileEntryBytes;
+                        const u64 namesPointerPos = fileTableStart + fileTableBytes;
+                        u32 namesOffset = 0;
+                        if (archiveHas(fileTableStart, fileTableBytes) &&
+                            readVfsU32(namesPointerPos, namesOffset)) {
+                            const u64 dataBaseOffset = namesPointerPos + 4;
+                            const bool validNamesPointer =
+                                namesOffset >= dataBaseOffset &&
+                                archiveHas(namesOffset, 4);
+                            LOG_INFO(Loader,
+                                     "[ASTRYX VFS3 V1] folders={} files={} "
+                                     "file_table_start={} names_ptr_at={} "
+                                     "data_base={} names_offset={} "
+                                     "names_pointer_valid={}",
+                                     folderCount, fileCount, fileTableStart,
+                                     namesPointerPos, dataBaseOffset, namesOffset,
+                                     validNamesPointer);
+                            if (validNamesPointer) {
+                                u32 nameCount = 0;
+                                if (readVfsU32(namesOffset, nameCount)) {
+                                    LOG_INFO(Loader,
+                                             "[ASTRYX VFS3 V1] file_names_count={} "
+                                             "matches_file_count={}",
+                                             nameCount, nameCount == fileCount);
+                                }
+                            }
+                            for (u32 idx = 0; idx < std::min<u32>(fileCount, 3); ++idx) {
+                                const u64 pos =
+                                    fileTableStart + static_cast<u64>(idx) * kFileEntryBytes;
+                                std::array<u8, 24> entry{};
+                                if (originalDataVfs->Read(entry.data(), entry.size(), pos) !=
+                                    entry.size()) {
+                                    break;
+                                }
+                                const auto entryU32 = [&](std::size_t off) -> u32 {
+                                    return static_cast<u32>(entry[off]) |
+                                           (static_cast<u32>(entry[off + 1]) << 8) |
+                                           (static_cast<u32>(entry[off + 2]) << 16) |
+                                           (static_cast<u32>(entry[off + 3]) << 24);
+                                };
+                                const auto fileId = entryU32(4);
+                                const auto flags = entryU32(8);
+                                const auto folderId = entryU32(12);
+                                const auto dataRelative = entryU32(16);
+                                const auto dataSize = entryU32(20);
+                                const u64 absoluteData =
+                                    dataBaseOffset + static_cast<u64>(dataRelative);
+                                const bool validBounds = archiveHas(absoluteData, dataSize) &&
+                                    (!validNamesPointer ||
+                                     (absoluteData <= namesOffset &&
+                                      dataSize <= namesOffset - absoluteData));
+                                LOG_INFO(Loader,
+                                         "[ASTRYX VFS3 V1] sample={} file_id={} "
+                                         "flags={} folder_id={} rel_offset={} size={} "
+                                         "within_payload={}",
+                                         idx, fileId, flags, folderId, dataRelative,
+                                         dataSize, validBounds);
+                            }
+                        } else {
+                            LOG_WARNING(Loader,
+                                        "[ASTRYX VFS3 V1] file table or names pointer "
+                                        "out of archive bounds");
+                        }
+                    } else {
+                        LOG_WARNING(Loader,
+                                    "[ASTRYX VFS3 V1] file count unavailable or implausible "
+                                    "at offset={}",
+                                    fileCountOffset);
+                    }
+                } else {
+                    LOG_INFO(Loader, "[ASTRYX VFS3 V1] unsupported version={} "
+                             "or folder count={}",
+                             vfsVersion, folderCount);
                 }
             } else if (!hasVfs3Magic) {
                 LOG_WARNING(Loader, "[ASTRYX VFS3 Audit] original archive is not VFS3 "
