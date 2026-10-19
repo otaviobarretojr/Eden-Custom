@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni PTBR RomFS Audit V7
+name: ASTRYX Ni no Kuni Original RomFS Layout V8
 
 on:
   workflow_dispatch:
@@ -14,6 +14,7 @@ on:
       - fix/astryx-ni-no-kuni-webview-v5-download-logs
       - fix/astryx-ni-no-kuni-v6-eula-interaction
       - fix/astryx-ni-no-kuni-v7-ptbr-audit
+      - fix/astryx-ni-no-kuni-v8-romfs-layout-audit
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -212,6 +213,18 @@ jobs:
           grep -Fq 'type == ContentRecordType::Program' "$PATCH"
           grep -Fq 'RomFS: LayeredFS patches applied successfully' "$PATCH"
 
+      - name: Verify Ni no Kuni original RomFS layout diagnosis
+        run: |
+          set -euo pipefail
+          PATCH="src/core/file_sys/patch_manager.cpp"
+          grep -Fq '[ASTRYX PTBR Layout] original directory' "$PATCH"
+          grep -Fq 'original titleMenu02 file count=' "$PATCH"
+          grep -Fq 'original root directory count=' "$PATCH"
+          grep -Fq 'original root file count=' "$PATCH"
+          grep -Fq 'std::min<std::size_t>(rootFiles.size(), 16)' "$PATCH"
+          grep -Fq 'title_id == kNiNoKuniId' "$PATCH"
+          grep -Fq 'auditTitleMenu("original RomFS", extracted)' "$PATCH"
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -254,7 +267,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-v7-NiNoKuni-PTBR-Audit-APK
+          name: ASTRYX-v8-NiNoKuni-RomFS-Layout-Audit-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
