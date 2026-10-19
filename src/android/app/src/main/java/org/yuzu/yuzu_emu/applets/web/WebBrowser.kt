@@ -4,9 +4,11 @@
 package org.yuzu.yuzu_emu.applets.web
 
 import android.content.Intent
+import android.content.DialogInterface
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -46,6 +48,7 @@ object WebBrowser {
             if (window.nx) return;
             window.end_applet = false;
             window.yuzu_key_callbacks = [];
+            window.yuzu_footer_labels = {};
             var codes = {A:0, B:1, X:2, Y:3, L:6, R:7};
             window.nx = {
                 endApplet: function () { window.end_applet = true; },
@@ -57,11 +60,15 @@ object WebBrowser {
                         var n = codes[key];
                         if (n !== undefined && typeof action === 'function') {
                             window.yuzu_key_callbacks[n] = action;
+                            window.yuzu_footer_labels[key] = String(label || '');
                         }
                     },
                     unsetAssign: function (key) {
                         var n = codes[key];
-                        if (n !== undefined) window.yuzu_key_callbacks[n] = function () {};
+                        if (n !== undefined) {
+                            window.yuzu_key_callbacks[n] = function () {};
+                            delete window.yuzu_footer_labels[key];
+                        }
                     },
                     setFixed: function () {}
                 },
@@ -199,10 +206,9 @@ object WebBrowser {
                 val dialog = MaterialAlertDialogBuilder(activity)
                     .setTitle("ASTRYX · Ni no Kuni")
                     .setView(wrapper)
-                    .setPositiveButton("Voltar ao jogo") { _, _ ->
-                        outcome.set("end")
-                        Log.info("[ASTRYX WebView] User pressed return-to-game button")
-                    }
+                    // Never report acceptance simply because a dialog button was pressed.
+                    // The game's page must complete via nx.endApplet() or its callback URL.
+                    .setPositiveButton("A · Selecionar", null)
                     .setNegativeButton("Cancelar", null)
                     .create()
                 dialogRef.set(dialog)
@@ -243,11 +249,16 @@ object WebBrowser {
 
                     override fun onPageFinished(view: WebView?, finishedUrl: String?) {
                         Log.info("[ASTRYX WebView] HTML main page loaded")
+                        if (dialog.isShowing) {
+                            dialog.getButton(DialogInterface.BUTTON_POSITIVE).isEnabled = true
+                        }
                         if (!hasDocumentStart) view?.evaluateJavascript(nxBootstrap, null)
                         view?.evaluateJavascript(
                             "(function(){return JSON.stringify({nx:!!window.nx, " +
                                 "end:!!window.end_applet, ready:document.readyState, " +
-                                "scripts:document.scripts.length});})()"
+                                "scripts:document.scripts.length, " +
+                                "aAssigned:typeof window.yuzu_key_callbacks[0]==='function'," +
+                                "footerA:(window.yuzu_footer_labels||{}).A||''});})()"
                         ) { state ->
                             Log.info("[ASTRYX WebView] HTML script state: ${state?.take(200)}")
                         }
@@ -295,6 +306,33 @@ object WebBrowser {
                     completion.countDown()
                 }
                 dialog.show()
+                val aButton = dialog.getButton(DialogInterface.BUTTON_POSITIVE)
+                aButton.isEnabled = false // Enable only once the HTML page is ready.
+                aButton.setOnClickListener {
+                    if (!dialog.isShowing) return@setOnClickListener
+                    browser.requestFocus()
+                    browser.evaluateJavascript(
+                        "(function(){var f=window.yuzu_key_callbacks && " +
+                            "window.yuzu_key_callbacks[0];" +
+                            "if(typeof f==='function'){f();return 'footer-A';}" +
+                            "return 'native-enter';})()"
+                    ) { result ->
+                        if (!dialog.isShowing) return@evaluateJavascript
+                        if (result == "\"footer-A\"") {
+                            Log.info("[ASTRYX WebView] User invoked game's A footer action")
+                        } else {
+                            // Qt's Web applet sends Space/Return when a footer callback
+                            // is absent. Android WebView needs native input for focused links.
+                            browser.dispatchKeyEvent(
+                                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER)
+                            )
+                            browser.dispatchKeyEvent(
+                                KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER)
+                            )
+                            Log.info("[ASTRYX WebView] User pressed A: native Enter fallback")
+                        }
+                    }
+                }
                 pollHandler.postDelayed(pollEnd, 500)
                 val suffix = url.substringAfter('?', "").let {
                     if (it.isEmpty()) "" else "?$it"
