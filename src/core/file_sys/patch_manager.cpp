@@ -627,6 +627,39 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
 
     if (auditNiNoKuni) {
         auditTitleMenu("original RomFS", extracted);
+        // A modified NSP is explicitly required by the translation's own README.
+        // List ONLY bounded names from the original game's packaged directory tree,
+        // never file contents, to identify the missing resource layout safely.
+        constexpr std::array<std::string_view, 4> kProbeDirs{
+            "data", "data/menu", "data/menu/gui", "data/menu/gui/titleMenu02"};
+        for (const auto relative : kProbeDirs) {
+            const auto folder = extracted->GetDirectoryRelative(relative);
+            LOG_INFO(Loader, "[ASTRYX PTBR Layout] original directory {}: {}",
+                     relative, folder ? "present" : "missing");
+            if (folder && relative == "data/menu/gui/titleMenu02") {
+                const auto files = folder->GetFiles();
+                LOG_INFO(Loader, "[ASTRYX PTBR Layout] original titleMenu02 file count={}",
+                         files.size());
+                for (std::size_t i = 0; i < std::min<std::size_t>(files.size(), 12); ++i) {
+                    LOG_INFO(Loader, "[ASTRYX PTBR Layout] original menu file {}",
+                             files[i]->GetName());
+                }
+            }
+        }
+        const auto rootDirs = extracted->GetSubdirectories();
+        LOG_INFO(Loader, "[ASTRYX PTBR Layout] original root directory count={}",
+                 rootDirs.size());
+        for (std::size_t i = 0; i < std::min<std::size_t>(rootDirs.size(), 16); ++i) {
+            LOG_INFO(Loader, "[ASTRYX PTBR Layout] original root directory {}",
+                     rootDirs[i]->GetName());
+        }
+        const auto rootFiles = extracted->GetFiles();
+        LOG_INFO(Loader, "[ASTRYX PTBR Layout] original root file count={}",
+                 rootFiles.size());
+        for (std::size_t i = 0; i < std::min<std::size_t>(rootFiles.size(), 16); ++i) {
+            LOG_INFO(Loader, "[ASTRYX PTBR Layout] original root file {}",
+                     rootFiles[i]->GetName());
+        }
     }
     layers.emplace_back(std::move(extracted));
 
