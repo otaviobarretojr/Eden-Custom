@@ -8,6 +8,7 @@
 #include <array>
 #include <cstddef>
 #include <cstring>
+#include <limits>
 #include <vector>
 
 #include "common/assert.h"
@@ -38,6 +39,64 @@
 
 namespace FileSys {
 namespace {
+
+// Builds a read-only view of the game's original data.vfs: only one 24-byte
+// index record is virtually replaced and one translated resource is appended.
+// No on-disk archive content is changed or copied into an output NSP.
+class ASTRYXVfs3MenuOverlay final : public VfsFile {
+public:
+    ASTRYXVfs3MenuOverlay(VirtualFile base_, std::size_t recordPos_,
+                         std::array<u8, 24> record_, std::vector<u8> payload_)
+        : base(std::move(base_)), recordPos(recordPos_), record(record_),
+          payload(std::move(payload_)) {}
+
+    std::string GetName() const override { return base->GetName(); }
+    std::size_t GetSize() const override { return base->GetSize() + payload.size(); }
+    bool Resize(std::size_t) override { return false; }
+    VirtualDir GetContainingDirectory() const override {
+        return base->GetContainingDirectory();
+    }
+    bool IsWritable() const override { return false; }
+    bool IsReadable() const override { return true; }
+    std::size_t Write(const u8*, std::size_t, std::size_t) override { return 0; }
+    bool Rename(std::string_view) override { return false; }
+
+    std::size_t Read(u8* output, std::size_t length,
+                     std::size_t offset = 0) const override {
+        const auto fullSize = GetSize();
+        if (offset >= fullSize || length == 0) {
+            return 0;
+        }
+        const auto actual = std::min(length, fullSize - offset);
+        const auto baseSize = base->GetSize();
+        const auto baseLen =
+            offset < baseSize ? std::min(actual, baseSize - offset) : 0;
+        if (baseLen && base->Read(output, baseLen, offset) != baseLen) {
+            return 0;
+        }
+        const auto appendedLen = actual - baseLen;
+        if (appendedLen) {
+            const auto appendOffset = offset + baseLen - baseSize;
+            std::memcpy(output + baseLen, payload.data() + appendOffset, appendedLen);
+        }
+
+        // Reapply the one patched record for reads of arbitrary boundaries.
+        if (baseLen && offset < recordPos + record.size() &&
+            offset + baseLen > recordPos) {
+            const auto begin = std::max(offset, recordPos);
+            const auto end = std::min(offset + baseLen, recordPos + record.size());
+            std::memcpy(output + (begin - offset),
+                        record.data() + (begin - recordPos), end - begin);
+        }
+        return actual;
+    }
+
+private:
+    VirtualFile base;
+    std::size_t recordPos;
+    std::array<u8, 24> record;
+    std::vector<u8> payload;
+};
 
 constexpr u32 SINGLE_BYTE_MODULUS = 0x100;
 
@@ -558,6 +617,10 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
         "data/menu/gui/titleMenu02/titleMenu02_en.mnupak";
     const bool auditNiNoKuni = title_id == kNiNoKuniId &&
                               type == ContentRecordType::Program;
+    VirtualFile vfsOriginalForMenuPatch;
+    std::optional<std::size_t> menuRecordPosition;
+    std::size_t vfsPayloadBase = 0;
+
     const auto auditTitleMenu = [&](std::string_view origin, const VirtualDir& directory) {
         if (!auditNiNoKuni || !directory) {
             return;
@@ -877,6 +940,25 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
                                                     }
                                                     const u64 absoluteOffset =
                                                         dataBaseOffset + static_cast<u64>(offset);
+                                                    if (folderPath ==
+                                                            "data/menu/gui/titleMenu02" &&
+                                                        entryFileId == 47314 && flags == 3 &&
+                                                        archiveHas(absoluteOffset, size) &&
+                                                        absoluteOffset + size <= namesOffset &&
+                                                        !menuRecordPosition) {
+                                                        menuRecordPosition =
+                                                            static_cast<std::size_t>(pos +
+                                                                static_cast<u64>(j) * 24);
+                                                        vfsOriginalForMenuPatch =
+                                                            originalDataVfs;
+                                                        vfsPayloadBase =
+                                                            static_cast<std::size_t>(dataBaseOffset);
+                                                        LOG_INFO(Loader,
+                                                                 "[ASTRYX PTBR Virtual] "
+                                                                 "target_verified=true "
+                                                                 "record_offset={}",
+                                                                 *menuRecordPosition);
+                                                    }
                                                     LOG_INFO(Loader,
                                                              "[ASTRYX VFS3 Names] menu_file_id={} "
                                                              "table_index={} dir={} flags={} "
@@ -998,6 +1080,77 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
 
     if (auditNiNoKuni) {
         auditTitleMenu("merged LayeredFS", layered);
+        const auto translated = layered->GetFileRelative(kTitleMenuAsset);
+        if (translated && vfsOriginalForMenuPatch && menuRecordPosition &&
+            vfsPayloadBase < vfsOriginalForMenuPatch->GetSize()) {
+            const auto translatedSize = translated->GetSize();
+            const auto originalSize = vfsOriginalForMenuPatch->GetSize();
+            const auto relativeNewOffset = originalSize - vfsPayloadBase;
+            constexpr std::size_t kMaxMenuSize = 4 * 1024 * 1024;
+            if (translatedSize > 0 && translatedSize <= kMaxMenuSize &&
+                translatedSize <= std::numeric_limits<u32>::max() &&
+                relativeNewOffset <= std::numeric_limits<u32>::max() &&
+                originalSize <= std::numeric_limits<std::size_t>::max() -
+                                    translatedSize) {
+                auto translatedBytes = translated->ReadAllBytes();
+                constexpr std::array<u8, 6> kPtEasy{'F', 0xC3, 0xA1, 'c', 'i', 'l'};
+                const bool verifiedTranslation =
+                    translatedBytes.size() == translatedSize &&
+                    std::search(translatedBytes.begin(), translatedBytes.end(),
+                                kPtEasy.begin(), kPtEasy.end()) != translatedBytes.end();
+                std::array<u8, 24> record{};
+                const bool gotRecord =
+                    vfsOriginalForMenuPatch->Read(record.data(), record.size(),
+                                                  *menuRecordPosition) == record.size();
+                const auto loadLe32 = [&](std::size_t off) -> u32 {
+                    return static_cast<u32>(record[off]) |
+                           (static_cast<u32>(record[off + 1]) << 8) |
+                           (static_cast<u32>(record[off + 2]) << 16) |
+                           (static_cast<u32>(record[off + 3]) << 24);
+                };
+                if (verifiedTranslation && gotRecord &&
+                    loadLe32(4) == 47314 && loadLe32(8) == 3) {
+                    const auto writeLe32 = [&](std::size_t off, u32 val) {
+                        for (std::size_t i = 0; i < 4; ++i) {
+                            record[off + i] = static_cast<u8>(val >> (i * 8));
+                        }
+                    };
+                    // VFS3 v1 flags & 2 means compressed. Override only this
+                    // file as raw data (flags=0); all other 60,159 records and
+                    // all original archive bytes stay unchanged.
+                    writeLe32(8, 0);
+                    writeLe32(16, static_cast<u32>(relativeNewOffset));
+                    writeLe32(20, static_cast<u32>(translatedSize));
+
+                    auto view = std::make_shared<ASTRYXVfs3MenuOverlay>(
+                        vfsOriginalForMenuPatch, *menuRecordPosition,
+                        record, std::move(translatedBytes));
+                    auto rootOverride = std::make_shared<VectorVfsDirectory>(
+                        std::vector<VirtualFile>{view}, std::vector<VirtualDir>{}, "");
+                    auto patchedLayered = LayeredVfsDirectory::MakeLayeredDirectory(
+                        std::vector<VirtualDir>{rootOverride, layered});
+                    if (patchedLayered) {
+                        layered = std::move(patchedLayered);
+                        LOG_INFO(Loader,
+                                 "[ASTRYX PTBR Virtual] applied=true source_size={} "
+                                 "virtual_size={} menu_size={} raw_flags=0 "
+                                 "target_file_id=47314",
+                                 originalSize, view->GetSize(), translatedSize);
+                    }
+                } else {
+                    LOG_WARNING(Loader,
+                                "[ASTRYX PTBR Virtual] applied=false "
+                                "reason=invalid_translation_or_record");
+                }
+            } else {
+                LOG_INFO(Loader,
+                         "[ASTRYX PTBR Virtual] applied=false "
+                         "reason=translation_size_or_offset_bounds");
+            }
+        } else {
+            LOG_INFO(Loader,
+                     "[ASTRYX PTBR Virtual] applied=false reason=missing_verified_target");
+        }
     }
     auto packed = CreateRomFS(std::move(layered), std::move(layered_ext));
     if (packed == nullptr) {
