@@ -7,6 +7,11 @@ import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.Context
+import android.content.ContentValues
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.content.pm.PackageManager
@@ -21,6 +26,14 @@ import android.widget.LinearLayout
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -60,6 +73,22 @@ class HomeSettingsFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var mainActivity: MainActivity
+
+    // Android 9 and older: use the system file picker instead of requiring
+    // broad external storage permissions. Android 10+ saves straight to Downloads.
+    private var legacyLogSource: Uri? = null
+    private var legacyLogFileName: String? = null
+    private val createLegacyLogDocument = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { destination ->
+        val source = legacyLogSource
+        val fileName = legacyLogFileName
+        legacyLogSource = null
+        legacyLogFileName = null
+        if (destination != null && source != null && fileName != null) {
+            writeLogDocument(source, fileName, destination)
+        }
+    }
 
     private val homeViewModel: HomeViewModel by activityViewModels()
     private val driverViewModel: DriverViewModel by activityViewModels()
@@ -366,7 +395,7 @@ class HomeSettingsFragment : Fragment() {
                     R.string.share_log,
                     R.string.share_log_description,
                     R.drawable.ic_log,
-                    { shareLog() }
+                    { downloadLog(gpu = false) }
                 )
             )
             add(
@@ -374,7 +403,7 @@ class HomeSettingsFragment : Fragment() {
                     R.string.share_gpu_log,
                     R.string.share_gpu_log_description,
                     R.drawable.ic_log,
-                    { shareGpuLog() }
+                    { downloadLog(gpu = true) }
                 )
             )
             add(
@@ -634,73 +663,106 @@ class HomeSettingsFragment : Fragment() {
         }
     }
 
-    // Share the current log if we just returned from a game but share the old log
-    // if we just started the app and the old log exists.
-    private fun shareLog() {
-        val currentLog = DocumentFile.fromSingleUri(
+    // Prefer the previous game's log when this app session has not launched a game.
+    // Both CPU and GPU logs are saved directly to the public Downloads collection.
+    private fun downloadLog(gpu: Boolean) {
+        val baseName = if (gpu) "eden_gpu.log" else "eden_log.txt"
+        val previousName = if (gpu) "eden_gpu.log.old.txt" else "eden_log.txt.old.txt"
+        fun documentFor(name: String): DocumentFile? = DocumentFile.fromSingleUri(
             mainActivity,
             DocumentsContract.buildDocumentUri(
                 DocumentProvider.AUTHORITY,
-                "${DocumentProvider.ROOT_ID}/log/eden_log.txt"
+                "${DocumentProvider.ROOT_ID}/log/$name"
             )
-        )!!
-        val oldLog = DocumentFile.fromSingleUri(
-            mainActivity,
-            DocumentsContract.buildDocumentUri(
-                DocumentProvider.AUTHORITY,
-                "${DocumentProvider.ROOT_ID}/log/eden_log.txt.old.txt"
-            )
-        )!!
+        )
 
-        val intent = Intent(Intent.ACTION_SEND)
-            .setDataAndType(currentLog.uri, FileUtil.TEXT_PLAIN)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        if (!Log.gameLaunched && oldLog.exists()) {
-            intent.putExtra(Intent.EXTRA_STREAM, oldLog.uri)
-            startActivity(Intent.createChooser(intent, getText(R.string.share_log)))
-        } else if (currentLog.exists()) {
-            intent.putExtra(Intent.EXTRA_STREAM, currentLog.uri)
-            startActivity(Intent.createChooser(intent, getText(R.string.share_log)))
-        } else {
+        val current = documentFor(baseName)
+        val previous = documentFor(previousName)
+        val source = when {
+            !Log.gameLaunched && previous?.exists() == true -> previous.uri
+            current?.exists() == true -> current.uri
+            previous?.exists() == true -> previous.uri
+            else -> null
+        }
+        if (source == null) {
             Toast.makeText(
                 requireContext(),
-                getText(R.string.share_log_missing),
+                if (gpu) R.string.share_gpu_log_missing else R.string.share_log_missing,
                 Toast.LENGTH_SHORT
             ).show()
+            return
+        }
+
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val fileName = "ASTRYX_${if (gpu) "gpu_log" else "log"}_$timeStamp.txt"
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            legacyLogSource = source
+            legacyLogFileName = fileName
+            createLegacyLogDocument.launch(fileName)
+        } else {
+            writeLogDocument(source, fileName)
         }
     }
 
-    private fun shareGpuLog() {
-        val currentLog = DocumentFile.fromSingleUri(
-            mainActivity,
-            DocumentsContract.buildDocumentUri(
-                DocumentProvider.AUTHORITY,
-                "${DocumentProvider.ROOT_ID}/log/eden_gpu.log"
-            )
-        )!!
-        val oldLog = DocumentFile.fromSingleUri(
-            mainActivity,
-            DocumentsContract.buildDocumentUri(
-                DocumentProvider.AUTHORITY,
-                "${DocumentProvider.ROOT_ID}/log/eden_gpu.log.old.txt"
-            )
-        )!!
+    private fun writeLogDocument(source: Uri, fileName: String, chosenDestination: Uri? = null) {
+        val resolver = mainActivity.contentResolver
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val useDownloads = chosenDestination == null
+                    val target = chosenDestination ?: run {
+                        check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                        val values = ContentValues().apply {
+                            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                            put(MediaStore.MediaColumns.MIME_TYPE, "text/plain")
+                            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                            put(MediaStore.MediaColumns.IS_PENDING, 1)
+                        }
+                        resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                            ?: error("Unable to create log in Downloads")
+                    }
 
-        val intent = Intent(Intent.ACTION_SEND)
-            .setDataAndType(currentLog.uri, FileUtil.TEXT_PLAIN)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        if (!Log.gameLaunched && oldLog.exists()) {
-            intent.putExtra(Intent.EXTRA_STREAM, oldLog.uri)
-            startActivity(Intent.createChooser(intent, getText(R.string.share_gpu_log)))
-        } else if (currentLog.exists()) {
-            intent.putExtra(Intent.EXTRA_STREAM, currentLog.uri)
-            startActivity(Intent.createChooser(intent, getText(R.string.share_gpu_log)))
-        } else {
-            Toast.makeText(
-                requireContext(),
-                getText(R.string.share_gpu_log_missing),
-                Toast.LENGTH_SHORT
-            ).show()
+                    try {
+                        val input = resolver.openInputStream(source)
+                            ?: error("Unable to open log source")
+                        input.use { data ->
+                            val output = resolver.openOutputStream(target, "w")
+                                ?: error("Unable to write downloaded log")
+                            output.use { data.copyTo(it) }
+                        }
+                        if (useDownloads) {
+                            resolver.update(target, ContentValues().apply {
+                                put(MediaStore.MediaColumns.IS_PENDING, 0)
+                            }, null, null)
+                        }
+                    } catch (error: Exception) {
+                        // Remove an incomplete public download, but never remove a
+                        // user-selected destination on legacy Android versions.
+                        if (useDownloads) resolver.delete(target, null, null)
+                        throw error
+                    }
+                }
+            }
+            if (!isAdded) return@launch
+            result.onSuccess {
+                Toast.makeText(
+                    requireContext(),
+                    getString(
+                        if (chosenDestination == null) R.string.log_download_success
+                        else R.string.log_file_saved,
+                        fileName
+                    ),
+                    Toast.LENGTH_LONG
+                ).show()
+            }.onFailure { failure ->
+                Log.error("[ASTRYX Log Download] ${failure.message}")
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.log_download_failed, failure.message ?: "unknown error"),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
