@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni Original RomFS Layout V8
+name: ASTRYX Ni no Kuni VFS3 Header Audit V9
 
 on:
   workflow_dispatch:
@@ -15,6 +15,7 @@ on:
       - fix/astryx-ni-no-kuni-v6-eula-interaction
       - fix/astryx-ni-no-kuni-v7-ptbr-audit
       - fix/astryx-ni-no-kuni-v8-romfs-layout-audit
+      - fix/astryx-ni-no-kuni-v9-vfs3-header-audit
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -225,6 +226,22 @@ jobs:
           grep -Fq 'title_id == kNiNoKuniId' "$PATCH"
           grep -Fq 'auditTitleMenu("original RomFS", extracted)' "$PATCH"
 
+      - name: Verify VFS3 bounded read-only diagnosis for Ni no Kuni
+        run: |
+          set -euo pipefail
+          PATCH="src/core/file_sys/patch_manager.cpp"
+          grep -Fq 'extracted->GetFile("data.vfs")' "$PATCH"
+          grep -Fq 'std::array<u8, 48> header{}' "$PATCH"
+          grep -Fq 'std::min<std::size_t>(header.size(), archiveSize)' "$PATCH"
+          grep -Fq 'originalDataVfs->Read(header.data(), wantedBytes, 0)' "$PATCH"
+          grep -Fq 'std::memcmp(header.data(), "VFS3", 4)' "$PATCH"
+          grep -Fq '[ASTRYX VFS3 Audit] le32_at_04=' "$PATCH"
+          grep -Fq 'title_id == kNiNoKuniId' "$PATCH"
+          grep -Fq 'type == ContentRecordType::Program' "$PATCH"
+          if grep -E 'originalDataVfs->(Write|Resize|Rename|Delete)' "$PATCH"; then
+            echo "Unsafe archive write detected"; exit 1
+          fi
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -267,7 +284,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-v8-NiNoKuni-RomFS-Layout-Audit-APK
+          name: ASTRYX-v9-NiNoKuni-VFS3-Header-Audit-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
