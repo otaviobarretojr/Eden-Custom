@@ -690,6 +690,86 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
                             LOG_INFO(Loader, "[ASTRYX VFS3 Index] file_count_candidate={}",
                                      candidateFileCount);
                             const std::size_t fileTablePos = fileCountPos + sizeof(u32);
+
+                            // Experimental VFS3 v1 record-layout test. Only inspect
+                            // seven small candidate metadata trailers, never file
+                            // payloads. A plausible trailer MUST point inside
+                            // data.vfs and beyond the guessed file table.
+                            if (candidateFileCount > 0 && candidateFileCount <= 1000000 &&
+                                fileTablePos < archiveSize) {
+                                constexpr std::array<std::size_t, 7> kCandidateRecordSizes{
+                                    24, 28, 32, 36, 40, 44, 48};
+                                for (const auto candidateRecordSize : kCandidateRecordSizes) {
+                                    if (static_cast<std::size_t>(candidateFileCount) >
+                                        (archiveSize - fileTablePos) / candidateRecordSize) {
+                                        continue;
+                                    }
+                                    const auto candidateEnd =
+                                        fileTablePos +
+                                        static_cast<std::size_t>(candidateFileCount) *
+                                            candidateRecordSize;
+                                    if (candidateEnd > archiveSize ||
+                                        archiveSize - candidateEnd < 20) {
+                                        continue;
+                                    }
+                                    std::array<u8, 20> candidateTrailer{};
+                                    if (originalDataVfs->Read(candidateTrailer.data(),
+                                                              candidateTrailer.size(),
+                                                              candidateEnd) !=
+                                        candidateTrailer.size()) {
+                                        continue;
+                                    }
+                                    const auto readCandidateU64 = [&](std::size_t pos) -> u64 {
+                                        u64 value = 0;
+                                        for (std::size_t k = 0; k < 8; ++k) {
+                                            value |= static_cast<u64>(candidateTrailer[pos + k])
+                                                     << (8 * k);
+                                        }
+                                        return value;
+                                    };
+                                    const auto chunksCandidate = readCandidateU64(0);
+                                    const auto namesCandidate = readCandidateU64(8);
+                                    const bool plausible =
+                                        chunksCandidate >= candidateEnd + 20 &&
+                                        chunksCandidate < archiveSize &&
+                                        namesCandidate > chunksCandidate &&
+                                        namesCandidate < archiveSize;
+                                    LOG_INFO(Loader,
+                                             "[ASTRYX VFS3 Record] entry_size={} "
+                                             "table_end={} chunks={} names={} "
+                                             "candidate_valid={}",
+                                             candidateRecordSize, candidateEnd,
+                                             chunksCandidate, namesCandidate, plausible);
+                                }
+
+                                // The version-1 first record's three u64 fields
+                                // yielded out-of-range sizes. Provide 32-bit words
+                                // for alignment analysis only (no file payload).
+                                if (archiveSize - fileTablePos >= 40) {
+                                    std::array<u8, 40> firstRecord{};
+                                    if (originalDataVfs->Read(firstRecord.data(),
+                                                              firstRecord.size(),
+                                                              fileTablePos) ==
+                                        firstRecord.size()) {
+                                        const auto readCandidateU32 = [&](std::size_t pos) -> u32 {
+                                            return static_cast<u32>(firstRecord[pos]) |
+                                                (static_cast<u32>(firstRecord[pos + 1]) << 8) |
+                                                (static_cast<u32>(firstRecord[pos + 2]) << 16) |
+                                                (static_cast<u32>(firstRecord[pos + 3]) << 24);
+                                        };
+                                        LOG_INFO(Loader,
+                                                 "[ASTRYX VFS3 Record] first_file "
+                                                 "u32_00={} u32_04={} u32_08={} u32_0c={} "
+                                                 "u32_10={} u32_14={} u32_18={} u32_1c={} "
+                                                 "u32_20={} u32_24={}",
+                                                 readCandidateU32(0), readCandidateU32(4),
+                                                 readCandidateU32(8), readCandidateU32(12),
+                                                 readCandidateU32(16), readCandidateU32(20),
+                                                 readCandidateU32(24), readCandidateU32(28),
+                                                 readCandidateU32(32), readCandidateU32(36));
+                                    }
+                                }
+                            }
                             if (candidateFileCount > 0 && candidateFileCount <= 1000000 &&
                                 fileTablePos <= archiveSize &&
                                 static_cast<std::size_t>(candidateFileCount) <=
