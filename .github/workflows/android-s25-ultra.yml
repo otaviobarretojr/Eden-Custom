@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni EULA Interaction V6
+name: ASTRYX Ni no Kuni PTBR RomFS Audit V7
 
 on:
   workflow_dispatch:
@@ -13,6 +13,7 @@ on:
       - fix/astryx-ni-no-kuni-webview-v4-diagnostics
       - fix/astryx-ni-no-kuni-webview-v5-download-logs
       - fix/astryx-ni-no-kuni-v6-eula-interaction
+      - fix/astryx-ni-no-kuni-v7-ptbr-audit
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -198,6 +199,19 @@ jobs:
             echo "Old premature applet dismissal is still enabled"; exit 1
           fi
 
+      - name: Verify Ni no Kuni PTBR title-scoped RomFS audit
+        run: |
+          set -euo pipefail
+          PATCH="src/core/file_sys/patch_manager.cpp"
+          grep -Fq '0x0100E5600D446000ULL' "$PATCH"
+          grep -Fq 'data/menu/gui/titleMenu02/titleMenu02_en.mnupak' "$PATCH"
+          grep -Fq 'auditTitleMenu("original RomFS", extracted)' "$PATCH"
+          grep -Fq 'auditTitleMenu("merged LayeredFS", layered)' "$PATCH"
+          grep -Fq 'auditTitleMenu(subdir->GetName(), romfs_dir)' "$PATCH"
+          grep -Fq 'contains_pt_easy=' "$PATCH"
+          grep -Fq 'type == ContentRecordType::Program' "$PATCH"
+          grep -Fq 'RomFS: LayeredFS patches applied successfully' "$PATCH"
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -240,7 +254,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-v6-NiNoKuni-EULA-Interaction-APK
+          name: ASTRYX-v7-NiNoKuni-PTBR-Audit-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
