@@ -92,6 +92,7 @@ import org.yuzu.yuzu_emu.utils.GameIconUtils
 import org.yuzu.yuzu_emu.utils.GpuDriverHelper
 import org.yuzu.yuzu_emu.utils.InputHandler
 import org.yuzu.yuzu_emu.utils.Log
+import org.yuzu.yuzu_emu.utils.NiNoKuniPerformanceProfile
 import org.yuzu.yuzu_emu.utils.LosslessScalingHelper
 import org.yuzu.yuzu_emu.utils.NativeConfig
 import org.yuzu.yuzu_emu.utils.NativeFreedrenoConfig
@@ -156,6 +157,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
     var shouldUseCustom = false
     private var isQuickSettingsMenuOpen = false
     private val quickSettings = QuickSettings(this)
+    private val niNoKuniPerformanceMenuId = View.generateViewId()
 
     private val loadAmiiboLauncher =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -323,7 +325,12 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
 
                 // Normal game launch from arguments
                 else -> {
-                    shouldUseCustom = game?.let { it == args.game && args.custom } ?: false
+                    shouldUseCustom = game?.let {
+                        (it == args.game && args.custom) ||
+                            (NiNoKuniPerformanceProfile.supports(it) &&
+                                NiNoKuniPerformanceProfile.current(requireContext()) !=
+                                NiNoKuniPerformanceProfile.ORIGINAL)
+                    } ?: false
 
                     if (shouldUseCustom) {
                         SettingsFile.loadCustomConfig(game!!)
@@ -743,6 +750,13 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
         binding.inGameMenu.menu.findItem(R.id.menu_quick_settings)?.isVisible =
             BooleanSetting.ENABLE_QUICK_SETTINGS.getBoolean()
 
+        // Optional per-game performance preset; no global renderer changes.
+        if (NiNoKuniPerformanceProfile.supports(game)) {
+            binding.inGameMenu.menu.add(
+                0, niNoKuniPerformanceMenuId, 90, "Ni no Kuni · FPS reais"
+            ).setIcon(android.R.drawable.ic_menu_manage)
+        }
+
         binding.pausedIcon.setOnClickListener {
             if (this::emulationState.isInitialized && emulationState.isPaused) {
                 resumeEmulationFromUi()
@@ -772,6 +786,11 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
 
         binding.inGameMenu.setNavigationItemSelectedListener {
             when (it.itemId) {
+                niNoKuniPerformanceMenuId -> {
+                    showNiNoKuniPerformanceProfiles()
+                    true
+                }
+
                 R.id.menu_pause_emulation -> {
                     if (emulationState.isPaused) {
                         resumeEmulationFromUi()
@@ -1088,6 +1107,56 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                 }
             }
         }
+    }
+
+    /**
+     * Deliberately does not promise >30 FPS. Ni no Kuni's Switch build needs a
+     * separately verified game patch to remove its own native 30 FPS limit.
+     * Users can compare real FPS between two GPU workloads and revert safely.
+     */
+    private fun showNiNoKuniPerformanceProfiles() {
+        val target = game ?: return
+        if (!NiNoKuniPerformanceProfile.supports(target)) return
+
+        val options = arrayOf(
+            "Original · restaurar configurações",
+            "Estabilidade · portátil, resolução 1×",
+            "Prioridade FPS · portátil, resolução 0,75×"
+        )
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("ASTRYX · Ni no Kuni")
+            .setMessage(
+                "Os perfis reduzem a carga gráfica para recuperar FPS reais. " +
+                    "Não desbloqueiam os 30 FPS do jogo e não usam geração de quadros. " +
+                    "A mudança exige fechar e iniciar o jogo novamente."
+            )
+            .setSingleChoiceItems(
+                options,
+                NiNoKuniPerformanceProfile.current(requireContext())
+            ) { dialog, selected ->
+                val applied = NiNoKuniPerformanceProfile.apply(
+                    requireContext(), target, selected
+                )
+                if (applied) {
+                    shouldUseCustom = selected != NiNoKuniPerformanceProfile.ORIGINAL ||
+                        shouldUseCustom
+                    Toast.makeText(
+                        requireContext(),
+                        "Perfil salvo. Feche e abra o Ni no Kuni para comparar o FPS.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        requireContext(),
+                        "Não foi possível salvar o perfil. Nenhum arquivo do jogo foi alterado.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                dialog.dismiss()
+                binding.drawerLayout.closeDrawer(binding.inGameMenu)
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun updateGameTitle() {
