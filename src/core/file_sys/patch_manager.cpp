@@ -660,6 +660,89 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
                          headerWord32(4), headerWord32(8), headerWord32(12),
                          headerWord32(16), headerWord32(20), headerWord32(24),
                          headerWord32(28), headerWord32(32));
+
+                // VFS3 version 1 appears to omit the extra field used by newer variants.
+                // Probe only index metadata at the predicted boundary; never extract
+                // archived file content or mutate data.vfs. Reject implausible lengths.
+                const auto candidateVersion = headerWord32(4);
+                const auto candidateDirCount = headerWord32(8);
+                if (candidateVersion == 1 && candidateDirCount > 0 &&
+                    candidateDirCount <= 100000) {
+                    constexpr std::size_t kDirEntrySize = 28;
+                    constexpr std::size_t kFileEntrySize = 40;
+                    constexpr std::size_t kDirTableStart = 12;
+                    const std::size_t fileCountPos =
+                        kDirTableStart + static_cast<std::size_t>(candidateDirCount) * kDirEntrySize;
+                    LOG_INFO(Loader, "[ASTRYX VFS3 Index] v1_candidate dirs={} "
+                             "file_count_offset={}",
+                             candidateDirCount, fileCountPos);
+                    if (fileCountPos <= archiveSize &&
+                        archiveSize - fileCountPos >= sizeof(u32)) {
+                        std::array<u8, 4> countBytes{};
+                        const auto countRead =
+                            originalDataVfs->Read(countBytes.data(), countBytes.size(), fileCountPos);
+                        if (countRead == countBytes.size()) {
+                            const auto candidateFileCount =
+                                static_cast<u32>(countBytes[0]) |
+                                (static_cast<u32>(countBytes[1]) << 8) |
+                                (static_cast<u32>(countBytes[2]) << 16) |
+                                (static_cast<u32>(countBytes[3]) << 24);
+                            LOG_INFO(Loader, "[ASTRYX VFS3 Index] file_count_candidate={}",
+                                     candidateFileCount);
+                            const std::size_t fileTablePos = fileCountPos + sizeof(u32);
+                            if (candidateFileCount > 0 && candidateFileCount <= 1000000 &&
+                                fileTablePos <= archiveSize &&
+                                static_cast<std::size_t>(candidateFileCount) <=
+                                    (archiveSize - fileTablePos) / kFileEntrySize) {
+                                std::array<u8, kFileEntrySize> firstFile{};
+                                const auto fileRead =
+                                    originalDataVfs->Read(firstFile.data(), firstFile.size(),
+                                                          fileTablePos);
+                                if (fileRead == firstFile.size()) {
+                                    const auto readLe64 = [&](std::size_t pos) -> u64 {
+                                        u64 result = 0;
+                                        for (std::size_t i = 0; i < 8; ++i) {
+                                            result |= static_cast<u64>(firstFile[pos + i]) << (i * 8);
+                                        }
+                                        return result;
+                                    };
+                                    LOG_INFO(Loader,
+                                             "[ASTRYX VFS3 Index] first_file rel_offset={} "
+                                             "compressed_size={} raw_size={}",
+                                             readLe64(0), readLe64(8), readLe64(16));
+                                }
+                                const auto tableEnd = fileTablePos +
+                                                      static_cast<std::size_t>(candidateFileCount) *
+                                                          kFileEntrySize;
+                                if (tableEnd <= archiveSize && archiveSize - tableEnd >= 24) {
+                                    std::array<u8, 24> trailer{};
+                                    if (originalDataVfs->Read(trailer.data(), trailer.size(), tableEnd) ==
+                                        trailer.size()) {
+                                        const auto trailerLe64 = [&](std::size_t pos) -> u64 {
+                                            u64 result = 0;
+                                            for (std::size_t i = 0; i < 8; ++i) {
+                                                result |= static_cast<u64>(trailer[pos + i])
+                                                          << (i * 8);
+                                            }
+                                            return result;
+                                        };
+                                        LOG_INFO(Loader,
+                                                 "[ASTRYX VFS3 Index] table_end={} "
+                                                 "chunks_offset_candidate={} "
+                                                 "names_offset_candidate={} "
+                                                 "data_start_candidate={}",
+                                                 tableEnd, trailerLe64(0), trailerLe64(8),
+                                                 tableEnd + trailer.size());
+                                    }
+                                }
+                            } else {
+                                LOG_INFO(Loader,
+                                         "[ASTRYX VFS3 Index] v1 candidate rejected "
+                                         "(implausible file count or bounds)");
+                            }
+                        }
+                    }
+                }
             } else if (!hasVfs3Magic) {
                 LOG_WARNING(Loader, "[ASTRYX VFS3 Audit] original archive is not VFS3 "
                             "or the header could not be read");
