@@ -299,9 +299,15 @@
     <string name="firmware_installed_failure">Falha na instalação do firmware</string>
     <string name="firmware_installed_failure_description">Verifique se os arquivos nca do firmware estão na raiz do arquivo zip e tente novamente.</string>
     <string name="firmware_uninstalled_failure">Falha na desinstalação do firmware</string>
-    <string name="share_log">Compartilhar registros de depuração</string>
-    <string name="share_log_description">Compartilhe o arquivo de registro do Eden para depurar problemas</string>
+    <string name="share_log">Baixar log de depuração</string>
+    <string name="share_log_description">Salvar o log do ASTRYX diretamente em Downloads</string>
     <string name="share_log_missing">Arquivo de registro não encontrado</string>
+    <string name="share_gpu_log">Baixar log da GPU</string>
+    <string name="share_gpu_log_description">Salvar o log gráfico do ASTRYX diretamente em Downloads</string>
+    <string name="share_gpu_log_missing">Log da GPU não encontrado</string>
+    <string name="log_download_success">Salvo em Downloads: %1$s</string>
+    <string name="log_file_saved">Log salvo: %1$s</string>
+    <string name="log_download_failed">Não foi possível salvar o log: %1$s</string>
     <string name="install_game_content">Instalar conteúdo de jogos</string>
     <string name="install_game_content_description">Instale atualizações de jogos ou DLC</string>
     <string name="installing_game_content">Instalando conteúdo...</string>
