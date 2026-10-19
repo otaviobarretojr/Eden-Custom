@@ -627,6 +627,45 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
 
     if (auditNiNoKuni) {
         auditTitleMenu("original RomFS", extracted);
+
+        // Ni no Kuni VFS3 format probe: read ONLY the first 48 bytes.
+        // No archive data is extracted, modified, or exported. Layout fields
+        // remain unlabeled because VFS3 has incompatible variants across games.
+        const auto originalDataVfs = extracted->GetFile("data.vfs");
+        if (!originalDataVfs) {
+            LOG_INFO(Loader, "[ASTRYX VFS3 Audit] original data.vfs missing");
+        } else {
+            const auto archiveSize = originalDataVfs->GetSize();
+            std::array<u8, 48> header{};
+            const auto wantedBytes = std::min<std::size_t>(header.size(), archiveSize);
+            const auto receivedBytes = originalDataVfs->Read(header.data(), wantedBytes, 0);
+            const bool hasVfs3Magic =
+                receivedBytes >= 4 && std::memcmp(header.data(), "VFS3", 4) == 0;
+            LOG_INFO(Loader, "[ASTRYX VFS3 Audit] data.vfs size={} "
+                     "header_bytes={} magic_vfs3={}",
+                     archiveSize, receivedBytes, hasVfs3Magic);
+            if (hasVfs3Magic && receivedBytes >= 36) {
+                // Uninterpreted little-endian header words: mapping/semantics
+                // must be verified against the FIRST game's specific format.
+                const auto headerWord32 = [&](std::size_t pos) -> u32 {
+                    return static_cast<u32>(header[pos]) |
+                           (static_cast<u32>(header[pos + 1]) << 8) |
+                           (static_cast<u32>(header[pos + 2]) << 16) |
+                           (static_cast<u32>(header[pos + 3]) << 24);
+                };
+                LOG_INFO(Loader,
+                         "[ASTRYX VFS3 Audit] le32_at_04={} le32_at_08={} "
+                         "le32_at_0c={} le32_at_10={} le32_at_14={} "
+                         "le32_at_18={} le32_at_1c={} le32_at_20={}",
+                         headerWord32(4), headerWord32(8), headerWord32(12),
+                         headerWord32(16), headerWord32(20), headerWord32(24),
+                         headerWord32(28), headerWord32(32));
+            } else if (!hasVfs3Magic) {
+                LOG_WARNING(Loader, "[ASTRYX VFS3 Audit] original archive is not VFS3 "
+                            "or the header could not be read");
+            }
+        }
+
         // A modified NSP is explicitly required by the translation's own README.
         // List ONLY bounded names from the original game's packaged directory tree,
         // never file contents, to identify the missing resource layout safely.
