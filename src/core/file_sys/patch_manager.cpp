@@ -29,6 +29,7 @@
 #include "core/file_sys/romfs.h"
 #include "core/file_sys/vfs/vfs_cached.h"
 #include "core/file_sys/vfs/vfs_layered.h"
+#include "core/file_sys/vfs/vfs3_ptbr_overlay.h"
 #include "core/file_sys/vfs/vfs_vector.h"
 #include "core/hle/service/filesystem/filesystem.h"
 #include "core/hle/service/ns/language.h"
@@ -1070,6 +1071,9 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
                      rootFiles[i]->GetName());
         }
     }
+    // Capture active mod layers only, so the batch reader never enumerates
+    // files originating in the official RomFS.
+    const auto ptbrModLayers = auditNiNoKuni ? layers : std::vector<VirtualDir>{};
     layers.emplace_back(std::move(extracted));
 
     auto layered = LayeredVfsDirectory::MakeLayeredDirectory(std::move(layers));
@@ -1080,7 +1084,28 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
 
     if (auditNiNoKuni) {
         auditTitleMenu("merged LayeredFS", layered);
-        const auto translated = layered->GetFileRelative(kTitleMenuAsset);
+        const auto batch = ASTRYX::TryMakeNiNoKuniPtbrBatchView(
+            vfsOriginalForMenuPatch, ptbrModLayers);
+        bool batchInstalled = false;
+        if (batch.view) {
+            auto batchRoot = std::make_shared<VectorVfsDirectory>(
+                std::vector<VirtualFile>{batch.view}, std::vector<VirtualDir>{}, "");
+            auto batchLayered = LayeredVfsDirectory::MakeLayeredDirectory(
+                std::vector<VirtualDir>{batchRoot, layered});
+            if (batchLayered) {
+                layered = std::move(batchLayered);
+                batchInstalled = true;
+                LOG_INFO(Loader,
+                         "[ASTRYX PTBR Batch] applied=true files={} bytes={} "
+                         "source_size={} virtual_size={}",
+                         batch.matched, batch.appendedBytes,
+                         vfsOriginalForMenuPatch->GetSize(), batch.view->GetSize());
+            }
+        }
+        // Preserve the already-proven v14 one-file translation if a batch
+        // was not eligible or an active full pack could not be validated.
+        if (!batchInstalled) {
+            const auto translated = layered->GetFileRelative(kTitleMenuAsset);
         if (translated && vfsOriginalForMenuPatch && menuRecordPosition &&
             vfsPayloadBase < vfsOriginalForMenuPatch->GetSize()) {
             const auto translatedSize = translated->GetSize();
@@ -1150,6 +1175,7 @@ void PatchManager::ApplyLayeredFS(VirtualFile& romfs, ContentRecordType type) co
         } else {
             LOG_INFO(Loader,
                      "[ASTRYX PTBR Virtual] applied=false reason=missing_verified_target");
+        }
         }
     }
     auto packed = CreateRomFS(std::move(layered), std::move(layered_ext));
