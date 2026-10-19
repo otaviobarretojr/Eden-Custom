@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni VFS3 Virtual Menu Test V14
+name: ASTRYX Ni no Kuni PTBR VFS3 Batch V15
 
 on:
   workflow_dispatch:
@@ -21,6 +21,7 @@ on:
       - fix/astryx-ni-no-kuni-v12-vfs3-v1-correct-layout
       - fix/astryx-ni-no-kuni-v13-vfs3-name-map
       - fix/astryx-ni-no-kuni-v14-virtual-vfs3-menu-override
+      - fix/astryx-ni-no-kuni-v15-vfs3-ptbr-batch
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -321,6 +322,27 @@ jobs:
             echo "Unsafe VFS3 source mutation"; exit 1
           fi
 
+      - name: Verify bounded Ni no Kuni full-pack VFS3 overlay
+        run: |
+          set -euo pipefail
+          PATCH="src/core/file_sys/patch_manager.cpp"
+          BATCH="src/core/file_sys/vfs/vfs3_ptbr_overlay.h"
+          grep -Fq 'TryMakeNiNoKuniPtbrBatchView(' "$PATCH"
+          grep -Fq 'if (!batchInstalled)' "$PATCH"
+          grep -Fq 'const auto ptbrModLayers = auditNiNoKuni ? layers' "$PATCH"
+          grep -Fq '[ASTRYX PTBR Batch] applied=true' "$PATCH"
+          grep -Fq 'class Vfs3BatchTranslationView final : public VfsFile' "$BATCH"
+          grep -Fq 'bool IsWritable() const override { return false; }' "$BATCH"
+          grep -Fq 'constexpr std::size_t kMaxModFiles = 2000;' "$BATCH"
+          grep -Fq 'constexpr std::size_t kMaxAppendBytes = 128 * 1024 * 1024;' "$BATCH"
+          grep -Fq 'kExpectedFileCount = 60160' "$BATCH"
+          grep -Fq 'write32(patch.bytes.data() + 8, 0)' "$BATCH"
+          grep -Fq 'if (patches.size() < 2 || !matchedMenu)' "$BATCH"
+          grep -Fq 'source->Read(output, originalCount, offset)' "$BATCH"
+          if grep -E '(originalDataVfs|vfsOriginalForMenuPatch|source)->(Write|Resize|Rename|Delete)' "$PATCH" "$BATCH"; then
+            echo "Unsafe archive modification attempt"; exit 1
+          fi
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -363,7 +385,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-v14-NiNoKuni-VFS3-Virtual-Menu-Test-APK
+          name: ASTRYX-v15-NiNoKuni-PTBR-VFS3-Batch-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
