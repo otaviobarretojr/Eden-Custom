@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni VFS3 Menu Name Map V13
+name: ASTRYX Ni no Kuni VFS3 Virtual Menu Test V14
 
 on:
   workflow_dispatch:
@@ -20,6 +20,7 @@ on:
       - fix/astryx-ni-no-kuni-v11-vfs3-record-layout
       - fix/astryx-ni-no-kuni-v12-vfs3-v1-correct-layout
       - fix/astryx-ni-no-kuni-v13-vfs3-name-map
+      - fix/astryx-ni-no-kuni-v14-virtual-vfs3-menu-override
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -299,6 +300,27 @@ jobs:
             echo "Unsafe archive mutation detected"; exit 1
           fi
 
+      - name: Verify Ni no Kuni virtual VFS3 menu override guards
+        run: |
+          set -euo pipefail
+          PATCH="src/core/file_sys/patch_manager.cpp"
+          grep -Fq 'class ASTRYXVfs3MenuOverlay final : public VfsFile' "$PATCH"
+          grep -Fq 'bool IsWritable() const override { return false; }' "$PATCH"
+          grep -Fq 'writeLe32(8, 0);' "$PATCH"
+          grep -Fq 'writeLe32(16, static_cast<u32>(relativeNewOffset));' "$PATCH"
+          grep -Fq 'writeLe32(20, static_cast<u32>(translatedSize));' "$PATCH"
+          grep -Fq 'loadLe32(4) == 47314 && loadLe32(8) == 3' "$PATCH"
+          grep -Fq 'folderPath ==' "$PATCH"
+          grep -Fq 'title_id == kNiNoKuniId' "$PATCH"
+          grep -Fq '[ASTRYX PTBR Virtual] applied=true' "$PATCH"
+          grep -Fq 'rootOverride, layered' "$PATCH"
+          if grep -E 'originalDataVfs->(Write|Resize|Rename|Delete)' "$PATCH"; then
+            echo "Unsafe VFS3 source mutation"; exit 1
+          fi
+          if grep -E 'vfsOriginalForMenuPatch->(Write|Resize|Rename|Delete)' "$PATCH"; then
+            echo "Unsafe VFS3 source mutation"; exit 1
+          fi
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -341,7 +363,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-v13-NiNoKuni-VFS3-Name-Map-APK
+          name: ASTRYX-v14-NiNoKuni-VFS3-Virtual-Menu-Test-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
