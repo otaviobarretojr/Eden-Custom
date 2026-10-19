@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni PTBR VFS3 Batch V15
+name: ASTRYX Ni no Kuni Native FPS Stability V16
 
 on:
   workflow_dispatch:
@@ -22,6 +22,7 @@ on:
       - fix/astryx-ni-no-kuni-v13-vfs3-name-map
       - fix/astryx-ni-no-kuni-v14-virtual-vfs3-menu-override
       - fix/astryx-ni-no-kuni-v15-vfs3-ptbr-batch
+      - perf/astryx-v16-ni-no-kuni-native-fps-profile
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -343,6 +344,28 @@ jobs:
             echo "Unsafe archive modification attempt"; exit 1
           fi
 
+      - name: Verify native FPS profile safety and telemetry
+        run: |
+          set -euo pipefail
+          PROF="src/android/app/src/main/java/org/yuzu/yuzu_emu/utils/NiNoKuniPerformanceProfile.kt"
+          UI="src/android/app/src/main/java/org/yuzu/yuzu_emu/fragments/EmulationFragment.kt"
+          grep -Fq 'private const val TITLE = "0100E5600D446000"' "$PROF"
+          grep -Fq 'const val STABLE_1X = 1' "$PROF"
+          grep -Fq 'const val PERFORMANCE_075X = 2' "$PROF"
+          grep -Fq 'SettingsFile.loadCustomConfig(game)' "$PROF"
+          grep -Fq 'NativeConfig.savePerGameConfig()' "$PROF"
+          grep -Fq 'BooleanSetting.RENDERER_FRAME_GEN.setBoolean(false)' "$PROF"
+          grep -Fq 'if (owned && NativeConfig.isPerGameConfigLoaded())' "$PROF"
+          grep -Fq 'showNiNoKuniPerformanceProfiles()' "$UI"
+          grep -Fq '[ASTRYX Native FPS]' "$UI"
+          grep -Fq 'niNoKuniFpsWindowStart >= 10000L' "$UI"
+          grep -Fq 'NiNoKuniPerformanceProfile.current(requireContext())' "$UI"
+          grep -Fq 'TryMakeNiNoKuniPtbrBatchView(' src/core/file_sys/patch_manager.cpp
+          if grep -E 'Write\(|Delete\(' src/core/file_sys/vfs/vfs3_ptbr_overlay.h; then
+            echo "Rejecting mutation of the original VFS3 archive"
+            exit 1
+          fi
+
       - name: Build S25 Ultra variant
         working-directory: src/android
         run: |
@@ -385,7 +408,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-v15-NiNoKuni-PTBR-VFS3-Batch-APK
+          name: ASTRYX-v16-NiNoKuni-Native-FPS-Stability-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
