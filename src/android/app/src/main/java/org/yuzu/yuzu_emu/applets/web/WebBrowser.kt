@@ -10,6 +10,9 @@ import android.os.Looper
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
+import android.webkit.WebResourceResponse
+import android.webkit.MimeTypeMap
+import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import android.webkit.WebResourceRequest
@@ -18,6 +21,8 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
+import java.io.ByteArrayInputStream
+import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -31,6 +36,8 @@ import org.yuzu.yuzu_emu.NativeLibrary
 
 @Keep
 object WebBrowser {
+    private const val offlineHost = "appassets.androidplatform.net"
+    private const val offlinePrefix = "/astryx-ni-no-kuni/"
     // Adapted from Eden's Qt WINDOW_NX_SCRIPT: provides the Switch-side
     // JavaScript API before inline page scripts execute. No Java/Kotlin
     // JavascriptInterface is exposed to untrusted HTML.
@@ -104,12 +111,59 @@ object WebBrowser {
                         FrameLayout.LayoutParams.MATCH_PARENT, height
                     ))
                 }
+                // Same-origin HTTPS routing for all assets under this game's extracted RomFS.
+                // Unlike file://, this permits page-local XHR without widening file URL access.
+                val offlineLoader = WebViewAssetLoader.Builder()
+                    .setDomain(offlineHost)
+                    .addPathHandler(
+                        offlinePrefix,
+                        WebViewAssetLoader.PathHandler { assetPath ->
+                            val requestedFile = runCatching {
+                                File(allowed, assetPath).canonicalFile
+                            }.getOrNull()
+                            if (requestedFile == null ||
+                                !requestedFile.path.startsWith(allowed.path + File.separator) ||
+                                !requestedFile.isFile) {
+                                Log.warning("[ASTRYX WebView] Offline asset missing or rejected")
+                                WebResourceResponse(
+                                    "text/plain", "UTF-8", 404, "Not Found",
+                                    emptyMap(), ByteArrayInputStream(ByteArray(0))
+                                )
+                            } else {
+                                try {
+                                    val mime = when (requestedFile.extension.lowercase(Locale.ROOT)) {
+                                        "html", "htm" -> "text/html"
+                                        "js", "mjs" -> "text/javascript"
+                                        "css" -> "text/css"
+                                        else -> MimeTypeMap.getSingleton()
+                                            .getMimeTypeFromExtension(
+                                                requestedFile.extension.lowercase(Locale.ROOT)
+                                            ) ?: "application/octet-stream"
+                                    }
+                                    WebResourceResponse(
+                                        mime, if (mime.startsWith("text/")) "UTF-8" else null,
+                                        requestedFile.inputStream()
+                                    )
+                                } catch (error: Exception) {
+                                    Log.error(
+                                        "[ASTRYX WebView] Offline asset could not be read: " +
+                                            "${requestedFile.name}: ${error.message}"
+                                    )
+                                    WebResourceResponse(
+                                        "text/plain", "UTF-8", 404, "Not Found",
+                                        emptyMap(), ByteArrayInputStream(ByteArray(0))
+                                    )
+                                }
+                            }
+                        }
+                    )
+                    .build()
                 browser.settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
                     // Offline game HTML may need to autoplay an embedded introduction.
                     mediaPlaybackRequiresUserGesture = false
-                    allowFileAccess = true
+                    allowFileAccess = false
                     allowContentAccess = false
                     blockNetworkLoads = true
                     @Suppress("DEPRECATION")
@@ -122,7 +176,7 @@ object WebBrowser {
                     WebViewFeature.DOCUMENT_START_SCRIPT
                 )
                 if (hasDocumentStart) {
-                    WebViewCompat.addDocumentStartJavaScript(browser, nxBootstrap, setOf("*"))
+                    WebViewCompat.addDocumentStartJavaScript(browser, nxBootstrap, setOf("https://$offlineHost"))
                     Log.info("[ASTRYX WebView] window.nx bootstrap registered at document start")
                 } else {
                     Log.error("[ASTRYX WebView] document-start JS not supported; using late shim")
@@ -173,6 +227,20 @@ object WebBrowser {
 
                 var loggedResourceErrors = 0
                 browser.webViewClient = object : WebViewClient() {
+                    override fun shouldInterceptRequest(
+                        view: WebView?, request: WebResourceRequest?
+                    ): WebResourceResponse? {
+                        val target = request?.url ?: return null
+                        return if (target.scheme == "https" &&
+                            target.host == offlineHost &&
+                            target.path?.startsWith(offlinePrefix) == true
+                        ) {
+                            offlineLoader.shouldInterceptRequest(target)
+                        } else {
+                            null // Networking and file:// remain disabled in WebSettings.
+                        }
+                    }
+
                     override fun onPageFinished(view: WebView?, finishedUrl: String?) {
                         Log.info("[ASTRYX WebView] HTML main page loaded")
                         if (!hasDocumentStart) view?.evaluateJavascript(nxBootstrap, null)
@@ -204,13 +272,9 @@ object WebBrowser {
                         view: WebView?, request: WebResourceRequest?
                     ): Boolean {
                         val target = request?.url ?: return true
-                        if (target.scheme == "file") {
-                            val targetFile = runCatching {
-                                File(target.path.orEmpty()).canonicalFile
-                            }.getOrNull() ?: return true
-                            return !targetFile.path.startsWith(
-                                allowed.path + File.separator
-                            )
+                        if (target.scheme == "https" && target.host == offlineHost &&
+                            target.path?.startsWith(offlinePrefix) == true) {
+                            return false
                         }
                         if (target.scheme in listOf("applet", "nx") ||
                             (target.scheme in listOf("http", "https") &&
@@ -235,7 +299,11 @@ object WebBrowser {
                 val suffix = url.substringAfter('?', "").let {
                     if (it.isEmpty()) "" else "?$it"
                 }
-                browser.loadUrl(Uri.fromFile(document).toString() + suffix)
+                val relativeUrl = document.relativeTo(allowed).path
+                    .replace(File.separatorChar, '/')
+                    .split('/')
+                    .joinToString("/") { Uri.encode(it) }
+                browser.loadUrl("https://$offlineHost$offlinePrefix$relativeUrl$suffix")
                 Log.info("[ASTRYX WebView] Opened local Ni no Kuni HTML")
             } catch (error: Exception) {
                 Log.error("[ASTRYX WebView] Failed: ${error.message}")
