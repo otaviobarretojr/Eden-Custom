@@ -158,6 +158,11 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
     private var isQuickSettingsMenuOpen = false
     private val quickSettings = QuickSettings(this)
     private val niNoKuniPerformanceMenuId = View.generateViewId()
+    private var niNoKuniFpsSamples = 0
+    private var niNoKuniFpsSum = 0.0
+    private var niNoKuniFpsMin = Double.POSITIVE_INFINITY
+    private var niNoKuniFpsMax = 0.0
+    private var niNoKuniFpsWindowStart = 0L
 
     private val loadAmiiboLauncher =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -1625,6 +1630,40 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
 
                     val perfStats = NativeLibrary.getPerfStats()
                     val actualFps = perfStats[FPS]
+
+                    // Measure *rendered* FPS, never interpolated output.
+                    // Only sample while the existing FPS overlay is enabled;
+                    // aggregate in ten-second windows to avoid log overhead.
+                    if (NiNoKuniPerformanceProfile.supports(game)) {
+                        val fps = actualFps.toDouble()
+                        if (fps.isFinite() && fps > 0.0 && fps < 500.0) {
+                            val now = SystemClock.elapsedRealtime()
+                            if (niNoKuniFpsWindowStart == 0L) {
+                                niNoKuniFpsWindowStart = now
+                            }
+                            niNoKuniFpsSamples++
+                            niNoKuniFpsSum += fps
+                            niNoKuniFpsMin = minOf(niNoKuniFpsMin, fps)
+                            niNoKuniFpsMax = maxOf(niNoKuniFpsMax, fps)
+                            if (now - niNoKuniFpsWindowStart >= 10000L) {
+                                Log.info(
+                                    "[ASTRYX Native FPS] title=0100E5600D446000 " +
+                                        "profile=" +
+                                        NiNoKuniPerformanceProfile.current(requireContext()) +
+                                        " samples=" + niNoKuniFpsSamples +
+                                        " avg=" + String.format("%.2f", niNoKuniFpsSum / niNoKuniFpsSamples) +
+                                        " min=" + String.format("%.2f", niNoKuniFpsMin) +
+                                        " max=" + String.format("%.2f", niNoKuniFpsMax) +
+                                        " frame_gen=off_or_unavailable"
+                                )
+                                niNoKuniFpsSamples = 0
+                                niNoKuniFpsSum = 0.0
+                                niNoKuniFpsMin = Double.POSITIVE_INFINITY
+                                niNoKuniFpsMax = 0.0
+                                niNoKuniFpsWindowStart = now
+                            }
+                        }
+                    }
 
                     if (BooleanSetting.SHOW_FPS.getBoolean(needsGlobal)) {
                         var fpsText = String.format("FPS: %.1f", actualFps)
