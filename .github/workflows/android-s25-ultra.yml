@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden S25 Ultra contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: ASTRYX Ni no Kuni Native FPS Stability V16
+name: ASTRYX Ni no Kuni Save WebView HTM Fix V17
 
 on:
   workflow_dispatch:
@@ -23,6 +23,7 @@ on:
       - fix/astryx-ni-no-kuni-v14-virtual-vfs3-menu-override
       - fix/astryx-ni-no-kuni-v15-vfs3-ptbr-batch
       - perf/astryx-v16-ni-no-kuni-native-fps-profile
+      - fix/astryx-v17-ni-no-kuni-save-htm-webview
 
 concurrency:
   group: astryx-ni-no-kuni-applet-${{ github.ref }}
@@ -210,6 +211,25 @@ jobs:
           if grep -Fq 'Intent.createChooser(intent, getText(R.string.share_log))' "$SETTINGS" ||
              grep -Fq 'Intent.createChooser(intent, getText(R.string.share_gpu_log))' "$SETTINGS"; then
             echo "Legacy Android sharesheet still used for logs"; exit 1
+          fi
+
+      - name: Regression check Ni no Kuni s.htm save applet
+        run: |
+          set -euo pipefail
+          WEB="src/android/app/src/main/java/org/yuzu/yuzu_emu/applets/web/WebBrowser.kt"
+          NATIVE="src/common/android/applets/web_browser.cpp"
+          # Regression: the game calls its offline web applet with s.htdocs/s.htm.
+          # The old gate only admitted .html, leaving the page invisible.
+          grep -Fq 'document.extension.equals("htm", true)' "$WEB"
+          grep -Fq 'document.extension.equals("html", true)' "$WEB"
+          grep -Fq 'val insideGameCache = document.path.startsWith(allowed.path + File.separator)' "$WEB"
+          grep -Fq 'if (!insideGameCache || !document.isFile || !supportedDocument)' "$WEB"
+          grep -Fq 'blockNetworkLoads = true' "$WEB"
+          grep -Fq 'Valid Ni no Kuni offline HTML' "$WEB"
+          grep -Fq 'ExtractOfflineRomFS();' "$NATIVE" || grep -Fq 'extract_romfs_callback();' "$NATIVE"
+          if grep -Fq '!document.extension.equals("html", true))' "$WEB"; then
+            echo 'ERROR: legacy .html-only gate still rejects Ni no Kuni s.htm'
+            exit 1
           fi
 
       - name: Verify Ni no Kuni explicit EULA input and completion
@@ -408,7 +428,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ASTRYX-v16-NiNoKuni-Native-FPS-Stability-APK
+          name: ASTRYX-v17-NiNoKuni-Save-WebView-HTM-Fix-APK
           path: src/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: error
           retention-days: 14
