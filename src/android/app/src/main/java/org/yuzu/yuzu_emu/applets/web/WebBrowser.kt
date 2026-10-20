@@ -96,11 +96,25 @@ object WebBrowser {
         ).canonicalFile
         val document = runCatching { File(url.substringBefore('?')).canonicalFile }
             .getOrNull() ?: return null
-        if (!document.path.startsWith(allowed.path + File.separator) ||
-            !document.isFile || !document.extension.equals("html", true)) {
-            Log.error("[ASTRYX WebView] Rejected missing or out-of-scope offline document")
+        // The game's offline applet uses s.htdocs/s.htm (not s.html).
+        // V16 rejected every such request before opening the save dialog.
+        // Keep the canonical-path sandbox intact; admit only HTML documents.
+        val insideGameCache = document.path.startsWith(allowed.path + File.separator)
+        val supportedDocument = document.extension.equals("html", true) ||
+            document.extension.equals("htm", true)
+        if (!insideGameCache || !document.isFile || !supportedDocument) {
+            Log.error(
+                "[ASTRYX WebView] Rejected offline document: " +
+                    "insideGameCache=$insideGameCache " +
+                    "exists=${document.isFile} " +
+                    "extension=${document.extension.take(8)}"
+            )
             return null
         }
+        Log.info(
+            "[ASTRYX WebView] Valid Ni no Kuni offline HTML " +
+                "document=${document.name}, opening game applet"
+        )
 
         val outcome = AtomicReference<String?>(null)
         val completion = CountDownLatch(1)
