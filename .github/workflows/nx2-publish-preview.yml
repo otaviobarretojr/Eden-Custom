@@ -1,0 +1,84 @@
+name: Publish NX2 Win64 pre-release
+on:
+  push:
+    branches:
+      - nx2-zen3-5060ti
+    paths:
+      - ".github/workflows/nx2-publish-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    name: Publish verified portable emulator package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Download successfully compiled Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Eden-Custom-NX2-Zen3-RTX5060Ti-Win64
+          run-id: 41356386152
+          github-token: ${{ github.token }}
+          path: package
+
+      - name: Check artifact contents, create ZIP and SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s package/eglantine.exe
+          test -s package/eden-cli.exe
+          test -s package/VERSION-CUSTOM.txt
+          grep -F '1dd40d86df4bca1b68700091fe5ddb71a13162b2' package/VERSION-CUSTOM.txt
+          (cd package && zip -q -r -9 ../Eden-Custom-NX2-Zen3-RTX5060Ti-Windows-x64.zip .)
+          sha256sum Eden-Custom-NX2-Zen3-RTX5060Ti-Windows-x64.zip > Eden-Custom-NX2-Zen3-RTX5060Ti-Windows-x64.zip.sha256
+          cat Eden-Custom-NX2-Zen3-RTX5060Ti-Windows-x64.zip.sha256
+
+      - name: Publish experimental GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='nx2-zen3-preview-2026-11-01'
+          cat > RELEASE-NOTES.md <<'EOF'
+          ## Eden Custom NX2 — Ryzen 5600X / RTX 5060 Ti (experimental)
+
+          Native Windows x64 emulator build, **not a profile manager or launcher**.
+          Compiled successfully with MSVC Release and AVX2; the extracted Windows PE64
+          binaries and CLI launch were checked by an independent GitHub Actions job.
+
+          ### C++ core changes
+          - GPU split ring publication batch 4096 -> 2048 words (experimental).
+          - Skip expensive debug-only GPU ownership tracking during ordinary execution.
+          - Base: PokeDinner/Eglantine, commit `1dd40d86df4bca1b68700091fe5ddb71a13162b2`.
+          - Patch source: `tools/nx2/apply_core_patch.py` in branch `nx2-zen3-5060ti`.
+          - Corresponding upstream source: https://git.eden-emu.dev/Franseven/PokeDinner-a-Eglantine-Fork
+
+          ### Installation
+          Unzip into a new folder. Launch `eglantine.exe`.
+          Keep the previous emulator installation and back up saves/configuration.
+          This release includes **no games, keys or console firmware**.
+
+          ### Verification scope and known limits
+          Build and packaging: passed. Win64 PE structure and CLI process startup: passed.
+          RTX 5060 Ti Vulkan execution, game compatibility, FPS, 1% lows and saves:
+          **not yet measured**. A boost in performance is not guaranteed.
+          Software provided as-is, experimental GPL software.
+          EOF
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists; not replacing existing assets."
+            gh release view "$tag" --json url -q .url
+          else
+            gh release create "$tag" \
+              Eden-Custom-NX2-Zen3-RTX5060Ti-Windows-x64.zip \
+              Eden-Custom-NX2-Zen3-RTX5060Ti-Windows-x64.zip.sha256 \
+              --target 133d44dee9fddae47f176c20f6a500a1f7f238c8 \
+              --title "Eden Custom NX2 - Ryzen 5600X / RTX 5060 Ti (preview)" \
+              --notes-file RELEASE-NOTES.md \
+              --prerelease
+          fi
