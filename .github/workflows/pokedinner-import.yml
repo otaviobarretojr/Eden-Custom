@@ -1,0 +1,88 @@
+name: Import PokeDinner source (one-time)
+on:
+  push:
+    branches: [master]
+    paths: ['.github/workflows/pokedinner-import.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify backup and original branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin backup/eden-custom-before-pokedinner-2026-11-01
+          expected=74b5e10dc553bb24ccb3460529b15b3c3198bb10
+          test "$(git rev-parse FETCH_HEAD)" = "$expected"
+          git fetch origin master
+          test "$(git rev-parse origin/master^)" = "$expected"
+      - name: Clone upstream PokeDinner
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --single-branch --branch master https://git.eden-emu.dev/Franseven/PokeDinner-a-Eglantine-Fork.git /tmp/pokedinner-upstream
+          test -f /tmp/pokedinner-upstream/LICENSE.txt
+          test -f /tmp/pokedinner-upstream/NX2_GPU_THREAD_SPLIT.md
+      - name: Import snapshot to independent PC branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream_sha=$(git -C /tmp/pokedinner-upstream rev-parse HEAD)
+          git checkout -B pokedinner-pc-5600x-5060ti origin/master
+          git rm -r -q --ignore-unmatch .
+          rsync -a --exclude='.git/' /tmp/pokedinner-upstream/ ./
+          mkdir -p docs/pc-custom profiles/pc-custom
+          cat > docs/pc-custom/README.md << 'PC_DOC'
+          # PokeDinner PC Custom — Ryzen 5 5600X + RTX 5060 Ti 16 GB
+          
+          Windows 11 x64; 32 GB RAM. Experiment only; no FPS gains verified.
+          
+          This branch imports a source snapshot from upstream Forgejo. 
+          The old Eden project is preserved at branch:
+          backup/eden-custom-before-pokedinner-2026-11-01
+          
+          Source revisions are tracked in UPSTREAM-COMMIT.txt. The original 
+          Forgejo commit history is not reproduced in this snapshot.
+          
+          Initial roadmap:
+          1. Build unmodified Windows Release from imported source.
+          2. Measure three runs per experiment, same scene and drivers.
+          3. Compare GPU split defaults vs EDEN_NX2_SPLIT=0 and value 2.
+          4. Inspect Vulkan frame waits, shader cache and VRAM allocation.
+          5. Compare AVX2 and general MSVC Release builds, never assume a gain.
+          6. Keep changes only if frametime improves without corruption.
+          
+          No copyrighted game images, console keys, or firmware are included.
+          PC_DOC
+          cat > profiles/pc-custom/default.txt << 'PC_DEFAULT'
+          # Baseline: use original PokeDinner defaults; no overrides.
+          PC_DEFAULT
+          cat > profiles/pc-custom/gpu-split-off.txt << 'PC_OFF'
+          # Experimental A/B comparison against default.
+          EDEN_NX2_SPLIT=0
+          PC_OFF
+          cat > profiles/pc-custom/gpu-split-2.txt << 'PC_SPLIT'
+          # Experimental A/B comparison against default.
+          EDEN_NX2_SPLIT=2
+          PC_SPLIT
+          cat > UPSTREAM-COMMIT.txt << EOF
+          Source: https://git.eden-emu.dev/Franseven/PokeDinner-a-Eglantine-Fork
+          Branch: master
+          Snapshot commit: $upstream_sha
+          Old Eden backup: backup/eden-custom-before-pokedinner-2026-11-01
+          Original source commit history not preserved: shallow source snapshot.
+          EOF
+          git add -A
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Import PokeDinner source and PC custom A/B profile baseline'
+          git push origin HEAD:refs/heads/pokedinner-pc-5600x-5060ti
