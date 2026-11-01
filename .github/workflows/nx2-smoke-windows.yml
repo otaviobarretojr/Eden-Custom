@@ -1,0 +1,88 @@
+name: NX2 Windows package smoke test
+on:
+  push:
+    branches:
+      - nx2-zen3-5060ti
+    paths:
+      - ".github/workflows/nx2-smoke-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  smoke:
+    name: Validate packaged Windows x64 emulator
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - name: Download compiled package (already built; no rebuild)
+        uses: actions/download-artifact@v4
+        with:
+          name: Eden-Custom-NX2-Zen3-RTX5060Ti-Win64
+          run-id: 41356386152
+          github-token: ${{ github.token }}
+          path: package
+
+      - name: Inspect PE64 executables and package metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = (Resolve-Path package).Path
+          $executables = @('eglantine.exe', 'eden-cli.exe')
+          foreach ($name in $executables) {
+            $path = Join-Path $root $name
+            if (!(Test-Path $path)) { throw "Missing executable: $path" }
+            $stream = [System.IO.File]::OpenRead($path)
+            try {
+              $r = [System.IO.BinaryReader]::new($stream)
+              if ($r.ReadUInt16() -ne 0x5A4D) { throw "$name is not a PE (MZ) executable" }
+              $stream.Position = 0x3c
+              $peOffset = $r.ReadInt32()
+              if ($peOffset -lt 64 -or $peOffset -gt 4096) { throw "$name has invalid PE offset" }
+              $stream.Position = $peOffset
+              if ($r.ReadUInt32() -ne 0x00004550) { throw "$name missing PE signature" }
+              if ($r.ReadUInt16() -ne 0x8664) { throw "$name is not x64 (AMD64)" }
+              $stream.Position = $peOffset + 24
+              if ($r.ReadUInt16() -ne 0x20b) { throw "$name is not a PE32+ binary" }
+            } finally { $stream.Dispose() }
+            $hash = (Get-FileHash -Algorithm SHA256 $path).Hash
+            Write-Host "$name PE32+ AMD64 OK SHA256=$hash"
+          }
+          $manifest = Join-Path $root 'VERSION-CUSTOM.txt'
+          if (!(Test-Path $manifest)) { throw "Missing custom build metadata" }
+          Get-Content $manifest
+          $dllCount = (Get-ChildItem $root -Recurse -Filter '*.dll' -File | Measure-Object).Count
+          if ($dllCount -lt 3) { throw "Very few DLLs ($dllCount) in deployed package" }
+          Write-Host "DLLs packaged: $dllCount"
+
+      - name: Start CLI without commercial games or keys
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:SDL_VIDEODRIVER = 'dummy'
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $root = (Resolve-Path package).Path
+          $cli = Join-Path $root 'eden-cli.exe'
+          $p = Start-Process -FilePath $cli -ArgumentList '--help' -WorkingDirectory $root -PassThru -NoNewWindow
+          try {
+            if (!$p.WaitForExit(20000)) {
+              throw "CLI did not terminate from --help within 20 seconds"
+            }
+            Write-Host "CLI exit code: $($p.ExitCode)"
+            # '--help' varies by frontend; non-zero 1 is accepted as usage output,
+            # but Windows NTSTATUS loader crashes or access violations are rejected.
+            if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 1) {
+              throw "CLI start failed: exit code $($p.ExitCode)"
+            }
+          } finally {
+            if (!$p.HasExited) { $p.Kill(); $p.WaitForExit() }
+          }
+          Write-Host "CLI executable started and exited (no games or keys loaded)."
+
+      - name: Report scope
+        shell: pwsh
+        run: |
+          Write-Host "PASS: packaged executables are Windows PE64 and CLI starts."
+          Write-Host "NOT VALIDATED: GUI rendering, Vulkan on RTX 5060 Ti, gameplay, FPS, saves and compatibility."
