@@ -1,0 +1,126 @@
+name: Eden Custom NX2 - Zen3 Windows
+on:
+  push:
+    branches:
+      - nx2-zen3-5060ti
+    paths:
+      - ".github/workflows/nx2-custom-windows.yml"
+      - "tools/nx2/**"
+      - "NX2-ZEN3-README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nx2-zen3-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Compile patched NX2 emulator for Ryzen 5600X
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - name: Check out custom source patches
+        uses: actions/checkout@v4
+
+      - name: Clone audited NX2 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --single-branch --branch master --depth 100 \
+            https://git.eden-emu.dev/Franseven/PokeDinner-a-Eglantine-Fork.git source
+          git -C source checkout --detach 1dd40d86df4bca1b68700091fe5ddb71a13162b2
+          echo "Upstream SHA: $(git -C source rev-parse HEAD)"
+
+      - name: Apply real C++ GPU-core changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/nx2/apply_core_patch.py --root source
+          git -C source diff --check
+          git -C source diff -- src/video_core/gpu_split.cpp
+
+      - name: Initialize MSVC (64-bit)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.3"
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: qtcharts
+          cache: true
+
+      - name: Install Vulkan SDK
+        working-directory: source
+        shell: pwsh
+        run: ./tools/windows/install-vulkan-sdk.ps1
+
+      - name: Validate Vulkan toolchain
+        shell: pwsh
+        run: glslangValidator --version
+
+      - name: Cache CMake dependencies
+        uses: actions/cache@v4
+        with:
+          path: source/.cache/cpm
+          key: nx2-zen3-cpm-${{ runner.os }}-1dd40d86df
+
+      - name: Configure Release for Ryzen Zen3 (AVX2)
+        working-directory: source
+        shell: bash
+        run: >-
+          cmake -S . -B build/release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_FLAGS="/arch:AVX2"
+          -DCMAKE_CXX_FLAGS="/arch:AVX2"
+          -DBUILD_TESTING=OFF
+          -DYUZU_TESTS=OFF
+          -DYUZU_CMD=ON
+          -DYUZU_ROOM=OFF
+          -DYUZU_ROOM_STANDALONE=OFF
+          -DYUZU_USE_BUNDLED_QT=OFF
+          -DYUZU_USE_BUNDLED_SDL3=ON
+          -DENABLE_UPDATE_CHECKER=OFF
+          -DUSE_DISCORD_PRESENCE=OFF
+
+      - name: Compile customized emulator executables
+        working-directory: source
+        shell: bash
+        run: cmake --build build/release --target yuzu yuzu-cmd --parallel 4
+
+      - name: Package Windows application
+        working-directory: source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($exe in @('eglantine.exe', 'eden-cli.exe')) {
+            if (!(Test-Path "build/release/bin/$exe")) {
+              throw "Missing compiled binary: $exe"
+            }
+          }
+          windeployqt --release --no-translations build/release/bin/eglantine.exe
+          Copy-Item LICENSE.txt build/release/bin/LICENSE.txt
+          $sourceSha = git rev-parse HEAD
+          @"
+          Name: Eden Custom NX2 - Zen3 RTX5060Ti
+          Compiled-source: PokeDinner Eglantine $sourceSha
+          CPU target: AMD Zen3 / Ryzen 5 5600X / AVX2
+          GPU target (to be runtime validated): NVIDIA RTX 5060 Ti 16 GB
+          C++ changes: tools/nx2/apply_core_patch.py in otaviobarretojr/Eden-Custom
+          Status: Experimental - compilation is not a game-compatibility guarantee.
+          "@ | Set-Content -Encoding utf8 build/release/bin/VERSION-CUSTOM.txt
+
+      - name: Upload complete custom emulator
+        uses: actions/upload-artifact@v4
+        with:
+          name: Eden-Custom-NX2-Zen3-RTX5060Ti-Win64
+          path: source/build/release/bin/
+          if-no-files-found: error
+          retention-days: 14
