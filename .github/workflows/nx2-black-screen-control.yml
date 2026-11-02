@@ -1,0 +1,134 @@
+name: NX2 - Black Screen Control Build (Original GPU Core)
+on:
+  push:
+    branches: [nx2-black-screen-recovery]
+    paths: ['.github/workflows/nx2-black-screen-control.yml', 'diagnostics/nx2/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nx2-black-screen-control-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Compile unpatched GPU core for controlled A/B test
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - name: Check out control-build workflow
+        uses: actions/checkout@v4
+
+      - name: Clone exactly the same Switch 2 source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --single-branch --branch master --depth 100 \
+            https://git.eden-emu.dev/Franseven/PokeDinner-a-Eglantine-Fork.git source
+          git -C source checkout --detach 1dd40d86df4bca1b68700091fe5ddb71a13162b2
+          test "$(git -C source rev-parse HEAD)" = "1dd40d86df4bca1b68700091fe5ddb71a13162b2"
+          echo "BASELINE: unmodified upstream gpu_split.cpp"
+          git -C source diff --exit-code
+
+      - name: Initialize MSVC (64-bit)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: qtcharts
+          cache: true
+
+      - name: Install Vulkan SDK
+        working-directory: source
+        shell: pwsh
+        run: ./tools/windows/install-vulkan-sdk.ps1
+
+      - name: Validate Vulkan SDK
+        shell: pwsh
+        run: glslangValidator --version
+
+      - name: Cache identical dependencies
+        uses: actions/cache@v4
+        with:
+          path: source/.cache/cpm
+          key: nx2-zen3-cpm-${{ runner.os }}-1dd40d86df
+
+      - name: Configure identical Release AVX2 build
+        working-directory: source
+        shell: bash
+        run: >-
+          cmake -S . -B build/release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_FLAGS="/arch:AVX2"
+          -DCMAKE_CXX_FLAGS="/arch:AVX2"
+          -DBUILD_TESTING=OFF
+          -DYUZU_TESTS=OFF
+          -DYUZU_CMD=ON
+          -DYUZU_ROOM=OFF
+          -DYUZU_ROOM_STANDALONE=OFF
+          -DYUZU_USE_BUNDLED_QT=OFF
+          -DYUZU_USE_BUNDLED_SDL3=ON
+          -DENABLE_UPDATE_CHECKER=OFF
+          -DUSE_DISCORD_PRESENCE=OFF
+
+      - name: Compile original GPU core
+        working-directory: source
+        shell: bash
+        run: cmake --build build/release --target yuzu yuzu-cmd --parallel 4
+
+      - name: Deploy and identify control binaries
+        working-directory: source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = "build/release/bin"
+          foreach ($exe in @("eglantine.exe", "eden-cli.exe")) {
+            $path = Join-Path $dir $exe
+            if (!(Test-Path $path)) { throw "Missing binary: $path" }
+            Write-Host "$exe SHA256: $((Get-FileHash -Path $path -Algorithm SHA256).Hash)"
+          }
+          windeployqt --release --no-translations (Join-Path $dir "eglantine.exe")
+          Copy-Item LICENSE.txt (Join-Path $dir "LICENSE.txt")
+          @"
+          NAME: Eden Custom NX2 - CONTROL: UNPATCHED GPU CORE
+          Upstream SHA: 1dd40d86df4bca1b68700091fe5ddb71a13162b2
+          CPU: MSVC x64 AVX2, same flags as customized Preview 01
+          DIFFERENCE FROM PREVIEW 01: all experimental gpu_split.cpp modifications are DISABLED.
+          DO NOT overwrite previous installation; test in a new folder.
+          Status: diagnostic baseline, no game compatibility measured.
+          "@ | Set-Content -Encoding UTF8 (Join-Path $dir "VERSION-CONTROL.txt")
+
+      - name: Run CLI smoke test without keys or game files
+        working-directory: source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:SDL_VIDEODRIVER = "dummy"
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $cli = (Resolve-Path "build/release/bin/eden-cli.exe").Path
+          $dir = (Resolve-Path "build/release/bin").Path
+          $p = Start-Process -FilePath $cli -ArgumentList '--help' -WorkingDirectory $dir -PassThru -NoNewWindow
+          try {
+            if (!$p.WaitForExit(20000)) { throw "CLI timeout" }
+            if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 1) { throw "CLI unexpected error code $($p.ExitCode)" }
+            Write-Host "CLI launched successfully. Exit: $($p.ExitCode)"
+          } finally {
+            if (!$p.HasExited) { $p.Kill(); $p.WaitForExit() }
+          }
+
+      - name: Upload control build for black-screen A/B
+        uses: actions/upload-artifact@v4
+        with:
+          name: Eden-NX2-BlackScreen-CONTROL-Unpatched-GPU-Win64
+          path: source/build/release/bin/
+          if-no-files-found: error
+          retention-days: 14
