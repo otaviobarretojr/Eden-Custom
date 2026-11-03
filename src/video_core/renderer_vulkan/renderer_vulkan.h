@@ -25,6 +25,7 @@
 #include "video_core/renderer_vulkan/vk_turbo_mode.h"
 #include "video_core/vulkan_common/vulkan_device.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
+#include "video_core/vulkan_common/streamline_runtime.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
 
 namespace Core::Memory {
@@ -81,6 +82,11 @@ private:
     Tegra::MaxwellDeviceMemoryManager& device_memory;
     Tegra::GPU& gpu;
 
+    // Streamline must initialize before the Vulkan loader/instance. Normal shutdown is
+    // explicit in RendererVulkan::~RendererVulkan() while Vulkan is still alive.
+    // If construction fails, C++ unwinds later Vulkan members first and destroys this
+    // runtime last; its destructor remains the constructor-failure fallback.
+    StreamlineRuntime streamline_runtime;
     std::shared_ptr<Common::DynamicLibrary> library;
     vk::InstanceDispatch dld;
 
@@ -104,6 +110,7 @@ private:
 #ifdef HAS_LSFG
     FrameGen frame_gen;
 #endif
+    u64 dlss_frame_index{};
     std::optional<TurboMode> turbo_mode;
 
     Frame applet_frame;

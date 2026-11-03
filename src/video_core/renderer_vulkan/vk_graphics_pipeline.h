@@ -95,6 +95,15 @@ public:
         return fragment_has_color0_output;
     }
 
+    [[nodiscard]] bool FragmentStoresColor(u32 index) const noexcept {
+        const auto& info = stage_infos[4];
+        return index < info.stores_frag_color.size() && info.stores_frag_color[index];
+    }
+
+    [[nodiscard]] u64 FragmentShaderHash() const noexcept {
+        return key.unique_hashes[5];
+    }
+
     bool UsesExtendedDynamicState() const noexcept {
         return key.state.extended_dynamic_state != 0;
     }

@@ -2975,6 +2975,12 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                                     ImageView* depth_buffer, bool is_rescaled_) {
     boost::container::small_vector<VkImageView, NUM_RT * 2 + 2> attachments;
     RenderPassKey renderpass_key{};
+
+    // A framebuffer can have sparse MRT slots. Keep explicit presence state so an
+    // absent slot never aliases the zero-initialized rt_map[slot] to images[0].
+    color_present.fill(false);
+    color_formats.fill(VK_FORMAT_UNDEFINED);
+    depth_format = VK_FORMAT_UNDEFINED;
     s32 num_layers = 1;
 
     is_rescaled = is_rescaled_;
@@ -2994,10 +3000,14 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                                               : color_buffer->size.height);
         attachments.push_back(color_buffer->RenderTarget());
         renderpass_key.color_formats[index] = color_buffer->format;
+        color_formats[index] = MaxwellToVK::SurfaceFormat(runtime.device, FormatType::Optimal,
+                                                            false, color_buffer->format).format;
         num_layers = (std::max)(num_layers, color_buffer->range.extent.layers);
         images[num_images] = color_buffer->ImageHandle();
+        image_views[num_images] = color_buffer->RenderTarget();
         image_ranges[num_images] = MakeSubresourceRange(color_buffer);
         rt_map[index] = num_images;
+        color_present[index] = true;
         samples = color_buffer->Samples();
         ++num_images;
     }
@@ -3011,8 +3021,11 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                                               : depth_buffer->size.height);
         attachments.push_back(depth_buffer->RenderTarget());
         renderpass_key.depth_format = depth_buffer->format;
+        depth_format = MaxwellToVK::SurfaceFormat(runtime.device, FormatType::Optimal, false,
+                                                   depth_buffer->format).format;
         num_layers = (std::max)(num_layers, depth_buffer->range.extent.layers);
         images[num_images] = depth_buffer->ImageHandle();
+        image_views[num_images] = depth_buffer->RenderTarget();
         const VkImageSubresourceRange subresource_range = MakeSubresourceRange(depth_buffer);
         image_ranges[num_images] = subresource_range;
         samples = depth_buffer->Samples();

@@ -24,6 +24,7 @@
 #include "video_core/gpu.h"
 #include "video_core/present.h"
 #include "video_core/renderer_vulkan/present/util.h"
+#include "video_core/renderer_vulkan/present/dlss_probe.h"
 #ifdef HAS_RESHADE
 #include "video_core/post_processing/fx_chain.h"
 #endif
@@ -128,6 +129,7 @@ try
     : RendererBase(emu_window, std::move(context_))
     , device_memory(device_memory_)
     , gpu(gpu_)
+    , streamline_runtime()
     , library(OpenLibrary(context.get()))
     , dld()
     // Create raw Vulkan instance first
@@ -181,6 +183,8 @@ try
 #endif
 {
 
+    streamline_runtime.BindVulkanDevice(instance, device);
+
     if (Settings::values.renderer_force_max_clock.GetValue() && device.ShouldBoostClocks()) {
         turbo_mode.emplace(instance, dld);
         scheduler.RegisterOnSubmit([this] { turbo_mode->QueueSubmitted(); });
@@ -191,6 +195,12 @@ try
 #endif
 
     Report();
+    const auto dlss_probe = ProbeDlssSupport(device);
+    if (dlss_probe.streamline_runtime_present) {
+        LOG_INFO(Render_Vulkan, "DLSS probe: {}", dlss_probe.reason);
+    } else {
+        LOG_DEBUG(Render_Vulkan, "DLSS probe: {}", dlss_probe.reason);
+    }
 } catch (const vk::Exception& exception) {
     LOG_ERROR(Render_Vulkan, "Vulkan initialization failed with error: {}", exception.what());
     throw std::runtime_error{fmt::format("Vulkan initialization error {}", exception.what())};
@@ -199,9 +209,31 @@ try
 RendererVulkan::~RendererVulkan() {
     scheduler.RegisterOnSubmit([] {});
     void(device.GetLogical().WaitIdle());
+
+    // Streamline must shut down while the Vulkan device and instance are still alive.
+    streamline_runtime.Shutdown();
 }
 
 void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebuffers) {
+    rasterizer.SetDlssSemanticTitleId(Settings::GetCurrentProgramID());
+    rasterizer.TrackDlssTemporalCandidates(++dlss_frame_index);
+    const auto dlss_snapshot = rasterizer.CaptureDlssTemporalSnapshot(dlss_frame_index);
+    if (dlss_snapshot.motion_confidence == DlssMotionConfidence::Candidate &&
+        dlss_frame_index % 120 == 0) {
+        LOG_DEBUG(Render_Vulkan,
+                  "DLSS temporal diagnostic: frame={} extent={}x{} motion_slot={} format={} "
+                  "resource_persistence={} producer_hash={:016x} producer_persistence={} "
+                  "shader_writes_slot={} producer_stable={} semantic={} confidence=candidate",
+                  dlss_snapshot.frame_index, dlss_snapshot.render_extent.width,
+                  dlss_snapshot.render_extent.height, dlss_snapshot.motion_candidate_slot,
+                  static_cast<int>(dlss_snapshot.motion_candidate_format),
+                  dlss_snapshot.motion_candidate_persistence,
+                  dlss_snapshot.motion_fragment_shader_hash,
+                  dlss_snapshot.motion_producer_persistence,
+                  dlss_snapshot.motion_fragment_shader_writes_slot,
+                  dlss_snapshot.motion_producer_stable,
+                  dlss_snapshot.motion_semantic_evidence);
+    }
     SCOPE_EXIT {
         render_window.OnFrameDisplayed();
     };
@@ -219,6 +251,26 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
     blit_swapchain.DrawToFrame(device, rasterizer, frame, framebuffers,
                                render_window.GetFramebufferLayout(), swapchain.GetImageCount(),
                                swapchain.GetImageViewFormat());
+
+    const auto dlss_color_out = MakeDlssPresentationOutput(
+        *frame->image, *frame->image_view, frame->format,
+        VkExtent2D{frame->width, frame->height}, frame->layout);
+    const auto dlss_inputs = MakeDlssTemporalInputs(dlss_snapshot, dlss_color_out);
+    const auto dlss_tag_plan = dlss_inputs.BuildTagPlan();
+    const auto dlss_resource_plan = BuildDlssVulkanResourcePlan(dlss_inputs);
+    if (!dlss_color_out.IsValid()) {
+        LOG_DEBUG(Render_Vulkan, "DLSS presentation output metadata is not ready");
+    } else if (!dlss_tag_plan.IsReady() && dlss_frame_index % 120 == 0) {
+        LOG_DEBUG(Render_Vulkan,
+                  "DLSS temporal gate remains closed: frame={} readiness={} title_id={:016x} "
+                  "motion_confidence={} temporal_profile_valid={}",
+                  dlss_frame_index, static_cast<int>(dlss_tag_plan.readiness),
+                  dlss_snapshot.title_id, static_cast<int>(dlss_snapshot.motion_confidence),
+                  dlss_snapshot.temporal_profile_valid);
+    } else if (dlss_tag_plan.IsReady() && !dlss_resource_plan.IsReady()) {
+        LOG_ERROR(Render_Vulkan,
+                  "DLSS resource plan rejected metadata after temporal gate; evaluation remains disabled");
+    }
 
 #ifdef HAS_LSFG
     void(frame_gen.WantedGenerations(present_manager.MaxExtraFrames()));

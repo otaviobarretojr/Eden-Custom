@@ -87,6 +87,33 @@ cmake_dependent_option(ENABLE_LSFG "Enable Lossless Scaling frame generation" ON
 
 option(ENABLE_RESHADE "Enable ReShade FX post-processing effects" ON)
 
+# NVIDIA Streamline / DLSS integration for the post-v0.8 Windows update.
+# Kept opt-in until the SDK runtime, signature validation and Vulkan resource tagging are complete.
+cmake_dependent_option(ENABLE_NVIDIA_STREAMLINE "Enable experimental NVIDIA Streamline/DLSS integration" OFF "WIN32 AND ARCHITECTURE_x86_64" OFF)
+set(STREAMLINE_SDK_ROOT "" CACHE PATH "Path to an NVIDIA Streamline SDK checkout/package")
+set(NVIDIA_STREAMLINE_APPLICATION_ID "0" CACHE STRING "NVIDIA-provided Streamline/NGX application ID; 0 keeps DLSS unavailable")
+if (ENABLE_NVIDIA_STREAMLINE)
+    if (NOT EXISTS "${STREAMLINE_SDK_ROOT}/include/sl.h")
+        message(FATAL_ERROR "ENABLE_NVIDIA_STREAMLINE requires STREAMLINE_SDK_ROOT with include/sl.h")
+    endif()
+    if (NOT EXISTS "${STREAMLINE_SDK_ROOT}/lib/x64/sl.interposer.lib")
+        message(FATAL_ERROR "ENABLE_NVIDIA_STREAMLINE requires lib/x64/sl.interposer.lib")
+    endif()
+    if (NOT EXISTS "${STREAMLINE_SDK_ROOT}/bin/x64/sl.interposer.dll")
+        message(FATAL_ERROR "ENABLE_NVIDIA_STREAMLINE requires bin/x64/sl.interposer.dll")
+    endif()
+    add_compile_definitions(HAS_NVIDIA_STREAMLINE)
+    if (NVIDIA_STREAMLINE_APPLICATION_ID MATCHES "^[1-9][0-9]*$")
+        add_compile_definitions(NVIDIA_STREAMLINE_APPLICATION_ID=${NVIDIA_STREAMLINE_APPLICATION_ID})
+        message(STATUS "NVIDIA Streamline application identity configured")
+    else()
+        add_compile_definitions(NVIDIA_STREAMLINE_APPLICATION_ID=0)
+        message(WARNING "No NVIDIA-provided Streamline application ID configured; DLSS feature loading remains disabled")
+    endif()
+    include_directories(SYSTEM "${STREAMLINE_SDK_ROOT}/include")
+    message(STATUS "Experimental NVIDIA Streamline integration enabled")
+endif()
+
 # non-linux bundled qt are static
 if (YUZU_USE_BUNDLED_QT AND (APPLE OR NOT UNIX))
     set(YUZU_STATIC_BUILD ON)
